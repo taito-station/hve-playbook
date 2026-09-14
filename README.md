@@ -66,6 +66,10 @@ cp -r hve-playbook/ my-project/.claude/
 5. **出力品質基準** — 日本語、見出し+箇条書き、出典付き
 6. **成果物管理** — ファイル配置・更新ポリシー
 
+## 使い方の詳細
+
+プロジェクトへの組み込み方やワークフロー実行のプロンプト例は [docs/usage-prompts.md](docs/usage-prompts.md) を参照。
+
 ## ライセンス
 
 MIT License. See [LICENSE](LICENSE).
