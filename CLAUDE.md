@@ -12,8 +12,7 @@ HypervelocityEngineering (HVE) の設計手法を Claude Code ネイティブで
 ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細設計)
 ```
 
-各ワークフローは `/hve-ard`, `/hve-aas`, `/hve-aad-web` スキルで実行する。
-フルパイプラインは `/hve-full-pipeline` で一括実行可能。
+各ワークフローは `/hve-ard`, `/hve-aas`, `/hve-aad-web` スキルで順次実行する。
 
 ## 出力ディレクトリ構造
 
