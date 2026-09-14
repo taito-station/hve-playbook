@@ -44,8 +44,7 @@ ARD にはこのほか任意パラメータがある（`include_kpi_okr`, `attac
 ```
 このプロジェクトに HVE 設計手法を導入したい。
 
-1. hve-playbook を .claude/ として配置してください
-   git clone https://github.com/taito-station/hve-playbook.git .claude
+1. hve-playbook を .claude/ として配置してください（cp -r でコピー、または git clone 後に .claude/.git/ を削除）
 2. .gitignore に .claude/ を追加するかどうかは聞いてください
 
 対象企業: {企業名}
@@ -128,10 +127,10 @@ AAS 完了後に実行する。`docs/catalog/` 配下に AAS の成果物が揃�
 /hve-aad-web
 ```
 
-### フルパイプライン（ARD → AAS → AAD-WEB 連続実行）
+### フルパイプライン（ARD → AAS → AAD-WEB 順次実行）
 
-3 フェーズを連続実行する。`workflows/hve-design-pipeline.js` にパイプライン定義がある。
-各フェーズ完了後に次のスキルを手動で起動する運用が基本。
+3 フェーズを順次実行する。`workflows/hve-design-pipeline.js` にパイプライン定義がある。
+各フェーズ完了後に次のスキルを手動で起動する。
 
 ```
 /hve-ard
