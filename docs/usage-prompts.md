@@ -15,8 +15,9 @@ Claude Code セッション内でコピー&ペーストして使う。
 セットアップ手順:
 1. プロジェクトディレクトリを作成
 2. git init
-3. hve-playbook を .claude/ として配置（git clone https://github.com/taito-station/hve-playbook.git .claude）
-4. docs/ ディレクトリを作成
+3. hve-playbook を .claude/ として配置（cp -r でコピー、または git clone 後に .claude/.git/ を削除）
+4. .gitignore に .claude/ を追加するかどうかは聞いてください
+5. docs/ ディレクトリを作成
 
 対象企業: {企業名}
 対象事業: {事業名または「全事業を俯瞰」}
@@ -31,6 +32,8 @@ Claude Code セッション内でコピー&ペーストして使う。
 | `{プロジェクト名}` | プロジェクトのディレクトリ名 | `my-saas-app` |
 | `{企業名}` | ARD の分析対象企業 | `株式会社〇〇` |
 | `{事業名}` | 特定事業に絞る場合に指定。省略時は事業ポートフォリオ全体を分析 | `EC事業部の受注管理業務` |
+
+ARD にはこのほか任意パラメータがある（`include_kpi_okr`, `attached_docs`, `survey_base_date`, `survey_period_years`, `target_region`, `analysis_purpose`）。詳細は `skills/hve-ard/SKILL.md` のパラメータ表を参照。
 
 ---
 
@@ -70,7 +73,7 @@ HVE の設計手法（hve-playbook）を既存設定とマージして追加し�
    - skills/hve-qa/      → .claude/skills/hve-qa/
    - agents/hve-*.md     → .claude/agents/
    - workflows/hve-*.js  → .claude/workflows/
-3. CLAUDE.md に HVE の出力ディレクトリ構造と規律セクションを追記（既存内容は残す）
+3. playbook の CLAUDE.md から「## 出力ディレクトリ構造」「## 規律の優先順位」「## 出力言語」「## 成果物の完了基準」を既存 CLAUDE.md に追記（既存内容は残す）
 4. 一時ディレクトリを削除
 5. 変更内容を見せてください
 ```
@@ -108,7 +111,10 @@ HVE の設計手法（hve-playbook）を既存設定とマージして追加し�
 
 ### AAS（アーキテクチャ設計）
 
-ARD 完了後に実行する。`docs/catalog/app-catalog.md` が存在していることが前提。
+ARD 完了後に実行する。以下が存在していることが前提。
+- `docs/catalog/app-catalog.md`
+- `docs/catalog/use-case-catalog.md`
+- `docs/architectural-requirements-app-*.md`
 
 ```
 /hve-aas
@@ -122,16 +128,28 @@ AAS 完了後に実行する。`docs/catalog/` 配下に AAS の成果物が揃�
 /hve-aad-web
 ```
 
-### フルパイプライン（ARD → AAS → AAD-WEB 一括）
+### フルパイプライン（ARD → AAS → AAD-WEB 連続実行）
 
-3 フェーズを連続実行する。途中で QA 質問票が生成された場合は回答が必要。
+3 フェーズを連続実行する。`workflows/hve-design-pipeline.js` にパイプライン定義がある。
+各フェーズ完了後に次のスキルを手動で起動する運用が基本。
 
 ```
-/hve-ard から始めて、ARD → AAS → AAD-WEB を順に実行してください。
-各フェーズ間で成果物の存在を確認し、不足があれば報告してください。
+/hve-ard
 
 企業名: {企業名}
 対象事業: {事業名}
+```
+
+ARD 完了後:
+
+```
+/hve-aas
+```
+
+AAS 完了後:
+
+```
+/hve-aad-web
 ```
 
 ---
@@ -140,7 +158,7 @@ AAS 完了後に実行する。`docs/catalog/` 配下に AAS の成果物が揃�
 
 ### 敵対的レビュー
 
-成果物に対して 6 軸（正確性・完全性・一貫性・実現可能性・保守性・セキュリティ）で検証する。
+成果物に対して 6 軸（要件充足性・技術的正確性・整合性・非機能品質・捏造検出・オーバーエンジニアリング検出）で検証する。
 
 ```
 /hve-review
