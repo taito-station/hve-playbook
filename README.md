@@ -27,7 +27,17 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 
 ## セットアップ
 
-プロジェクトディレクトリに `.claude/` として配置する。
+`setup.sh` を使うと、対象プロジェクトの `.claude/` に必要なファイルだけを自動配置できる。
+
+```bash
+git clone https://github.com/taito-station/hve-playbook.git
+bash hve-playbook/setup.sh /path/to/my-project
+```
+
+配置対象は `rules/hve/`, `skills/hve-*/`, `agents/hve-*.md`, `workflows/hve-*.js` と `CLAUDE.md`。
+対象プロジェクトに `.claude/CLAUDE.md` が既にある場合は `CLAUDE.hve.md` として配置されるため、内容を確認して手動でマージする。
+
+### 手動セットアップ
 
 ```bash
 # 方法 1: クローン
@@ -55,6 +65,17 @@ cp -r hve-playbook/ my-project/.claude/
 /hve-qa           # QA 質問票の生成
 ```
 
+## 推奨ツール
+
+コード/ドキュメント探索には以下のツールを推奨する（必須ではない）。未インストールでも grep/find にフォールバックして動作する。
+
+| ツール | 用途 |
+|---|---|
+| cq (Code Query) | ソースコード検索（SQLite + BM25 + tree-sitter） |
+| mdq (Markdown Query) | Markdown/CSV ドキュメント検索（SQLite + BM25） |
+
+cq/mdq は HVE 本体リポジトリ（[dahatake/HypervelocityEngineering](https://github.com/dahatake/HypervelocityEngineering)、設計手法の原典）に含まれる Python モジュール。インストール方法と利用ポリシーは `rules/hve/tool-usage.md` を参照。
+
 ## 開発規律
 
 本パッケージは以下の開発規律を `rules/hve/` で強制する（優先順位順）:
@@ -65,6 +86,7 @@ cp -r hve-playbook/ my-project/.claude/
 4. **検証必須** — 動作を証明できるまで完了としない
 5. **出力品質基準** — 日本語、見出し+箇条書き、出典付き
 6. **成果物管理** — ファイル配置・更新ポリシー
+7. **ツール利用ポリシー** — cq/mdq/serena/grep の優先順位
 
 ## 使い方の詳細
 
