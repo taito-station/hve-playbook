@@ -54,41 +54,15 @@ description: 成果物管理規律 — ファイル配置・更新ポリシー�
 
 ### 書式
 
-```markdown
-# タイトル
-
-## ステータス
-
-Accepted | Superseded by ADR-NNNN — YYYY-MM-DD
-
-## 背景と課題
-
-（この決定が必要になった経緯）
-
-## 決定内容
-
-（何を決めたか）
-
-## 理由
-
-（なぜこの決定にしたか）
-
-## 却下した代替案
-
-（検討したが採用しなかった案と、その理由）
-
-## 影響
-
-（この決定による良い結果・悪い結果）
-```
+documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
 
 ### 機械検査
 
 git diff で既存エントリの改変を検出する:
 
 ```bash
-# 決定ログの既存行が削除・変更されていないか確認
-git diff HEAD~1 -- knowledge/adr/ | grep '^-[^-]' | grep -v '^-#'
+# 決定ログの既存行が削除・変更されていないか確認（PR スコープ）
+git diff origin/main..HEAD -- knowledge/adr/ | grep '^-' | grep -v '^---'
 ```
 
 pre-push hook や CI で実行することを推奨する。

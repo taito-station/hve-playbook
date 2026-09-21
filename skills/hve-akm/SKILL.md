@@ -18,11 +18,7 @@ knowledge/ 配下の文書を source（docs-original/ および qa/）と同期�
 
 ## SoT 優先順位
 
-情報が矛盾する場合、上位が勝つ:
-
-```
-docs-original（一次資料）> qa（Confirmed 回答）> knowledge（蒸留済み確定知）
-```
+`rules/hve/knowledge-maturity.md` の「SoT（Single Source of Truth）優先順位」に従う。
 
 ## パイプライン全体像
 
@@ -83,7 +79,7 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 
 #### 機械検査チェックリスト
 
-- [ ] frontmatter の必須フィールド（status / kind / sources / distilled_from_sha / updated）が全ファイルに存在する
+- [ ] frontmatter の必須フィールド（title / status / kind / sources / distilled_from_sha / updated）が全ファイルに存在する
 - [ ] `distilled_from_sha` で参照している source ファイルが実在する
 - [ ] 決定ログの既存エントリが改変されていない（append-only 原則）
 - [ ] status が Conflict のまま放置されている文書がない

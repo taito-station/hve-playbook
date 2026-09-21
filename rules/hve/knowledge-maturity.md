@@ -19,8 +19,8 @@ sources:
   - docs-original/NNN-xxx.md
   - qa/QA-yyy.md
 distilled_from_sha:
-  docs-original/NNN-xxx.md: abc1234
-  qa/QA-yyy.md: def5678
+  docs-original/NNN-xxx.md: a1b2c3d4...  # フル SHA（40 文字）
+  qa/QA-yyy.md: e5f6a7b8...              # git log -1 --format=%H で取得
 updated: "YYYY-MM-DD"
 doc_class: プロジェクト定義の分類コード
 tags: [分類コード]
