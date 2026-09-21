@@ -34,6 +34,39 @@ description: 成果物管理規律 — ファイル配置・更新ポリシー�
 4. 確認できない情報を補完しない
 5. 変更がない場合は「変更なし」と明示する
 
+## 決定ログの不変性
+
+決定ログ（`knowledge/adr/`）は **append-only** で運用する。
+
+### 原則
+
+- 既存エントリを書き換えない（誤字修正を除く）
+- 決定を覆すときは新エントリを追加し、旧エントリを supersede した旨を記載する
+- 削除は禁止
+
+### 配置
+
+独立ファイル方式を採用する。`knowledge/adr/` に 1 決定 1 ファイルで配置する。
+
+- `ls knowledge/adr/` で全決定を一覧できる
+- 必要な ADR だけ読めばよく、トークン効率が良い
+- 更新漏れは implement-flow Step 7（Knowledge 同期）で防ぐ
+
+### 書式
+
+documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
+
+### 機械検査
+
+git diff で既存エントリの改変を検出する:
+
+```bash
+# 決定ログの既存行が削除・変更されていないか確認（PR スコープ）
+git diff origin/main..HEAD -- knowledge/adr/ | grep '^-' | grep -v '^---'
+```
+
+pre-push hook や CI で実行することを推奨する。
+
 ## fan-out ステップの制約
 
 並列実行（fan-out）で複数サブエージェントが動作する場合:
