@@ -90,18 +90,29 @@ fi
 mkdir -p "$TARGET/docs"
 echo "[INFO] docs/ を確保しました"
 
-# 推奨ツールの確認
-if ! python3 -m cq --help >/dev/null 2>&1; then
-    echo "[INFO] cq (Code Query) が未インストールです"
-    echo "  HVE 本体リポジトリ（設計手法の原典）をクローンしてインストール:"
-    echo "  git clone https://github.com/dahatake/HypervelocityEngineering.git"
-    echo "  pip install -e 'HypervelocityEngineering[code]'"
-fi
-if ! python3 -m mdq --help >/dev/null 2>&1; then
-    echo "[INFO] mdq (Markdown Query) が未インストールです"
-    echo "  HVE 本体リポジトリ（設計手法の原典）をクローンしてインストール:"
-    echo "  git clone https://github.com/dahatake/HypervelocityEngineering.git"
-    echo "  pip install -e 'HypervelocityEngineering[mdq]'"
+# cq/mdq の自動インストール
+if python3 -m cq --help >/dev/null 2>&1 && python3 -m mdq --help >/dev/null 2>&1; then
+    echo "[INFO] cq/mdq はインストール済みです"
+else
+    echo "[INFO] cq/mdq をインストールします..."
+    if [ -n "${HVE_REPO_PATH:-}" ] && [ ! -d "$HVE_REPO_PATH" ]; then
+        echo "[WARN] HVE_REPO_PATH が存在しません: $HVE_REPO_PATH（無視して自動探索します）"
+        HVE_DIR="$SCRIPT_DIR/../HypervelocityEngineering"
+    else
+        HVE_DIR="${HVE_REPO_PATH:-$SCRIPT_DIR/../HypervelocityEngineering}"
+    fi
+    if [ ! -d "$HVE_DIR" ]; then
+        echo "[INFO] HypervelocityEngineering をクローンします: $HVE_DIR"
+        git clone https://github.com/dahatake/HypervelocityEngineering.git "$HVE_DIR" || {
+            echo "[WARN] クローンに失敗しました。cq/mdq なしで続行します"
+            rm -rf "$HVE_DIR"
+        }
+    fi
+    if [ -d "$HVE_DIR" ]; then
+        python3 -m pip install -e "$HVE_DIR[code,mdq]" || {
+            echo "[WARN] cq/mdq のインストールに失敗しました。grep/find にフォールバックします"
+        }
+    fi
 fi
 
 echo ""

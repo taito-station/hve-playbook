@@ -271,12 +271,7 @@ Plan（Step 1）で特定した影響領域ごとに知識ベースを網羅的�
 プロジェクトに AKM を導入する際に準備すべきもの:
 
 1. **`docs/` ディレクトリ**: `setup.sh` が自動作成する
-2. **cq / mdq のインストール**（推奨、必須ではない）:
-   ```bash
-   git clone https://github.com/dahatake/HypervelocityEngineering.git
-   pip install -e 'HypervelocityEngineering[code]'   # cq
-   pip install -e 'HypervelocityEngineering[mdq]'     # mdq
-   ```
+2. **cq / mdq のインストール**（推奨、必須ではない）: `setup.sh` が自動インストールする。ローカルに HypervelocityEngineering リポがあれば `HVE_REPO_PATH` 環境変数で指定可能
 3. **決定ログの運用開始**: 設計判断が発生したら記録を始める。既存プロジェクトでは過去の決定を遡って書く必要はない（今後の判断から記録すれば十分）
 
 ### 適用時の注意事項

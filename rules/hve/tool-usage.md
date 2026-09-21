@@ -22,19 +22,16 @@ HVE プロジェクトでのコード/ドキュメント探索ツールの利用
 
 ## cq/mdq のインストール
 
-dahatake/HypervelocityEngineering リポジトリの Python モジュール（pip 未公開）:
+`setup.sh` が自動でインストールする。手順:
 
-```
-git clone https://github.com/dahatake/HypervelocityEngineering.git
-pip install -e 'HypervelocityEngineering[code]'   # cq
-pip install -e 'HypervelocityEngineering[mdq]'     # mdq
-```
+1. ローカルに HypervelocityEngineering リポがあれば環境変数で指定:
+   ```
+   HVE_REPO_PATH=/path/to/HypervelocityEngineering bash setup.sh /path/to/target
+   ```
+2. 指定がなければ hve-playbook の兄弟ディレクトリ (`../HypervelocityEngineering`) を探す
+3. 見つからなければ自動で `git clone` してインストール
 
-venv の利用を推奨:
-
+手動インストール:
 ```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e 'HypervelocityEngineering[code]'
-pip install -e 'HypervelocityEngineering[mdq]'
+python3 -m pip install -e 'path/to/HypervelocityEngineering[code,mdq]'
 ```
