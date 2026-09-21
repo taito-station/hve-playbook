@@ -467,19 +467,19 @@ spawn することで、レビュー評価の独立性は構造的に担保さ�
 implement-flow Step 7 に相当するチェック。コード変更が確定知の前提を変えていないか確認する。
 
 ```bash
-CODE_CHANGED=$(git diff "origin/$BASE"...HEAD --name-only | grep -cvE '^docs/' || true)
-DOCS_CHANGED=$(git diff "origin/$BASE"...HEAD --name-only | grep -c  '^docs/' || true)
+CODE_CHANGED=$(git diff "origin/$BASE"...HEAD --name-only | grep -cvE '^(docs/|knowledge/)' || true)
+KNOWLEDGE_CHANGED=$(git diff "origin/$BASE"...HEAD --name-only | grep -cE  '^(docs/|knowledge/)' || true)
 ```
 
-- `CODE_CHANGED > 0` かつ `DOCS_CHANGED == 0` の場合:
+- `CODE_CHANGED > 0` かつ `KNOWLEDGE_CHANGED == 0` の場合:
   注意喚起を出力する（STOP はしない）:
   ```
   [create-pr] Knowledge 同期の確認 (implement-flow Step 7):
-  コード変更がありますが docs/ の変更がありません。
-  確定知の前提が変わっている場合は docs/ を更新してください。
+  コード変更がありますが docs/ および knowledge/ の変更がありません。
+  確定知の前提が変わっている場合は knowledge/ または docs/ を更新してください。
   （更新不要であればこのまま続行します）
   ```
-- `DOCS_CHANGED > 0` の場合: 自動パス（メッセージ不要）
+- `KNOWLEDGE_CHANGED > 0` の場合: 自動パス（メッセージ不要）
 - `CODE_CHANGED == 0` の場合: 自動パス（ドキュメントのみの変更）
 
 ### Step 5.5: リモートブランチ判定 (Step 6・7 共通)
