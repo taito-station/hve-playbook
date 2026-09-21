@@ -1,10 +1,39 @@
 # hve-playbook
 
-HypervelocityEngineering (HVE) の設計手法を Claude Code ネイティブで実行するための `.claude/` 設定パッケージ。
+Claude Code の開発基盤設定（user-level）と HVE 設計手法（project-level）を一元管理するリポジトリ。
 
 Based on [dahatake/HypervelocityEngineering](https://github.com/dahatake/HypervelocityEngineering) (MIT License).
+Includes [dotclaude-public](https://github.com/taito-station/dotclaude-public) by youhei-ushio (MIT License).
 
-## 概要
+## 構成
+
+本リポジトリは 2 つの役割を持つ:
+
+| 役割 | デプロイ方法 | デプロイ先 | 内容 |
+|---|---|---|---|
+| **user-level 基盤** | `sync-dotclaude.sh` (symlink) | `~/.claude/` | hooks, global skills, scripts, settings |
+| **project-level HVE** | `setup.sh` (copy) | target/.claude/ | rules/hve, HVE skills/agents/workflows |
+
+## セットアップ
+
+### 1. user-level 基盤の同期
+
+```bash
+git clone https://github.com/taito-station/hve-playbook.git
+bash hve-playbook/sync-dotclaude.sh
+```
+
+`sync-dotclaude.sh` は `~/.claude/` に symlink を張る（冪等・何度実行しても安全）。以降は `git pull` + `sync-dotclaude.sh` で最新化。
+
+### 2. プロジェクトへの HVE 導入
+
+```bash
+bash hve-playbook/setup.sh /path/to/my-project
+```
+
+対象プロジェクトの `.claude/` に HVE 関連ファイル（rules, skills, agents, workflows）をコピーする。
+
+## HVE 設計ワークフロー
 
 ビジネス要件の定義からソフトウェア詳細設計までを 3 つのワークフローで段階的に進める。
 
@@ -18,67 +47,39 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 | AAS | `/hve-aas` | アーキテクチャ選定 → DDD ドメイン分析 → データモデル → テスト戦略 |
 | AAD-WEB | `/hve-aad-web` | 画面設計 → サービス設計 → テストスペック → 一貫性レビュー |
 
-補助スキル:
+補助スキル: `/hve-review`（敵対的レビュー）、`/hve-qa`（QA 質問票生成）
+
+## Global Skills（user-level）
+
+`sync-dotclaude.sh` で配置される汎用スキル。全プロジェクトで利用可能。
+
+主なスキル:
 
 | スキル名 | 内容 |
 |---|---|
-| `/hve-review` | 敵対的レビュー（6 軸検証） |
-| `/hve-qa` | QA 質問票生成 |
+| `/create-pr` | PR 作成 + セルフレビュー + AKM チェック + セッション費用表示 |
+| `/review-pr` | 敵対的セルフレビュー（多観点・複数巡） |
+| `/commit-workflow` | Conventional Commits 準拠のコミット作成 |
+| `/resolve-issue` | Issue 分析から PR 作成までの一貫フロー |
 
-## セットアップ
+## Scripts
 
-`setup.sh` を使うと、対象プロジェクトの `.claude/` に必要なファイルだけを自動配置できる。
-
-```bash
-git clone https://github.com/taito-station/hve-playbook.git
-bash hve-playbook/setup.sh /path/to/my-project
-```
-
-配置対象は `rules/hve/`, `skills/hve-*/`, `agents/hve-*.md`, `workflows/hve-*.js` と `CLAUDE.md`。
-対象プロジェクトに `.claude/CLAUDE.md` が既にある場合は `CLAUDE.hve.md` として配置されるため、内容を確認して手動でマージする。
-
-### 手動セットアップ
-
-```bash
-# 方法 1: クローン
-git clone https://github.com/taito-station/hve-playbook.git my-project/.claude
-
-# 方法 2: 既存プロジェクトにコピー
-cp -r hve-playbook/ my-project/.claude/
-```
-
-## 使い方
-
-### 個別ワークフローの実行
-
-```
-# Claude Code セッション内で
-/hve-ard          # 要件定義を開始
-/hve-aas          # アーキテクチャ設計を開始（ARD 完了後）
-/hve-aad-web      # Web 詳細設計を開始（AAS 完了後）
-```
-
-### 補助スキル
-
-```
-/hve-review       # 成果物の敵対的レビュー
-/hve-qa           # QA 質問票の生成
-```
+| スクリプト | 内容 |
+|---|---|
+| `scripts/session-cost.py` | セッション JSONL からトークン使用量と費用を集計 |
 
 ## 推奨ツール
-
-コード/ドキュメント探索には以下のツールを推奨する（必須ではない）。未インストールでも grep/find にフォールバックして動作する。
 
 | ツール | 用途 |
 |---|---|
 | cq (Code Query) | ソースコード検索（SQLite + BM25 + tree-sitter） |
 | mdq (Markdown Query) | Markdown/CSV ドキュメント検索（SQLite + BM25） |
 
-cq/mdq は HVE 本体リポジトリ（[dahatake/HypervelocityEngineering](https://github.com/dahatake/HypervelocityEngineering)、設計手法の原典）に含まれる Python モジュール。インストール方法と利用ポリシーは `rules/hve/tool-usage.md` を参照。
+インストール方法は `rules/hve/tool-usage.md` を参照。
 
 ## 開発規律
 
-本パッケージは以下の開発規律を `rules/hve/` で強制する（優先順位順）:
+`rules/hve/` で以下の規律を強制する（優先順位順）:
 
 1. **捏造禁止** — 根拠のない情報を成果物に含めない
 2. **オーバーエンジニアリング禁止** — YAGNI、不要な抽象化を入れない

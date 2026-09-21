@@ -1,2 +1,27 @@
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Windows / NTFS (WSL マウント越しに混入する Zone.Identifier 等)
+*:Zone.Identifier
+
+# Local ignores
+*.local
+.env
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Claude Code
 .claude/worktrees/
+**/.claude/settings.local.json
+
+# HVE 一時作業ファイル
 work/
+
+# create-pr / review-pr 一時ファイル
+docs/temp/
