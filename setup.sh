@@ -71,17 +71,17 @@ if [ ${#workflows[@]} -gt 0 ]; then
     echo "[INFO] workflows/hve-*.js を配置しました"
 fi
 
-# CLAUDE.md
+# CLAUDE.hve.md（HVE 方法論の説明）
 if [ ! -f "$TARGET_CLAUDE/CLAUDE.md" ]; then
-    cp "$SCRIPT_DIR/CLAUDE.md" "$TARGET_CLAUDE/CLAUDE.md"
-    echo "[INFO] CLAUDE.md を配置しました"
+    cp "$SCRIPT_DIR/CLAUDE.hve.md" "$TARGET_CLAUDE/CLAUDE.md"
+    echo "[INFO] CLAUDE.md を配置しました（HVE 方法論）"
 elif [ ! -f "$TARGET_CLAUDE/CLAUDE.hve.md" ]; then
-    cp "$SCRIPT_DIR/CLAUDE.md" "$TARGET_CLAUDE/CLAUDE.hve.md"
-    echo "[WARN] $TARGET_CLAUDE/CLAUDE.md が既に存在するため、hve-playbook の内容は"
+    cp "$SCRIPT_DIR/CLAUDE.hve.md" "$TARGET_CLAUDE/CLAUDE.hve.md"
+    echo "[WARN] $TARGET_CLAUDE/CLAUDE.md が既に存在するため、HVE 方法論は"
     echo "       $TARGET_CLAUDE/CLAUDE.hve.md として配置しました。"
     echo "       内容を確認し、既存の CLAUDE.md へ手動でマージしてください。"
 else
-    cp "$SCRIPT_DIR/CLAUDE.md" "$TARGET_CLAUDE/CLAUDE.hve.md"
+    cp "$SCRIPT_DIR/CLAUDE.hve.md" "$TARGET_CLAUDE/CLAUDE.hve.md"
     echo "[INFO] CLAUDE.hve.md を最新版で更新しました。"
     echo "       既存の CLAUDE.md との差分を確認し、必要に応じてマージしてください。"
 fi
