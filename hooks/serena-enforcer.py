@@ -86,7 +86,7 @@ RULES = [
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードを対象にした grep は禁止。Serena の "
-        "mcp__serena__find_symbol / mcp__serena__find_referencing_symbols を使う（テキスト検索が必要なら bypass を付ける）。",
+        "mcp__serena__find_symbol / mcp__serena__find_referencing_symbols を使う。テキスト検索が必要なら cq（導入済みなら）を使い、無ければ bypass を付ける。",
         "grep",
     ),
     (
@@ -95,7 +95,7 @@ RULES = [
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r"))"
         ),
         "コードを対象にした find は禁止。Serena の "
-        "mcp__serena__find_symbol を使う（ファイル名検索が必要なら bypass を付ける）。",
+        "mcp__serena__find_symbol でシンボルを探す。ファイル名での検索はシンボル検索で代替できないため、必要なら bypass を付ける。",
         "find",
     ),
     (
@@ -121,7 +121,7 @@ RULES = [
             r"\bls\b[^|;&]*?-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r")"
         ),
         "コード配下の再帰 ls は禁止。Serena の "
-        "mcp__serena__get_symbols_overview を使う（ディレクトリ構造の確認が必要なら bypass を付ける）。",
+        "mcp__serena__get_symbols_overview でファイル内の構造を見る。ディレクトリ一覧はシンボル検索で代替できないため、必要なら bypass を付ける。",
         "ls-R",
     ),
 ]

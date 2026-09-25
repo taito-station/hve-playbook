@@ -379,8 +379,9 @@ if ERRORS is not empty:
 
 ### Step 3: ブランチ作成 + 実装
 
-1. `~/.claude/rules/git/branching.md` の命名規約（`<type>/<issue番号>-<概要>`、
-   type は bug パスなら `fix`、feature パスなら `feat` 等）でブランチを作成
+1. `<type>/<issue番号>-<概要>` 形式でブランチを作成する。type は bug パスなら `fix`、
+   feature パスなら `feat`、ops パスなら `chore`（user-level に `~/.claude/rules/git/branching.md`
+   があればその命名規約に従う）
    - ブランチ名の概要部分は Issue タイトルから英語のケバブケースで生成
 
 2. Issue の要件に基づいて実装を行う
@@ -701,7 +702,7 @@ context を維持したまま次ステップに進む。
 - テスト実行は効率的に行う:
   - 開発中は `--filter` で関連テストのみ実行する
   - 全テスト（`docker exec <container> php artisan test`）はコミット前にのみ実行する
-- コードベースの調査はプロジェクトの探索ツール規約（あれば `rules/hve/tool-usage.md`、
+- コードベースの調査はプロジェクトの探索ツール規約（HVE 導入先なら `.claude/rules/hve/tool-usage.md`、
   無ければシンボル検索系の MCP 優先）に従い、ファイル全体の読み込みは最小限にして
   シンボル単位で必要な情報を取得する
 

@@ -95,7 +95,8 @@ description: |
 - 複数リポジトリに跨る共通ポリシー → 共通ポリシー用の中央リポジトリの `docs/adr/`
 - 特定リポジトリのみに適用 → そのリポジトリの `docs/adr/`
 - knowledge 運用を導入したリポジトリ → `knowledge/adr/`
-  （決定ログとして append-only で運用する。`rules/hve/artifact-management.md` の「決定ログの不変性」参照）
+  （決定ログとして append-only で運用する。HVE の artifact-management ルール（導入先では `.claude/rules/hve/artifact-management.md`）の「決定ログの不変性」参照）
+- 既に別の配置先（例: `knowledge/D19/`）で ADR を運用しているリポジトリは、その配置先・採番・索引を継続する（移行は別途判断する）
 
 いずれの配置先でも**様式（MADR の章立て・ファイル名・採番・ステータス値）は本標準に従う**。
 

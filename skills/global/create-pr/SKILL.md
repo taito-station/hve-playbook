@@ -275,7 +275,9 @@ diff を分析し、以下の各軸について該当/非該当を判定する:
 判定は以下で機械的に行う:
 
 ```bash
-# diff 解析
+# 条件 1: PR 本文素案のキーワード
+grep -E 'ブラウザ|画面|UI|Playwright|Livewire|画面遷移|ボタン|表示|印刷|帳票' "$REPO_ROOT/docs/temp/pr-body.md"
+# 条件 2: diff 解析
 git diff --name-only "origin/$BASE"...HEAD | grep -E '\.(blade\.php|vue|tsx|jsx)$|^(resources/views|resources/js|app/(Http/)?Livewire)/'
 ```
 

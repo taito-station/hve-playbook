@@ -33,9 +33,9 @@ CMP_LINE=$(grep -n '} - RESOLVED_KEYS' "$SKILL" | head -1 | cut -d: -f1)
 ADD_FIRST=$(grep -n 'RESOLVED_KEYS |= FIXED_KEYS_THIS_ROUND' "$SKILL" | head -1 | cut -d: -f1)
 ADD_COUNT=$(grep -c 'RESOLVED_KEYS |= FIXED_KEYS_THIS_ROUND' "$SKILL")
 if [ -n "$CMP_LINE" ] && [ -n "$ADD_FIRST" ] && [ "$CMP_LINE" -lt "$ADD_FIRST" ]; then
-    pass "収束判定 (行 $CMP_LINE) が本巡分の RESOLVED_KEYS 追加 (先頭 行 $ADD_FIRST、$ADD_COUNT 箇所) より前にある"
+    pass "収束判定 (行 ${CMP_LINE}) が本巡分の RESOLVED_KEYS 追加 (先頭 行 ${ADD_FIRST}、${ADD_COUNT} 箇所) より前にある"
 else
-    fail "収束判定と RESOLVED_KEYS 追加の順序が崩れている (cmp=$CMP_LINE add_first=$ADD_FIRST)"
+    fail "収束判定と RESOLVED_KEYS 追加の順序が崩れている (cmp=${CMP_LINE} add_first=${ADD_FIRST})"
 fi
 # fix-steps Step 4 節を抜き出し、「足さない」と書いた行以外で RESOLVED_KEYS に足す記述が無いこと
 STEP4=$(awk '/^## Step 4: 修正実行/{f=1} /^## Step 4\.5/{f=0} f' "$FIX_STEPS")

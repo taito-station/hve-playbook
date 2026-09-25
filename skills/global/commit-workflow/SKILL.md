@@ -43,12 +43,15 @@ Conventional Commits（`<type>(<scope>): <subject>`、件名は日本語）を�
 
 ## デバッグログの確認
 
-コミット前に、ステージした差分にデバッグ出力が混入していないか確認する。
-パターンはプロジェクトの言語・ロガーに合わせる（一例）:
+`git add` の後・コミット前に、ステージした差分にデバッグ出力が混入していないか確認する。
+パターンはプロジェクトの言語・ロガーに合わせる（一例。Go なら `fmt\.Print`、.NET なら
+`Console\.WriteLine` 等に差し替える）:
 
 ```bash
-git diff --cached -U0 | grep -nE '^\+.*(console\.(log|debug)|Log::(info|debug)|print\()'
+git diff --cached -U0 | grep -E '^(\+\+\+ |\+.*(console\.(log|debug)|Log::(info|debug)|print\())'
 ```
+
+（`+++` 行を併せて出すことで、ヒットした行がどのファイルかわかる）
 
 デバッグ出力（`console.log` / `print` / `Log::info` 等）は本番に残してはいけない。
 エラーログ（`console.error` / `Log::error` 等）は必要に応じて残す。
