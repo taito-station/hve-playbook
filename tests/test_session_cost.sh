@@ -19,28 +19,31 @@ spec = importlib.util.spec_from_file_location("session_cost", sys.argv[1])
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 
-# (モデル ID, 期待キー, 既知扱いか, input 単価, output 単価, cache_read 単価)
+# (モデル ID, 期待キー, 既知扱いか, input, output, cache_write, cache_read)
 CASES = [
-    ("claude-opus-5-5", "claude-opus-5-5", True, 4.0, 20.0, 0.20),
-    ("claude-opus-5", "claude-opus-5", True, 5.0, 25.0, 0.50),
-    ("claude-opus-4-8", "claude-opus-4-8", True, 5.0, 25.0, 0.50),
-    ("claude-opus-4-5-20251101", "claude-opus-4-5", True, 5.0, 25.0, 0.50),
-    ("claude-opus-4-1-20250805", "claude-opus-4", True, 15.0, 75.0, 1.50),
-    ("claude-sonnet-5", "claude-sonnet-5", True, 2.0, 10.0, 0.20),
-    ("claude-sonnet-4-6", "claude-sonnet-4", True, 3.0, 15.0, 0.30),
-    ("claude-haiku-4-5-20251001", "claude-haiku-4", True, 1.0, 5.0, 0.10),
-    ("claude-fable-5-1", "claude-fable-5-1", True, 10.0, 50.0, 0.25),
-    ("claude-fable-5", "claude-fable-5", True, 10.0, 50.0, 1.0),
-    ("claude-mythos-5-1", "claude-mythos-5-1", True, 10.0, 50.0, 0.25),
-    ("<synthetic>", "claude-opus-5", False, 5.0, 25.0, 0.50),
+    ("claude-opus-5-5", "claude-opus-5-5", True, 4.0, 20.0, 5.0, 0.20),
+    ("claude-opus-5", "claude-opus-5", True, 5.0, 25.0, 6.25, 0.50),
+    ("claude-opus-4-8", "claude-opus-4-8", True, 5.0, 25.0, 6.25, 0.50),
+    ("claude-opus-4-7", "claude-opus-4-7", True, 5.0, 25.0, 6.25, 0.50),
+    ("claude-opus-4-6", "claude-opus-4-6", True, 5.0, 25.0, 6.25, 0.50),
+    ("claude-opus-4-5-20251101", "claude-opus-4-5", True, 5.0, 25.0, 6.25, 0.50),
+    ("claude-opus-4-1-20250805", "claude-opus-4", True, 15.0, 75.0, 18.75, 1.50),
+    ("claude-sonnet-5", "claude-sonnet-5", True, 2.0, 10.0, 2.50, 0.20),
+    ("claude-sonnet-4-6", "claude-sonnet-4", True, 3.0, 15.0, 3.75, 0.30),
+    ("claude-haiku-4-5-20251001", "claude-haiku-4", True, 1.0, 5.0, 1.25, 0.10),
+    ("claude-fable-5-1", "claude-fable-5-1", True, 10.0, 50.0, 12.50, 0.25),
+    ("claude-fable-5", "claude-fable-5", True, 10.0, 50.0, 12.50, 1.0),
+    ("claude-mythos-5-1", "claude-mythos-5-1", True, 10.0, 50.0, 12.50, 0.25),
+    ("claude-mythos-5", "claude-mythos-5", True, 10.0, 50.0, 12.50, 1.0),
+    ("<synthetic>", "claude-opus-5", False, 5.0, 25.0, 6.25, 0.50),
 ]
 
 fail = 0
-for model, key, known, inp, out, cr in CASES:
+for model, key, known, inp, out, cw, cr in CASES:
     got_key, got_known = m.resolve_pricing_key(model)
     price = m.PRICING[got_key]
-    ok = (got_key, got_known) == (key, known) and (price["input"], price["output"], price["cache_read"]) == (inp, out, cr)
-    print(f"[{'PASS' if ok else 'FAIL'}] {model} -> {got_key} known={got_known} {price['input']}/{price['output']}/{price['cache_read']}")
+    ok = (got_key, got_known) == (key, known) and (price["input"], price["output"], price["cache_write"], price["cache_read"]) == (inp, out, cw, cr)
+    print(f"[{'PASS' if ok else 'FAIL'}] {model} -> {got_key} known={got_known} {price['input']}/{price['output']}/{price['cache_write']}/{price['cache_read']}")
     fail |= not ok
 
 # 並び順に依存しないこと: キー順を逆にしても同じ解決になる

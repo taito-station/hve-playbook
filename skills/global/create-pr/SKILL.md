@@ -275,8 +275,10 @@ diff を分析し、以下の各軸について該当/非該当を判定する:
 判定は以下で機械的に行う:
 
 ```bash
-# 条件 1: PR 本文素案のキーワード
-grep -E 'ブラウザ|画面|UI|Playwright|Livewire|画面遷移|ボタン|表示|印刷|帳票' "$REPO_ROOT/docs/temp/pr-body.md"
+# 条件 1: PR 本文素案のキーワード (Critical Decisions 節は判定ガイドラインの引用で誤検知するため除外。
+#         UI は BUILD / GUID 等に部分一致しないよう前後を英字以外に限定)
+awk '/^## Critical Decisions/{skip=1; next} /^## /{skip=0} !skip' "$REPO_ROOT/docs/temp/pr-body.md" \
+    | grep -E 'ブラウザ|画面|(^|[^A-Za-z])UI([^A-Za-z]|$)|Playwright|Livewire|画面遷移|ボタン|表示|印刷|帳票'
 # 条件 2: diff 解析
 git diff --name-only "origin/$BASE"...HEAD | grep -E '\.(blade\.php|vue|tsx|jsx)$|^(resources/views|resources/js|app/(Http/)?Livewire)/'
 ```

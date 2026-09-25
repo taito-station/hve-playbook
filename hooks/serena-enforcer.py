@@ -86,7 +86,8 @@ RULES = [
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードを対象にした grep は禁止。Serena の "
-        "mcp__serena__find_symbol / mcp__serena__find_referencing_symbols を使う。テキスト検索が必要なら cq（導入済みなら）を使い、無ければ bypass を付ける。",
+        "シンボル名が分かるなら mcp__serena__find_symbol / mcp__serena__find_referencing_symbols を使う。"
+        "純粋なテキスト検索はプロジェクトの検索ツール規約（HVE なら cq）に従い、無ければ理由付きで bypass を付ける。",
         "grep",
     ),
     (
@@ -134,9 +135,9 @@ RULES = [
 # 警告は出すが block はしない (= bypass の意図は尊重)。
 BYPASS_WARNINGS = {
     "grep": (
-        "[serena-enforcer] WARN: grep の bash-discovery bypass は serena 代替推奨。"
-        "mcp__serena__find_referencing_symbols (参照検索) / "
-        "mcp__serena__find_symbol (シンボル定義) を検討してください。"
+        "[serena-enforcer] WARN: grep の bash-discovery bypass を使用。"
+        "シンボル名が分かる探索なら mcp__serena__find_symbol (定義) / "
+        "mcp__serena__find_referencing_symbols (参照) を検討してください。"
     ),
     "cat": (
         "[serena-enforcer] WARN: cat の bash-discovery bypass は Read tool 代替推奨。"

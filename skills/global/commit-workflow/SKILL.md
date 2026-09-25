@@ -22,8 +22,8 @@ description: |
 ## コミットメッセージ形式
 
 プロジェクトのコミット履歴の形式に合わせる。履歴が無い・混在している場合は
-Conventional Commits（`<type>(<scope>): <subject>`、件名は日本語）を使う
-（user-level に `~/.claude/rules/git/branching.md` があればそれに従う）。
+Conventional Commits（`<type>(<scope>): <subject>`、件名はプロジェクトの言語）を使う
+（user-level のコミット・ブランチ規約があればそれに従う）。
 
 履歴が `[機能カテゴリ] 変更内容の概要` 形式のプロジェクトの例:
 - `[注文] 複数明細の一括選択機能を追加`
@@ -44,14 +44,14 @@ Conventional Commits（`<type>(<scope>): <subject>`、件名は日本語）を�
 ## デバッグログの確認
 
 `git add` の後・コミット前に、ステージした差分にデバッグ出力が混入していないか確認する。
-パターンはプロジェクトの言語・ロガーに合わせる（一例。Go なら `fmt\.Print`、.NET なら
-`Console\.WriteLine` 等に差し替える）:
+パターンはプロジェクトの言語・ロガーに合わせる（一例。Python なら `logging\.debug`、Rails なら
+`Rails\.logger\.debug`、Go なら `fmt\.Print`、.NET なら `Console\.WriteLine` 等に差し替える）:
 
 ```bash
-git diff --cached -U0 | grep -E '^(\+\+\+ |\+.*(console\.(log|debug)|Log::(info|debug)|print\())'
+git diff --cached -U0 | awk '/^\+\+\+ /{f=$0; next} /^\+/ && /console\.(log|debug)|Log::(info|debug)|print\(/{print f; print}'
 ```
 
-（`+++` 行を併せて出すことで、ヒットした行がどのファイルかわかる）
+（ヒットした行だけを、直前のファイル名（`+++` 行）付きで出す。出力が空なら混入なし）
 
 デバッグ出力（`console.log` / `print` / `Log::info` 等）は本番に残してはいけない。
 エラーログ（`console.error` / `Log::error` 等）は必要に応じて残す。
