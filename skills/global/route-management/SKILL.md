@@ -6,7 +6,7 @@ description: |
   Route::get, Route::post 等を書く前に必ず確認。
 ---
 
-# ルート追加の絶対ルール
+# ルート追加のルール
 
 DDD / モジュラーモノリス的に `app/Contexts/<ContextName>/` で機能を区切る
 Laravel プロジェクトを想定したルール。プロジェクト構造が違う場合は配置先を
@@ -30,8 +30,9 @@ Laravel プロジェクトを想定したルール。プロジェクト構造が
 - バージョニングするなら `app/Contexts/v3/<ContextName>/ServiceProvider.php`
   のように切る（自プロジェクトの方針に合わせる）
 
-新規 Context の `ServiceProvider` は `config/app.php` の `providers` 配列に
-登録する。
+新規 Context の `ServiceProvider` は、プロジェクトで既存 ServiceProvider を登録している箇所に
+登録する（Laravel 11 以降の標準構成なら `bootstrap/providers.php`、それ以前は `config/app.php`
+の `providers` 配列）。
 
 ## 記述パターン
 
@@ -57,5 +58,3 @@ public function boot(): void
 `routes/web.php` を誤って編集してしまった場合:
 1. 即座に元の状態に戻す（または該当行を削除）
 2. 適切な Context の `ServiceProvider` に移動
-
-「動いているから大丈夫」は理由にならない。

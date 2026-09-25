@@ -133,8 +133,6 @@ gh issue create --repo <owner>/<repo> --title "<タイトル>" --body-file docs/
 gh label list --repo <owner>/<repo> --limit 1000 --json name -q '.[].name' | grep -qx ops \
   || gh label create ops --repo <owner>/<repo> --color 0E8A16 --description "処理依頼・データ修正"
 gh issue create --repo <owner>/<repo> --title "<タイトル>" --body-file docs/temp/issue-body.md --label ops
-# ↓
-rm docs/temp/issue-body.md
 ```
 
 ### 3. Issue本文フォーマット（種別別テンプレート）

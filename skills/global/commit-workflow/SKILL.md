@@ -21,18 +21,15 @@ description: |
 
 ## コミットメッセージ形式
 
-`[機能カテゴリ] 変更内容の概要`
+プロジェクトのコミット履歴の形式に合わせる。履歴が無い・混在している場合は
+Conventional Commits（`<type>(<scope>): <subject>`、件名は日本語）を使う
+（user-level に `~/.claude/rules/git/branching.md` があればそれに従う）。
 
-例（カテゴリ名は自プロジェクトのドメインに合わせる）:
+履歴が `[機能カテゴリ] 変更内容の概要` 形式のプロジェクトの例:
 - `[注文] 複数明細の一括選択機能を追加`
 - `[バグ修正] 戻り値型エラーを修正`
 - `[データベース] 未使用カラムを削除`
 - `[CLAUDE] hotfix モードのルールを更新`
-
-慣例の選択肢:
-- `[カテゴリ] ...`（このスキルの基本形）
-- Conventional Commits（`feat: ...` / `fix: ...` / `docs: ...` 等）
-- どちらに合わせるかはプロジェクトのコミット履歴に従う
 
 ## コミット前チェックリスト
 
@@ -46,32 +43,18 @@ description: |
 
 ## デバッグログの確認
 
-コミット前に必ず実行（自プロジェクトの言語に該当する 1 ブロックのみ実行すればよい。下記は単一の bash ブロックに 6 言語を並べているので、不要な言語行は削除して使う。logging API・探索起点はいずれも一例なので、言語・フレームワーク・ディレクトリ構成に合わせて読み替える）:
+コミット前に、ステージした差分にデバッグ出力が混入していないか確認する。
+パターンはプロジェクトの言語・ロガーに合わせる（一例）:
 
 ```bash
-# Node.js
-grep -rE "console\.(log|debug)" src/
-# Python
-grep -rE "print\(|logging\.debug" .
-# .NET
-grep -rE "Console\.WriteLine|Debug\.WriteLine" .
-# Go（fmt.Print 系・log.Print 系は正規の標準出力／本番ロガーにも使われるため誤検出に注意。vendor/ のノイズが大きいので除外推奨）
-grep -rE --exclude-dir=vendor "fmt\.Print(ln|f)?|log\.Print" .
-# Rails
-grep -rE "Rails\.logger\.(debug|info)" app/
-# Laravel
-grep -rE "Log::(info|debug)" app/
+git diff --cached -U0 | grep -nE '^\+.*(console\.(log|debug)|Log::(info|debug)|print\()'
 ```
-
-探索起点（`src/` / `app/` / `.`）も一例。`.` 起点は `node_modules` やドキュメント等のノイズを拾いやすいので、実コードのディレクトリに絞ると精度が上がる。
 
 デバッグ出力（`console.log` / `print` / `Log::info` 等）は本番に残してはいけない。
 エラーログ（`console.error` / `Log::error` 等）は必要に応じて残す。
 
 ## 禁止事項
 
-- ユーザー指示なしに勝手にコミット
-- 明示的指示後の重複確認
-- 推測でコミットメッセージ作成
-- 作業途中でのコミット
-- テストが通っていない状態でのコミット
+- ユーザー指示なしにコミットしない（上記「コミット指示の判定」の手順で確認を取る）
+- 明示的指示を受けた後に重複確認しない
+- テストが通っていない状態でコミットしない

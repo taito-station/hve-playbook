@@ -71,9 +71,9 @@ def main() -> int:
             print(
                 "BLOCKED by skill-enforcer hook.\n"
                 f"reason: {reason}\n"
-                f"use skill: /{skill}\n"
-                "Stop and re-run via the Skill tool with the matching skill name.\n"
-                f"Bypass (only after invoking the skill): append `# via:{skill}` to the command.",
+                f"route: {skill}\n"
+                "Stop and re-run via the route given in reason (a skill or a wrapper script).\n"
+                f"Bypass (only after going through that route): append `# via:{skill}` to the command.",
                 file=sys.stderr,
             )
             return 2

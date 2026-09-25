@@ -24,17 +24,16 @@ SKILL.md の Step 2.1 から参照される。
 - remote への書き込み (`git push` / `gh pr edit|review|merge` / `gh api` の
   非 GET) も禁止。
 
-## 手順
-1. `{DIFF_PATH}` を Read して diff を把握する
-2. `{PR_BODY_PATH}` を Read して PR 本文（Critical Decisions 含む）を把握する
-3. 担当観点で指摘事項を列挙
-4. 各指摘に以下を付ける:
-   - 主マーク: [Must-fix] / [Should-fix] / [Nice-to-have]
-   - 付加マーク: [Security] / [Tradeoff] (該当時)
-   - 種別: [defect] (客観的誤り — バグ・型不整合・仕様違反・セキュリティ穴)
-           または [judgment] (主観的提案 — 命名・可読性・リファクタ・スタイル)
-5. 報告は「ファイルパス:行番号 — マーク — 種別 — 内容 — 推奨アクション」で
-   構造化し、指摘番号 (R-1, R-2, ...) を付けて返す
+## 入力と報告形式
+入力は diff (`{DIFF_PATH}`) と PR 本文 (`{PR_BODY_PATH}`、Critical Decisions 含む)。
+担当観点での指摘を以下の形式で返す。
+各指摘に以下を付ける:
+- 主マーク: [Must-fix] / [Should-fix] / [Nice-to-have]
+- 付加マーク: [Security] / [Tradeoff] (該当時)
+- 種別: [defect] (客観的誤り — バグ・型不整合・仕様違反・セキュリティ穴)
+        または [judgment] (主観的提案 — 命名・可読性・リファクタ・スタイル)
+報告は「ファイルパス:行番号 — マーク — 種別 — 内容 — 推奨アクション」で
+構造化し、指摘番号 (R-1, R-2, ...) を付けて返す
 
 ## spec 観点 (全ロール共通)
 PR 本文（`{PR_BODY_PATH}`）に GitHub が認識する Issue クローズキーワード
@@ -65,7 +64,6 @@ PR 本文（`{PR_BODY_PATH}`）に GitHub が認識する Issue クローズキ�
   + テストがある場合、Blade 内の全 `{{ $変数名 }}` / `wire:model` 参照に対し、
   テスト側に `->get('変数名')` のアサーションがあるか照合する。テストで一度も
   検証されていない表示変数があれば [Must-fix] [defect] で報告する
-  （実例: プロパティ名の誤りがテスト未検証で素通りしたケースがある）
 ```
 
 ## SECURITY_PROMPT (共通ヘッダ + 以下)
@@ -180,7 +178,7 @@ remote への書き込み (`git push` / `gh pr edit|review|merge` / `gh api` の
 指摘が無ければ「指摘なし」と明示的に返す。
 ```
 
-(根拠: 5 PR 連続して 5 巡 → 2-4 巡への短縮を実測し正式採用)
+(目的: 後半巡で些末な指摘が出続けて収束しないのを防ぎ、ブロッカー級の検出に集中させる)
 
 ## fix-stable 収束キーの除外指示
 

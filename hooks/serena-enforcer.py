@@ -86,7 +86,7 @@ RULES = [
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードを対象にした grep は禁止。Serena の "
-        "mcp__serena__search_for_pattern / mcp__serena__find_symbol を使う。",
+        "mcp__serena__find_symbol / mcp__serena__find_referencing_symbols を使う（テキスト検索が必要なら bypass を付ける）。",
         "grep",
     ),
     (
@@ -95,7 +95,7 @@ RULES = [
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r"))"
         ),
         "コードを対象にした find は禁止。Serena の "
-        "mcp__serena__find_file / mcp__serena__find_symbol を使う。",
+        "mcp__serena__find_symbol を使う（ファイル名検索が必要なら bypass を付ける）。",
         "find",
     ),
     (
@@ -121,7 +121,7 @@ RULES = [
             r"\bls\b[^|;&]*?-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r")"
         ),
         "コード配下の再帰 ls は禁止。Serena の "
-        "mcp__serena__list_dir / mcp__serena__find_file を使う。",
+        "mcp__serena__get_symbols_overview を使う（ディレクトリ構造の確認が必要なら bypass を付ける）。",
         "ls-R",
     ),
 ]
@@ -135,7 +135,7 @@ RULES = [
 BYPASS_WARNINGS = {
     "grep": (
         "[serena-enforcer] WARN: grep の bash-discovery bypass は serena 代替推奨。"
-        "mcp__serena__search_for_pattern (パターン検索) / "
+        "mcp__serena__find_referencing_symbols (参照検索) / "
         "mcp__serena__find_symbol (シンボル定義) を検討してください。"
     ),
     "cat": (

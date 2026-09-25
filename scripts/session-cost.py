@@ -8,10 +8,23 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+# 出典: https://platform.claude.com/docs/en/about-claude/pricing（2026-09-26 確認）。
+# cache_write は 5 分キャッシュ書込。前方一致で先にマッチしたキーを使うため、
+# 長い（より具体的な）キーを先に置く。
+_OPUS_45_PLUS = {"input": 5.0, "output": 25.0, "cache_write": 6.25, "cache_read": 0.50}
 PRICING = {
+    "claude-fable-5-1": {"input": 10.0, "output": 50.0, "cache_write": 12.50, "cache_read": 0.25},
+    "claude-fable-5": {"input": 10.0, "output": 50.0, "cache_write": 12.50, "cache_read": 1.0},
+    "claude-opus-5-5": {"input": 4.0, "output": 20.0, "cache_write": 5.0, "cache_read": 0.20},
+    "claude-opus-5": _OPUS_45_PLUS,
+    "claude-opus-4-8": _OPUS_45_PLUS,
+    "claude-opus-4-7": _OPUS_45_PLUS,
+    "claude-opus-4-6": _OPUS_45_PLUS,
+    "claude-opus-4-5": _OPUS_45_PLUS,
     "claude-opus-4": {"input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.50},
+    "claude-sonnet-5": {"input": 2.0, "output": 10.0, "cache_write": 2.50, "cache_read": 0.20},
     "claude-sonnet-4": {"input": 3.0, "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
-    "claude-haiku-4": {"input": 0.80, "output": 4.0, "cache_write": 1.0, "cache_read": 0.08},
+    "claude-haiku-4": {"input": 1.0, "output": 5.0, "cache_write": 1.25, "cache_read": 0.10},
 }
 DEFAULT_PRICING_KEY = "claude-opus-4"
 
