@@ -1064,27 +1064,12 @@ worktree を対象外とする**ため掃除できない)。累積するとリ�
 セッションが使用中の可能性があるため絶対に触らない**。無条件の
 `rm -rf .claude/worktrees/*` は厳禁。
 
-**この sweep ブロックは本 skill 内で唯一の実行可能 shell** であり、末尾「注意
-事項」の「`bash` code block は疑似コード」宣言の **例外**である。Step 8 で親
-エージェントが `bash` ツールで **verbatim 実行する** (他ブロックのような
-`if [ ... ]:` 風の非実行疑似コードではない)。
+Step 8 で親エージェントが `bash` ツールで以下を実行する（リポジトリルートで実行）。
+処理本体は同梱スクリプトにある。skill 本文に置くと、Claude Code が本文中の位置引数記法
+（ドル記号 + 数字）を skill 引数で置換して awk が壊れるため、別ファイルにしている:
 
 ```bash
-# .claude/worktrees 配下で lock の pid が死んでいる孤児だけを掃除。
-# pid が抽出できない (手動 lock 等) ものは安全側に倒して対象外。
-# wt 抽出は substr で行末まで取る (パスにスペースが含まれても切れないように。
-# $2 だと "worktree /path with space/..." が途中で切れる)。
-git worktree list --porcelain | awk '
-  /^worktree /{wt=substr($0,10)}
-  /^locked/{ if (match($0,/pid [0-9]+/)) print wt"\t"substr($0,RSTART+4,RLENGTH-4) }
-' | while IFS=$'\t' read -r wt pid; do
-    case "$wt" in */.claude/worktrees/*) ;; *) continue ;; esac   # 対象限定
-    kill -0 "$pid" 2>/dev/null && continue                        # 稼働中は触らない
-    git worktree unlock "$wt" 2>/dev/null
-    git worktree remove --force "$wt" 2>/dev/null \
-      && git branch -D "worktree-$(basename "$wt")" 2>/dev/null   # 残骸ブランチも削除
-done
-git worktree prune
+bash ~/.claude/skills/review-pr/scripts/sweep-orphan-worktrees.sh
 ```
 
 review-only モードでも本 sweep は実行してよい (collaborator のブランチや PR
@@ -1157,8 +1142,8 @@ Step 5 を参照。判定の skip 判断は不要。条件が false でも実施
 - 本 skill 内の `bash` 言語タグ付き code block は原則 **LLM 向け疑似コード**
   (Python 風 `if [ ... ]:` / `else:` 等を許容)。実行可能な shell スクリプト
   ではない。実機実行する箇所は親エージェントが個別に `bash` ツールで実行
-  する責務。**例外: Step 8「孤児 worktree の防御的 sweep」のブロックのみは
-  verbatim 実行を意図した実シェル** (当該節に明記)
+  する責務。**例外: Step 8「孤児 worktree の防御的 sweep」は同梱スクリプト
+  (`scripts/sweep-orphan-worktrees.sh`) をそのまま実行する** (当該節に明記)
 - `review-pr` 自身を **Skill ツール経由で呼ぶ** ことは可能 (create-pr Step 5
   の委譲経路) で、その場合 `review-pr` 本体は親と同一コンテキストで走る。
   これがバイアスを生まないのは、本 skill が「コードを書いた本人がレビュー

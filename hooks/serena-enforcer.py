@@ -46,6 +46,12 @@ CODE_EXT_PATTERN = (
 )
 BLADE_EXT_PATTERN = r"\.blade\.php\b"
 
+# コマンド名として現れたときだけ一致させる。`\bhead\b` だと `-` も単語境界になり、
+# `session-cost-head.py` のようなファイル名の一部に誤爆していた。
+def _cmd(names: str) -> str:
+    return r"(?<![\w./-])(?:" + names + r")(?![\w.-])"
+
+
 # ---- 判定前に落とすノイズ（誤爆の実例に基づく） ---------------------------
 
 # ビルド生成物・依存物のディレクトリ配下のトークン。
@@ -70,7 +76,7 @@ def _strip_for_match(command: str) -> str:
     c = HEREDOC_BODY.sub(" ", command)
     c = HEREDOC_OPEN.sub(" ", c)
     c = ARTIFACT_TOKEN.sub(" ", c)
-    if re.search(r"\bgrep\b", c):
+    if re.search(_cmd("grep"), c):
         c = QUOTED.sub(" ", c)
     return c
 
@@ -82,7 +88,7 @@ def _strip_for_match(command: str) -> str:
 RULES = [
     (
         re.compile(
-            r"\bgrep\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|"
+            _cmd("grep") + r"[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードを対象にした grep は禁止。Serena の "
@@ -91,7 +97,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\bfind\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|-name\s+['\"][^'\"]*?(?:"
+            _cmd("find") + r"[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|-name\s+['\"][^'\"]*?(?:"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r"))"
         ),
         "コードを対象にした find は禁止。Serena の "
@@ -100,7 +106,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\bcat\b[^|;&]*?(?:"
+            _cmd("cat") + r"[^|;&]*?(?:"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードファイルの cat は禁止。Read tool または Serena の "
@@ -109,7 +115,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\b(?:head|tail|wc|less|more)\b[^|;&]*?(?:"
+            _cmd("head|tail|wc|less|more") + r"[^|;&]*?(?:"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードファイルの head/tail/wc/less/more は禁止。Serena の "
@@ -118,7 +124,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\bls\b[^|;&]*?-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r")"
+            _cmd("ls") + r"[^|;&]*?-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r")"
         ),
         "コード配下の再帰 ls は禁止。Serena の "
         "mcp__serena__list_dir / mcp__serena__find_file を使う。",
