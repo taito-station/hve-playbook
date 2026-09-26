@@ -66,9 +66,8 @@ description: |
 }
 ```
 
-## Playwright MCP 使用時の禁則
+## ブラウザ操作の手段
 
-- いかなる形式のコード実行も禁止（Python・JavaScript・Bash 等でのブラウザ操作）
-- subprocess やコマンド実行によるアプローチ不可
-- 利用可能なのは MCP ツールの直接呼び出しのみ
-- エラー時は即座に報告（回避策を探さない、代替手段を実行しない）
+ブラウザ操作は Playwright MCP ツール（上記の `browser_evaluate` を含む）経由でのみ行い、
+Python / Node / Bash のスクリプトや subprocess で別途ブラウザを起動・操作しない。
+Playwright MCP ツール自体が失敗した場合は、代替手段で回避せずユーザーに報告する。

@@ -174,8 +174,7 @@ def main() -> int:
         + (", ".join(sorted(checked)) if checked else "(none)")
         + "\n"
         "Action: 当該テーブルを INFORMATION_SCHEMA.COLUMNS / SHOW CREATE TABLE で dump\n"
-        "してから再度 Write を試みること。dump は production-investigate スキルの\n"
-        "STEP 2.5 「使用テーブルの宣言と一括 dump」に従う。\n"
+        "してから再度 Write を試みること。\n"
         "Bypass (only with explicit justification): add\n"
         "  -- via:no-schema-check: <reason>\n"
         "as a comment line in the SQL.",

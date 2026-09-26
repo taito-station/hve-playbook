@@ -66,10 +66,7 @@ PR の Closes #XXXX の Issue を読んで、現場が触る画面・操作を�
    拡張子や `app/Contexts/` のようなコード配置パス
 
 すべてヒット 0 件であること。ヒットがあれば論理名に書き換える。
-
-> **重要**: 1 だけでは不十分。実運用で「業務語に擬態した短い英名」
-> （例: `Fill`、`Pick` のような単語）が固定 NG リストに無く、括弧併記の形で
-> マニュアルに混入する事故が起きた。**4 種類すべて実行する** こと。
+1 の固定 NG リストは `Fill` / `Pick` のような業務語に似た短い英名を拾えないため、2〜4 がそれを補う。
 
 詳細・コマンドは `TERMINOLOGY.md` 参照。
 
@@ -130,19 +127,9 @@ symlink で配布している環境では、共有ツリーでのブランチ切
 
 ### Step 7. PDF 化
 
-`/pdf` スキルを呼び出す:
-
-```bash
-cd docs/business/manuals && PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome \
-  npx --yes md-to-pdf <file>.md \
-  --basedir <repo-root> \
-  --stylesheet ~/.claude/skills/pdf/assets/manual-style.css \
-  --pdf-options '{"format":"A4","printBackground":true,"preferCSSPageSize":true}' \
-  --launch-options '{"executablePath":"/usr/bin/google-chrome","args":["--no-sandbox","--disable-dev-shm-usage"]}'
-```
-
-PUPPETEER_EXECUTABLE_PATH を指定しないと WSL2 環境で Chrome 起動タイムアウトになる
-ことがあるので、明示する。
+`/pdf` スキルの「3-3. 日本語マニュアル体裁」で生成する（`--basedir` はリポジトリルート）。
+WSL2 で Chrome の起動がタイムアウトする場合は、`PUPPETEER_EXECUTABLE_PATH` と
+`--launch-options` の `executablePath` に Chrome の実パス（例: `/usr/bin/google-chrome`）を指定する。
 
 PDF は `.gitignore` に `docs/**/*.pdf` がある場合がほとんどなので、コミットせず
 ローカル生成物として扱う (運用に応じてユーザーに確認)。

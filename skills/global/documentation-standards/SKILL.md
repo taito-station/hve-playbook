@@ -18,7 +18,7 @@ description: |
 | 操作マニュアル（顧客向け） | `docs/business/manuals/{機能名}.md` |
 | 業務フロー（顧客向け） | `docs/business/workflows/{内容}.md` |
 | トレーニング資料 | `docs/business/training/{内容}.md` |
-| アーキテクチャ決定記録 (ADR) | `docs/adr/{4桁連番}-{kebab-case-title}.md`（knowledge 運用のリポジトリは `knowledge/D19/`。「## ADR」の配置先を参照） |
+| アーキテクチャ決定記録 (ADR) | `docs/adr/{4桁連番}-{kebab-case-title}.md`（knowledge 運用のリポジトリは `knowledge/adr/`。「## ADR」の配置先を参照） |
 | リリースノート | `docs/release-notes/{ISO日付}.md` |
 | 運用・デプロイ・トラブルシュート | `docs/operations/{内容}.md` |
 | 開発者向けガイド | `docs/development/{内容}.md` |
@@ -70,7 +70,7 @@ description: |
 
 - ファイル名: `{4桁連番}-{kebab-case-title}.md`（ファイル名は英語 kebab-case で統一。本文タイトル・内容はプロジェクトの言語で書いてよい）
 - 例: `0001-adopt-feature-flags.md`, `0042-introduce-event-sourcing.md`
-- 連番は**配置先ディレクトリ**（`docs/adr/` または `knowledge/D19/`）内の最大値+1（既存を確認してから採番）
+- 連番は**配置先ディレクトリ**（`docs/adr/` または `knowledge/adr/`）内の最大値+1（既存を確認してから採番）
 - 配置先・フォーマット・ステータス値・作成手順は「## ADR（Architecture Decision Record）」を参照
 
 ### リリースノート専用ルール
@@ -94,8 +94,9 @@ description: |
 
 - 複数リポジトリに跨る共通ポリシー → 共通ポリシー用の中央リポジトリの `docs/adr/`
 - 特定リポジトリのみに適用 → そのリポジトリの `docs/adr/`
-- **knowledge 運用（D01〜D21 の文書クラス）を導入したリポジトリ → `knowledge/D19/`**
-  （ADR は D19「ソフトウェアアーキテクチャ・ADR パック」に属するため。索引は `knowledge/D19-*.md`）
+- knowledge 運用を導入したリポジトリ → `knowledge/adr/`
+  （決定ログとして append-only で運用する。HVE の artifact-management ルール（導入先では `.claude/rules/hve/artifact-management.md`）の「決定ログの不変性」参照）
+- 既に別の配置先（例: `knowledge/D19/`）で ADR を運用しているリポジトリは、その配置先・採番・索引を継続する（移行は別途判断する）
 
 いずれの配置先でも**様式（MADR の章立て・ファイル名・採番・ステータス値）は本標準に従う**。
 
@@ -175,10 +176,10 @@ description: |
 
 ### 作成手順
 
-1. 配置先ディレクトリ（`docs/adr/` または `knowledge/D19/`）内の既存 ADR を確認して次の連番を決定する（命名規則を参照）
+1. 配置先ディレクトリ（`docs/adr/` または `knowledge/adr/`）内の既存 ADR を確認して次の連番を決定する（命名規則を参照）
 2. 上記テンプレートでファイルを作成する。ステータス行は表の値から1つ選んで角括弧とパイプを外し、日付は `date +%Y-%m-%d` で確定した値を入れる（学習データの日付に頼らない）。`Superseded by {4桁連番}-{kebab-case-title}` を選んだ場合はプレースホルダを置き換えた ADR の実 ID に置換する
 3. 既存 ADR を置き換える場合は双方向に更新する。新 ADR の「関連リンク」に `Supersedes:` を記載し、**かつ旧 ADR のステータスを `Superseded by {新 ADR の ID}` に更新する**（片側更新漏れを防ぐ）
-4. 一覧表に追記する（存在する場合）。`docs/adr/README.md`、knowledge 運用なら `knowledge/D19-*.md` の ADR 索引
+4. 一覧表に追記する（存在する場合。例: `docs/adr/README.md`）
 
 ## 内容ルール
 
@@ -239,4 +240,4 @@ Google Drive 等のドラフト管理サービスへ自動同期したい場合�
 2. 永続化が必要なら `docs/` の適切なサブディレクトリへ kebab-case 命名で移動
 3. 顧客フィードバック等の参照価値があるなら `docs/features/{機能名}/{ISO日付}-{内容}.md` で保存
 
-`docs/temp/` は使用しない（廃止済み）。
+ユーザー提供の一時ファイルは `inbox/` に置く。`docs/temp/` は create-issue / questionnaire 等の skill が自身の作業ファイル用に使う揮発ディレクトリであり、ユーザー提供ファイルの置き場にはしない。

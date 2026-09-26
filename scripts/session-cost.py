@@ -8,12 +8,27 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+# 出典: https://platform.claude.com/docs/en/about-claude/pricing（2026-09-26 確認）。
+# cache_write は 5 分キャッシュ書込。キーはモデル ID の前方一致で、最も長く一致したキーを使う。
+# Opus 5.5 / Fable 5.1 / Mythos 5.1 の cache_read は公表どおり 0.1x ではない（0.05x / 0.025x）。
+_OPUS_45_PLUS = {"input": 5.0, "output": 25.0, "cache_write": 6.25, "cache_read": 0.50}
 PRICING = {
+    "claude-fable-5-1": {"input": 10.0, "output": 50.0, "cache_write": 12.50, "cache_read": 0.25},
+    "claude-mythos-5-1": {"input": 10.0, "output": 50.0, "cache_write": 12.50, "cache_read": 0.25},
+    "claude-fable-5": {"input": 10.0, "output": 50.0, "cache_write": 12.50, "cache_read": 1.0},
+    "claude-mythos-5": {"input": 10.0, "output": 50.0, "cache_write": 12.50, "cache_read": 1.0},
+    "claude-opus-5-5": {"input": 4.0, "output": 20.0, "cache_write": 5.0, "cache_read": 0.20},
+    "claude-opus-5": _OPUS_45_PLUS,
+    "claude-opus-4-8": _OPUS_45_PLUS,
+    "claude-opus-4-7": _OPUS_45_PLUS,
+    "claude-opus-4-6": _OPUS_45_PLUS,
+    "claude-opus-4-5": _OPUS_45_PLUS,
     "claude-opus-4": {"input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.50},
+    "claude-sonnet-5": {"input": 2.0, "output": 10.0, "cache_write": 2.50, "cache_read": 0.20},
     "claude-sonnet-4": {"input": 3.0, "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
-    "claude-haiku-4": {"input": 0.80, "output": 4.0, "cache_write": 1.0, "cache_read": 0.08},
+    "claude-haiku-4": {"input": 1.0, "output": 5.0, "cache_write": 1.25, "cache_read": 0.10},
 }
-DEFAULT_PRICING_KEY = "claude-opus-4"
+DEFAULT_PRICING_KEY = "claude-opus-5"
 
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
@@ -33,9 +48,9 @@ def find_latest_session_file(cwd: str) -> Optional[Path]:
 
 
 def resolve_pricing_key(model: str) -> Tuple[str, bool]:
-    for key in PRICING:
-        if model.startswith(key):
-            return key, True
+    matches = [key for key in PRICING if model.startswith(key)]
+    if matches:
+        return max(matches, key=len), True
     return DEFAULT_PRICING_KEY, False
 
 
@@ -83,7 +98,7 @@ def format_report(stats: Dict[str, Dict[str, int]]) -> str:
         entry = stats[model]
         pricing_key, known = resolve_pricing_key(model)
         if not known:
-            print(f"警告: 未知のモデル '{model}' は Opus 料金で計算します", file=sys.stderr)
+            print(f"警告: 未知のモデル '{model}' は {DEFAULT_PRICING_KEY} の料金で計算します", file=sys.stderr)
         price = PRICING[pricing_key]
 
         input_cost = round(entry["input"] / 1_000_000 * price["input"], 2)

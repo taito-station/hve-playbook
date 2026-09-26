@@ -163,9 +163,8 @@ tool_name.startswith("mcp__"):
 #### (c-1) hook 化
 
 1. hook 名 (kebab-case) と matcher (Bash / Write / etc) をユーザーに聞く
-2. 配置先: `~/.claude/hooks/<name>.py` (既存があれば timestamp suffix)
-3. PreToolUse 用の最小雛形を書く (既存 `serena-enforcer.py` のヘッダを参考に)
-4. settings.json の `hooks.PreToolUse` に登録するかは別途確認
+2. 雛形作成・settings.json 配線・検証は add-hook skill の手順で行う（同名の既存ファイルがあれば timestamp suffix）
+3. settings.json に配線するかはユーザーに確認し、配線する場合は add-hook 手順 3(d) の参照解決検証まで通す
 
 #### (c-2) スクリプト化
 

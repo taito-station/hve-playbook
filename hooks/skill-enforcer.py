@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
 Pre-Tool-Use hook for Bash that blocks commands which should be invoked
-through a Skill instead.
+through a dedicated route (a Skill or a wrapper script) instead.
 
 Reads tool input from stdin (JSON) and:
 - Returns exit 0 (allow) when the command does not match any known pattern.
-- Returns exit 2 (block) with a stderr message naming the correct skill
+- Returns exit 2 (block) with a stderr message naming the correct route
   when the command matches a registered pattern.
 
 Triggered by Claude Code's PreToolUse hook with matcher="Bash".
 
 Patterns are intentionally narrow: only block the literal commands that
-correspond to a known skill, so general bash usage is not affected.
+correspond to a known route, so general bash usage is not affected.
 """
 
 import json
@@ -19,7 +19,7 @@ import re
 import sys
 
 
-# Each rule: (compiled regex, skill name, reason)
+# Each rule: (compiled regex, route name (skill or wrapper script), reason)
 RULES = [
     (
         re.compile(r"\bdrawio\b(?=[^|;&]*--export\b)"),
@@ -58,11 +58,10 @@ def main() -> int:
     if not isinstance(command, str):
         return 0
 
-    # Bypass: explicit acknowledgment that the call is part of a skill flow.
-    # Add a comment like `# via:export-drawio` at the end of the bash command
-    # to confirm you went through the Skill tool first. This forces a conscious
-    # confirmation rather than silent rule-evasion: if you add this comment
-    # without first invoking the Skill, that's a deliberate choice you've made.
+    # Bypass: explicit acknowledgment that the call is part of the route's flow.
+    # Add a comment like `# via:run-drawio-export` at the end of the bash command
+    # to confirm you went through that route (skill or wrapper script) first.
+    # This forces a conscious confirmation rather than silent rule-evasion.
     if re.search(r"#\s*via:[a-z0-9_-]+", command):
         return 0
 
@@ -71,9 +70,9 @@ def main() -> int:
             print(
                 "BLOCKED by skill-enforcer hook.\n"
                 f"reason: {reason}\n"
-                f"use skill: /{skill}\n"
-                "Stop and re-run via the Skill tool with the matching skill name.\n"
-                f"Bypass (only after invoking the skill): append `# via:{skill}` to the command.",
+                f"route: {skill}\n"
+                "Stop and re-run via the route given in reason (a skill or a wrapper script).\n"
+                f"Bypass (only after going through that route): append `# via:{skill}` to the command.",
                 file=sys.stderr,
             )
             return 2

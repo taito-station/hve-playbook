@@ -1,16 +1,14 @@
+---
+name: edit-issue
+description: |
+  既存の GitHub Issue の本文を編集・追記するとき、または Issue にコメントを投稿するとき。
+  gh issue edit / gh issue comment を直接使わず本 skill を使う。
+  「issue を更新して」「issue にコメントして」のような自然言語でも起動。
+---
+
 # GitHub Issue 編集
 
 既存の GitHub Issue の本文を編集、またはコメントを追記する。一時ファイル経由で `--body-file` を使い、`#` 行による許可確認を回避する。
-
-## 起動トリガー
-
-- 「issue を編集して」
-- 「issue 本文を更新して」
-- 「issue NNNN を更新して」
-- 「issue 本文に追記して」
-- 「issue にコメントして」
-- 「issue NNNN にコメント追加して」
-- 「issue に方針を追記」（コメントとして追記する場合）
 
 ## 一時ファイル置き場
 

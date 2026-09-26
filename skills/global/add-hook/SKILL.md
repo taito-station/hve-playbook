@@ -12,10 +12,9 @@ allowed-tools: Read, Edit, Write, Grep, Glob, Bash
 
 **settings.json が参照する hook ファイルが存在しないと、その event の tool 呼び出しが
 すべて exit 2 で block される**(例: `PreToolUse` Bash hook のファイル欠落 → 全 Bash が
-死ぬ)。過去にこの事故が実際に発生した (destructive-guard.py を settings に配線したが
-deploy が漏れた)。本 skill はその配線・配備・検証を型化して再発を防ぐ。
+死ぬ)。本 skill は配線・配備・検証を型化してこれを防ぐ。
 
-**配備は構造的に解決済み**: `~/.claude/hooks/` は repo `hooks/` への **ディレクトリ
+**配備**: `~/.claude/hooks/` は repo `hooks/` への **ディレクトリ
 symlink** なので、**repo の `hooks/` に置いた hook は自動で `~/.claude/hooks/` に現れる**
 (個別 symlink を張る必要は無い。README の配備手順参照)。したがって hook 追加の手順は
 「① repo に置く ② settings.json に配線 ③ 検証」に集約される。

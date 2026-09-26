@@ -50,12 +50,12 @@ create-pr Step 5 からの内部呼び出しで depth フラグが渡された�
 - base 同期で意味的コンフリクトが発生したとき
 - ブラウザテスト再走査で回帰が出たとき
 
-それ以外は全自動で進める。**「指摘 0 件で自然終了」が基本ゴール、5 巡到達は警戒シグナル** (修正が新たな問題を呼んでいる / レビュアーが新しい観点を毎巡見つけて収束しない可能性)。
+それ以外は全自動で進める。「指摘 0 件で自然終了」が基本ゴールで、ITER_MAX 到達は警戒シグナル (修正が新たな問題を呼んでいる / レビュアーが新しい観点を毎巡見つけて収束しない可能性)。
 
-5 巡到達の解釈:
+ITER_MAX 到達の解釈 (ITER_MAX > 1 の fix モード):
 
-- **5 巡到達 + 後半巡が Nice-to-have のみ** → 正常な収束、機能的にはマージ可。Step 7 報告で「警戒」ではなく「収束」として記述
-- **5 巡到達 + 後半巡に Must-fix / Should-fix が出続ける** → 真の警戒シグナル。修正が新たな問題を呼んでいる / 観点が収束しない可能性が高い。Step 7 報告で巡ごとの件数推移と残課題を強調
+- **ITER_MAX 到達 + 後半巡が Nice-to-have のみ** → 正常な収束、機能的にはマージ可。Step 7 報告で「警戒」ではなく「収束」として記述
+- **ITER_MAX 到達 + 後半巡に Must-fix / Should-fix が出続ける** → 真の警戒シグナル。修正が新たな問題を呼んでいる / 観点が収束しない可能性が高い。Step 7 報告で巡ごとの件数推移と残課題を強調
 
 ## 短縮禁止
 
@@ -65,7 +65,7 @@ create-pr Step 5 からの内部呼び出しで depth フラグが渡された�
 
 本ルールが禁止対象とするのは **Step 2 のレビュー構成と巡数上限の独断短縮のみ**。skill 内に明記された条件付き skip パス (Step 5 のブラウザテスト未実施時 skip、Step 4 先頭の early-break による escalate / auto-fix=0 中断等) は本ルールの対象外であり、明記された条件で正規に skip / 中断する。
 
-**review-only モードの ITER_MAX=1 は本ルールの「短縮」に該当しない**: Step 0.4 の説明 (line 「review-only モードの ITER_MAX が 1 である理由」参照) のとおり、修正をかけずに reviewer を再起動しても新しい情報が得られない構造的理由による設計上の正規値。fix モードの「5 巡」と同列の規範であり、「独断で減らした」ものではない。
+**review-only モードの ITER_MAX=1 は本ルールの「短縮」に該当しない**: Step 0.4 の説明 (line 「review-only モードの ITER_MAX が 1 である理由」参照) のとおり、修正をかけずに reviewer を再起動しても新しい情報が得られない構造的理由による設計上の正規値。fix モードの depth 別 ITER_MAX と同列の規範であり、「独断で減らした」ものではない。
 
 **`--depth` フラグによる ITER_MAX / ロール構成の変更は本ルールの「独断での短縮」に該当しない**: `--depth` は workflow 設計レベルの決定（resolve-issue skill がパスに応じて指定）であり、実行時の ad-hoc 判断ではない。設計段階でバグを潰す前提でレビュー範囲を再定義したもの。
 
@@ -80,13 +80,13 @@ create-pr Step 5 からの内部呼び出しで depth フラグが渡された�
 ### 具体的に禁止される行動
 
 - `--depth` で指定されたロール構成を勝手に減らす（lightweight で Correctness のみにする等）
-- Analyst（裁定者）/ Fact-checker（legacy モード）を「面倒だから」省略する（Analyst / Fact-checker は全ロールの指摘を統合・事実検証する必須ロール）
+- Analyst（裁定者）/ Fact-checker（legacy モード）を省略する（Analyst / Fact-checker は全ロールの指摘を統合・事実検証する必須ロール）
 - legacy モード（--depth なし）で Reviewer A / B 2 名並列を 1 名に減らす
 - 「1 巡で終わらせる前提」で 2 巡目以降のレビュー実施判断をスキップする (auto-fix 0 件で自然 break するまで毎巡レビューを起動する)
 - 「これは些細だから」と escalate 候補を勝手に auto-fix 扱いに格下げ
 - 逆方向 (短縮の対称) として **「auto-fix 可能な指摘を不必要に escalate に格上げして 2 巡目以降を打ち切る」のも禁止**。Step 3 の分類基準に厳密に従う
 
-例外: **無し**。skill の流れ通りに必ず実施する。
+上の「適用範囲」に明記した条件付き skip / 中断以外で、構成や巡数を減らさない。
 
 ## 重要原則
 
@@ -116,9 +116,8 @@ create-pr Step 5 からの内部呼び出しで depth フラグが渡された�
    dotclaude のように `~/.claude/*` がリポ作業ツリーへの symlink で
    配布される環境では、subagent が「実機テスト」のつもりで
    `git checkout` / `gh pr checkout` すると **ライブ設定
-   (settings.json / hooks) ごと別ブランチ版にリバートされる**
-   (実際に発生した事例があり、`SessionStart` matcher が複数回 main 版に
-   戻った)。worktree 分離で親ツリーを物理的に守り、
+   (settings.json / hooks) ごと別ブランチ版にリバートされる**。
+   worktree 分離で親ツリーを物理的に守り、
    プロンプト制約で checkout 自体を抑止する。レビュー (Reviewer A/B /
    Correctness / Security / Impact / Analyst) はローカル diff ファイルの
    Read のみで完結するため、作業ツリーの書き換えは本来不要。
@@ -413,7 +412,7 @@ FIXED_KEYS_THIS_ROUND = set()   # 本巡 Step 4 で auto-fix した指摘のキ�
 **review-only モードの ITER_MAX が 1 である理由**: 修正をかけずに reviewer
 を再起動しても、新しい情報が無いので findings は本質的に同じになる
 (reviewer subagent は親文脈を持たないため、前巡の findings を知らない)。
-fix モードの 5 巡が意味を持つのは「修正 → その修正が新たな問題を呼んでい
+fix モードの複数巡が意味を持つのは「修正 → その修正が新たな問題を呼んでい
 ないか再レビュー」のサイクルがあるため。review-only は単発で十分。
 
 **ループ枠の明示** (Step 1 〜 Step 6 の流れ):
@@ -917,7 +916,7 @@ else:
 | 終了原因 | 振る舞い | 該当 MODE |
 |---|---|---|
 | auto-fix が 0 件のレビューが返った | Step 4 で break、Step 7 へ (理想形) | fix |
-| 5 巡完了 (iteration > ITER_MAX) | Step 6 で break、Step 7 へ (警戒シグナル or 収束 — 上の概要を参照) | fix |
+| ITER_MAX 巡完了 (iteration > ITER_MAX) | Step 6 で break、Step 7 へ (警戒シグナル or 収束 — 上の概要を参照) | fix |
 | escalate を検出 (ESCALATE_REASON 設定) | 検出した Step で即 break、Step 7 へ | fix |
 | ブラウザテスト回帰失敗 | 即中断して Step 7 へ | fix |
 | base 同期で意味的コンフリクト | 即中断して Step 7 へ (ユーザー判断) | fix |
@@ -1009,7 +1008,7 @@ if [ "$MODE" = "fix" ] && [ "$OWNED_BODY_FILE" = "True" ] && [ -n "$N" ]:
 
 ### Step 8: クリーンアップ
 
-**いかなる break 経路 (自然終了 / 5 巡到達 / base-conflict / review-finding /
+**いかなる break 経路 (自然終了 / ITER_MAX 到達 / base-conflict / review-finding /
 browser-regression escalate / review-only 投稿完了) でも、Step 7 完了後に
 必ず本 Step を実行する**。スキップすると `OWNED_BODY_FILE=True` 経路で
 `docs/temp/pr-body.md` が、review-only 経路で `docs/temp/pr${N}-review-comment.md`
@@ -1110,13 +1109,6 @@ skill が「ユーザー確認を取って停止する」のは以下のとき�
 
 ---
 
-## ブラウザテスト再走査判定基準
-
-Step 5 を参照。判定の skip 判断は不要。条件が false でも実施したほうが
-安心な場合は実施して構わない。
-
----
-
 ## 注意事項
 
 - `docs/temp/` は `.gitignore` 対象外なので Step 8 で必ず掃除 (所有権ある場合)
@@ -1124,8 +1116,8 @@ Step 5 を参照。判定の skip 判断は不要。条件が false でも実施
   (`chore: <N> 巡目レビュー指摘反映` 等)、プロジェクトの commit 規約
   (日本語 / 英語) に合わせる。squash は経路 A では create-pr Step 6 が自動で行う
   (経路 B の単独起動では squash しない)
-- **指摘 0 件で自然終了 = 基本ゴール / 5 巡到達 = 警戒シグナル または収束**
-  (上の概要を参照)。Step 7 の報告では 5 巡到達ケースの「巡ごとの auto-fix
+- 指摘 0 件で自然終了 = 基本ゴール / ITER_MAX 到達 = 警戒シグナル または収束
+  (上の概要を参照)。Step 7 の報告では ITER_MAX 到達ケースの「巡ごとの auto-fix
   件数推移」と「収束 / 警戒の判定」を明記すること
 
 ### review-only モード固有の注意

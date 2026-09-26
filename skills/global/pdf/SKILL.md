@@ -184,6 +184,6 @@ print(fonts)"
 - `sed` でのbase64置換はSVGが大きいと `Argument list too long` エラーになる → Pythonスクリプト必須
 - `--basedir` を忘れると相対パス画像が黙って欠落する。生成後の画像確認必須
 - 章ごとに強制改ページしたい場合は CSS に `h2 { page-break-before: always; }` を追加。ただしページ数が増える（各章末尾に空白）ので、密度優先なら入れない
-- PDF生成後は必ず確認してからコミットする
+- PDF は手順 4 の確認を済ませてから配布する（`docs/**/*.pdf` は通常 gitignore 対象で、コミットしない）
 
 ARGUMENTS: $ARGUMENTS

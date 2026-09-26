@@ -141,7 +141,7 @@ def main():
         f"reason: 現在ブランチ \"{current_branch}\" は MERGED 済みの PR #{pr['number']} ({pr['title']}) を持っています。\n"
         f"  URL: {pr['url']}\n"
         "このブランチへの追加 push は混乱の元になります。以下のいずれかを検討してください:\n"
-        "  1. 新しいブランチを切る (例: git checkout -b feature/<次の作業名>)\n"
+        "  1. 新しいブランチを切る (例: git switch -c feat/<次の作業名>)\n"
         "  2. 意図的な追加 push の場合はユーザーに確認したうえで実行する\n"
         "Bypass (only after user confirmation): append `# via:git-push-merged-pr-check` to the command.",
         file=sys.stderr,
