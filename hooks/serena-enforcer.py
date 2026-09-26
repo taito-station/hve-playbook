@@ -25,6 +25,10 @@ false positives observed in practice (see _strip_for_match):
 - build artifacts — `wc -l lib/index.js` inspects compiled output.
   Serena reads source, so it cannot answer questions about build results.
 
+Command names are matched only as command tokens (see _cmd), so a name
+embedded in a filename or option (`session-cost-head.py`, `--tail`) does
+not trigger a rule, while `/usr/bin/grep` still does.
+
 Bypass: append `# via:bash-discovery: <reason>` to the command if you
 have a justified reason to use bash for discovery anyway (e.g., a quick
 sanity check that serena cannot do, or running tests via grep on test
@@ -46,10 +50,13 @@ CODE_EXT_PATTERN = (
 )
 BLADE_EXT_PATTERN = r"\.blade\.php\b"
 
+
 # コマンド名として現れたときだけ一致させる。`\bhead\b` だと `-` も単語境界になり、
 # `session-cost-head.py` のようなファイル名の一部に誤爆していた。
+# 直前の `/` は許す（`/usr/bin/grep` のようなパス付き起動を拾う）。直後の `/` は
+# 許さない（`scripts/cat/run.py` のようなディレクトリ名は拾わない）。
 def _cmd(names: str) -> str:
-    return r"(?<![\w./-])(?:" + names + r")(?![\w.-])"
+    return r"(?<![\w.-])(?:" + names + r")(?![\w./-])"
 
 
 # ---- 判定前に落とすノイズ（誤爆の実例に基づく） ---------------------------

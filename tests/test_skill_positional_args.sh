@@ -13,9 +13,9 @@ ROOT="${SKILLS_ROOT:-$(cd "$(dirname "$0")/.." && pwd)/skills}"
 
 FAIL=0
 while IFS= read -r f; do
-    hits=$(grep -nE '\$[0-9]' "$f" || true)
+    hits=$(grep -nE '\$\{?[0-9]' "$f" || true)
     if [ -n "$hits" ]; then
-        echo "[FAIL] $f"
+        echo "[FAIL] $f (シェル・awk は skill 同梱の scripts/ に切り出す)"
         echo "$hits" | sed 's/^/    /'
         FAIL=1
     fi

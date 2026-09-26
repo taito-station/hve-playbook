@@ -34,15 +34,19 @@ check block "grep でコード配下" "grep -rn foo src/"
 check block "find でコード配下" "find app/ -name '*.php'"
 check block "ls -R でコード配下" "ls -R src/"
 check block "&& の後の head" "cd /tmp && head -3 main.go"
+check block "絶対パスで起動した head" "/usr/bin/head -20 src/app.py"
+check block "絶対パスで起動した cat" "/bin/cat src/index.ts"
+check block "絶対パスで起動した grep" "/usr/bin/grep -rn foo src/"
+check block "相対パスで起動した find" "./find src/ -name '*.py'"
 
 # ファイル名・オプションの一部なら allow
 check allow "ファイル名に head を含む .py を実行" "python3 /tmp/session-cost-head.py"
-check allow "ファイル名に tail を含む .py を引数に渡す" "SCRIPT=/tmp/detail-tail.py bash run.sh"
+check allow "ファイル名に tail を含む .py を環境変数で渡す" "SCRIPT=/tmp/detail-tail.py bash run.sh"
 check allow "ファイル名に cat を含む .py を実行" "python3 scripts/cat-notes.py"
 check allow "ファイル名に grep を含む .py を実行" "python3 /tmp/grep-helper.py"
 check allow "ファイル名に find を含む .py を実行" "python3 /tmp/find-dupes.py"
-check allow "git の --stat (wc 等を含まない)" "git show --stat HEAD"
-check allow "ログの tail" "tail -f storage/logs/laravel.log"
+check allow "オプション名に tail を含む" "docker compose logs --tail 5 app.py"
+check allow "ディレクトリ名が cat" "python3 scripts/cat/run.py"
 
 # bypass
 check allow "理由付き bypass" "head -20 src/app.py # via:bash-discovery: 行数確認"
