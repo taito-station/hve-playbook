@@ -1074,7 +1074,8 @@ bash ~/.claude/skills/review-pr/scripts/sweep-orphan-worktrees.sh
 
 異常終了したセッションの作業は消さない。未コミットの変更がある worktree と、独自コミット
 （他のどの ref にも含まれないコミット）がある残骸ブランチは残し、`[sweep]` で始まる行で
-出力する。この行が出たら Step 7 の最終報告に含め、残すか消すかをユーザーに委ねる。
+出力する。sweep は Step 7 の最終報告の後に走るため、この行が出たら Step 8 の後に追加の
+報告としてそのままユーザーに伝え、残すか消すかをユーザーに委ねる。
 
 review-only モードでも本 sweep は実行してよい (collaborator のブランチや PR
 本文には触れず、ローカルの孤児 worktree を掃除するだけなので read-only 制約に
