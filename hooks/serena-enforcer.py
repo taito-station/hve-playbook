@@ -25,9 +25,11 @@ false positives observed in practice (see _strip_for_match):
 - build artifacts — `wc -l lib/index.js` inspects compiled output.
   Serena reads source, so it cannot answer questions about build results.
 
-Command names are matched only as command tokens (see _cmd), so a name
-embedded in a filename or option (`session-cost-head.py`, `--tail`) does
-not trigger a rule, while `/usr/bin/grep` still does.
+Command names are matched as standalone tokens (see _cmd): a name embedded
+in a filename or option (`session-cost-head.py`, `--tail`) does not trigger
+a rule, while a path-qualified one (`/usr/bin/grep`) still does. The token
+is not required to be in command position, and a name right after `/` or
+`:` still matches (e.g. `python3 tools/grep src/a.py`, `lint:grep src/`).
 
 Bypass: append `# via:bash-discovery: <reason>` to the command if you
 have a justified reason to use bash for discovery anyway (e.g., a quick
@@ -51,7 +53,7 @@ CODE_EXT_PATTERN = (
 BLADE_EXT_PATTERN = r"\.blade\.php\b"
 
 
-# コマンド名として現れたときだけ一致させる。`\bhead\b` だと `-` も単語境界になり、
+# コマンド名を独立したトークンとして現れたときだけ一致させる。`\bhead\b` だと `-` も単語境界になり、
 # `session-cost-head.py` のようなファイル名の一部に誤爆していた。
 # 直前の `/` は許す（`/usr/bin/grep` のようなパス付き起動を拾う）。直後の `/` は
 # 許さない（`scripts/cat/run.py` のようなディレクトリ名は拾わない）。
@@ -83,7 +85,7 @@ def _strip_for_match(command: str) -> str:
     c = HEREDOC_BODY.sub(" ", command)
     c = HEREDOC_OPEN.sub(" ", c)
     c = ARTIFACT_TOKEN.sub(" ", c)
-    if re.search(_cmd("grep"), c):
+    if re.search(r"\bgrep\b", c):
         c = QUOTED.sub(" ", c)
     return c
 

@@ -11,8 +11,12 @@
 set -u
 ROOT="${SKILLS_ROOT:-$(cd "$(dirname "$0")/.." && pwd)/skills}"
 
+if [ ! -d "$ROOT" ]; then echo "[FAIL] skills ディレクトリがありません: $ROOT"; exit 1; fi
+
 FAIL=0
+COUNT=0
 while IFS= read -r f; do
+    COUNT=$((COUNT + 1))
     hits=$(grep -nE '\$\{?[0-9]' "$f" || true)
     if [ -n "$hits" ]; then
         echo "[FAIL] $f (シェル・awk は skill 同梱の scripts/ に切り出す)"
@@ -20,6 +24,8 @@ while IFS= read -r f; do
         FAIL=1
     fi
 done < <(find "$ROOT" -name SKILL.md)
+
+if [ "$COUNT" -eq 0 ]; then echo "[FAIL] 検査対象の SKILL.md が 0 件: $ROOT"; FAIL=1; else echo "[INFO] 検査した SKILL.md: $COUNT 件"; fi
 
 echo "==================================="
 if [ "$FAIL" -eq 0 ]; then echo "ALL TESTS PASSED"; exit 0; else echo "SOME TESTS FAILED"; exit 1; fi

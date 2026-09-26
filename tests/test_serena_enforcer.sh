@@ -16,7 +16,7 @@ check() {  # $1=期待 (block|allow) $2=説明 $3=コマンド
     json=$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$3")
     printf '%s' "$json" | python3 "$HOOK" >/dev/null 2>&1
     rc=$?
-    if [ "$rc" -eq 2 ]; then got=block; else got=allow; fi
+    case "$rc" in 2) got=block ;; 0) got=allow ;; *) got="異常終了(rc=$rc)" ;; esac
     if [ "$got" = "$1" ]; then
         echo "[PASS] $2"
     else
@@ -47,6 +47,7 @@ check allow "ファイル名に grep を含む .py を実行" "python3 /tmp/grep
 check allow "ファイル名に find を含む .py を実行" "python3 /tmp/find-dupes.py"
 check allow "オプション名に tail を含む" "docker compose logs --tail 5 app.py"
 check allow "ディレクトリ名が cat" "python3 scripts/cat/run.py"
+check allow "git log --grep のクォート内のコード名" "git log --grep \"cat src/a.py\""
 
 # bypass
 check allow "理由付き bypass" "head -20 src/app.py # via:bash-discovery: 行数確認"

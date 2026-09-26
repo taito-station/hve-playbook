@@ -1059,7 +1059,7 @@ worktree を対象外とする**ため掃除できない)。累積するとリ�
 
 そこで Step 8 で **lock の pid が死んでいる孤児 worktree のみ**を掃除する。
 これは「**過去の死亡セッションが残した孤児の防御的掃除**」であり、自セッション
-の worktree (親 harness が生存 = `kill -0` が成功) は対象外になる (意図どおり)。
+の worktree (親 harness が生存 = `ps -p` で確認できる) は対象外になる (意図どおり)。
 **lock の pid が生存している worktree は実行中の自セッション / 他の parallel
 セッションが使用中の可能性があるため絶対に触らない**。無条件の
 `rm -rf .claude/worktrees/*` は厳禁。
@@ -1071,6 +1071,10 @@ Step 8 で親エージェントが `bash` ツールで以下を実行する（�
 ```bash
 bash ~/.claude/skills/review-pr/scripts/sweep-orphan-worktrees.sh
 ```
+
+異常終了したセッションの作業は消さない。未コミットの変更がある worktree と、独自コミット
+（他のどの ref にも含まれないコミット）がある残骸ブランチは残し、`[sweep]` で始まる行で
+出力する。この行が出たら Step 7 の最終報告に含め、残すか消すかをユーザーに委ねる。
 
 review-only モードでも本 sweep は実行してよい (collaborator のブランチや PR
 本文には触れず、ローカルの孤児 worktree を掃除するだけなので read-only 制約に
