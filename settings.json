@@ -40,9 +40,9 @@
       "Skill(questionnaire)",
       "Bash(gh pr merge *)"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "auto"
   },
-  "model": "claude-opus-4-6[1m]",
+  "model": "opus",
   "skipWorkflowUsageWarning": true,
   "agentPushNotifEnabled": true,
   "hooks": {
