@@ -21,7 +21,8 @@ Accepted — 2026-09-26
 
 ## 意思決定の要因
 
-- `ANTHROPIC_MODEL` を設定していない同期先の環境で、最新の Opus に追従させたい。
+- `ANTHROPIC_MODEL` を設定していない同期先の環境で、プロバイダが推奨する Opus に追従させたい。同期先は Anthropic API を使う前提とする。
+- `opus` の解決先はプロバイダで変わる（公式ドキュメント https://code.claude.com/docs/en/model-config 、2026-09-26 確認）。Anthropic API / Claude Platform on AWS / Bedrock / Google Cloud's Agent Platform では Opus 5.5 に解決されるが、Microsoft Foundry では Opus 4.6 に解決される。`[1m]` なしで 1M になるのは、Anthropic API 上の Opus 4.7 以降に限られる。Opus 4.6 の 1M には `[1m]` が必要。
 - 特定の版に固定したい環境は `ANTHROPIC_MODEL` で固定できる。`ANTHROPIC_MODEL` は settings の `model` より優先される。作者の環境は `~/.zshrc` で `claude-opus-5-5` に固定している。
 - `hooks/destructive-guard.py` は、allowlist 外の mutator（`cp` / `mv` / `dd` / `truncate`）による上書きや、オプション付きの wrapper（`sudo -u root rm` など）を、自分では止めない。これらは都度確認（許可プロンプト）で止める前提で設計されている。
 - ただし `acceptEdits` でも、作業ディレクトリ内の `cp` / `mv` / `rm` / `sed` は自動承認されるため、許可プロンプトが止めるのは、作業ディレクトリ外（`~/.claude` / `~/.ssh` / `/etc` など）・保護パス・重要パスへの操作と、`dd` / `truncate` / `sudo` などに限られる。
@@ -44,15 +45,15 @@ Accepted — 2026-09-26
 ## 決定内容
 
 - モデル — 選択した選択肢: **`opus` エイリアスにする**。
-  - 採用理由: 同期先の環境で最新の Opus に追従でき、版を固定したい環境は `ANTHROPIC_MODEL` で固定できる。
-  - 実機確認（2026-09-26、`ANTHROPIC_MODEL` を外して `claude -p` で起動）: `opus` は `claude-opus-5-5` に解決され、コンテキストは 1,000,000 だった。そのため `[1m]` の指定は外してよい。
+  - 採用理由: Anthropic API を使う同期先で、推奨される Opus に追従できる。版を固定したい環境や、Microsoft Foundry のように `opus` が旧世代に解決される環境は、`ANTHROPIC_MODEL` で版（必要なら `[1m]` 付き）を固定する。
+  - 実機確認（2026-09-26、Anthropic API、`ANTHROPIC_MODEL` を外して `claude -p` で起動）: `opus` は `claude-opus-5-5` に解決され、コンテキストは 1,000,000 だった。そのため Anthropic API では `[1m]` の指定は外してよい。
 - 権限モード — 選択した選択肢: **`acceptEdits` を維持する**。
   - 採用理由: 作業ディレクトリ外・保護パス・重要パスへの操作と、`dd` / `truncate` / `sudo` などは、`acceptEdits` なら許可プロンプトで止まる。destructive-guard が止めないこれらの操作に対する二段目の防御を、同期先の全環境で保つ。`auto` を使いたいときは、その都度セッション内で切り替える。
 
 ### 結果（Consequences）
 
-- 良い結果: 同期先の既定モデルが最新の Opus に追従する。作業ディレクトリ外などへの破壊的操作に対する二段目の防御（許可プロンプト）が、同期先の全環境で保たれる。
-- 悪い結果: `opus` は、モデルのリリースに応じて解決先が変わる。`auto` を使いたい場合は、セッションごとに切り替える必要がある。作業ディレクトリ内の `cp` / `mv` / `rm` / `sed` は `acceptEdits` でも自動承認されるため、destructive-guard が止めない形（allowlist 外の上書き等）には二段目の防御が無い。Pro / Max / Team プランでは Claude Code が `defaultMode` を auto に変えるかを一度尋ねるので、承諾すると symlink 先のリポジトリの `settings.json` が書き換わる。
+- 良い結果: Anthropic API を使う同期先の既定モデルが、推奨される Opus に追従する。作業ディレクトリ外などへの破壊的操作に対する二段目の防御（許可プロンプト）が、同期先の全環境で保たれる。
+- 悪い結果: `opus` は、モデルのリリースとプロバイダに応じて解決先が変わる。Microsoft Foundry では Opus 4.6 の標準コンテキストになるため、`ANTHROPIC_MODEL` での固定が要る。`auto` を使いたい場合は、セッションごとに切り替える必要がある。作業ディレクトリ内の `cp` / `mv` / `rm` / `sed` は `acceptEdits` でも自動承認されるため、destructive-guard が止めない形（allowlist 外の上書き等）には二段目の防御が無い。Pro / Max / Team プランでは Claude Code が `defaultMode` を auto に変えるかを一度尋ねるので、承諾すると symlink 先のリポジトリの `settings.json` が書き換わる。
 
 ## 選択肢の評価（Pros and Cons）
 
@@ -60,7 +61,7 @@ Accepted — 2026-09-26
 
 #### メリット
 
-- 最新の Opus に自動で追従する。
+- Anthropic API では、推奨される Opus に自動で追従する（2026-09-26 時点で Opus 5.5、1M）。
 
 #### デメリット
 
