@@ -10,3 +10,4 @@
 | [0002](0002-integrate-dotclaude-public-into-hve-playbook.md) | dotclaude-public を hve-playbook に統合する | Accepted | 2026-09-20 |
 | [0003](0003-add-session-cost-and-akm-to-create-pr.md) | create-pr にセッション費用表示と AKM チェックを追加する | Accepted | 2026-09-20 |
 | [0004](0004-audit-prompts-for-opus-5-5.md) | Opus 5.5 向けにプロンプト文面を監査し、規則の食い違いを揃える | Accepted | 2026-09-26 |
+| [0005](0005-default-model-opus-alias.md) | 既定モデルを opus エイリアスにし、既定の権限モードは acceptEdits を維持する | Accepted | 2026-09-26 |
