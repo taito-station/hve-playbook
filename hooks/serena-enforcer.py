@@ -25,6 +25,12 @@ false positives observed in practice (see _strip_for_match):
 - build artifacts — `wc -l lib/index.js` inspects compiled output.
   Serena reads source, so it cannot answer questions about build results.
 
+Command names are matched as standalone tokens (see _cmd): a name embedded
+in a filename or option (`session-cost-head.py`, `--tail`) does not trigger
+a rule, while a path-qualified one (`/usr/bin/grep`) still does. The token
+is not required to be in command position, and a name right after `/` or
+`:` still matches (e.g. `python3 tools/grep src/a.py`, `lint:grep src/`).
+
 Bypass: append `# via:bash-discovery: <reason>` to the command if you
 have a justified reason to use bash for discovery anyway (e.g., a quick
 sanity check that serena cannot do, or running tests via grep on test
@@ -45,6 +51,15 @@ CODE_EXT_PATTERN = (
     r"\.(?:php|ts|tsx|js|jsx|py|rb|go|java|kt|rs|cpp|cc|c|h|hpp|cs|swift|scala|vue)\b"
 )
 BLADE_EXT_PATTERN = r"\.blade\.php\b"
+
+
+# コマンド名を独立したトークンとして現れたときだけ一致させる。`\bhead\b` だと `-` も単語境界になり、
+# `session-cost-head.py` のようなファイル名の一部に誤爆していた。
+# 直前の `/` は許す（`/usr/bin/grep` のようなパス付き起動を拾う）。直後の `/` は
+# 許さない（`scripts/cat/run.py` のようなディレクトリ名は拾わない）。
+def _cmd(names: str) -> str:
+    return r"(?<![\w.-])(?:" + names + r")(?![\w./-])"
+
 
 # ---- 判定前に落とすノイズ（誤爆の実例に基づく） ---------------------------
 
@@ -82,7 +97,7 @@ def _strip_for_match(command: str) -> str:
 RULES = [
     (
         re.compile(
-            r"\bgrep\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|"
+            _cmd("grep") + r"[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードを対象にした grep は禁止。Serena の "
@@ -92,7 +107,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\bfind\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|-name\s+['\"][^'\"]*?(?:"
+            _cmd("find") + r"[^|;&]*?(?:" + CODE_PATH_PATTERN + r"|-name\s+['\"][^'\"]*?(?:"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r"))"
         ),
         "コードを対象にした find は禁止。Serena の "
@@ -101,7 +116,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\bcat\b[^|;&]*?(?:"
+            _cmd("cat") + r"[^|;&]*?(?:"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードファイルの cat は禁止。Read tool または Serena の "
@@ -110,7 +125,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\b(?:head|tail|wc|less|more)\b[^|;&]*?(?:"
+            _cmd("head|tail|wc|less|more") + r"[^|;&]*?(?:"
             + CODE_EXT_PATTERN + r"|" + BLADE_EXT_PATTERN + r")"
         ),
         "コードファイルの head/tail/wc/less/more は禁止。Serena の "
@@ -119,7 +134,7 @@ RULES = [
     ),
     (
         re.compile(
-            r"\bls\b[^|;&]*?-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r")"
+            _cmd("ls") + r"[^|;&]*?-[a-zA-Z]*R[a-zA-Z]*\b[^|;&]*?(?:" + CODE_PATH_PATTERN + r")"
         ),
         "コード配下の再帰 ls は禁止。Serena の "
         "mcp__serena__get_symbols_overview でファイル内の構造を見る。ディレクトリ一覧はシンボル検索で代替できないため、必要なら bypass を付ける。",
