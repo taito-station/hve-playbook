@@ -27,9 +27,11 @@ false positives observed in practice (see _strip_for_match):
 
 Command names are matched as standalone tokens (see _cmd): a name embedded
 in a filename or option (`session-cost-head.py`, `--tail`) does not trigger
-a rule, while a path-qualified one (`/usr/bin/grep`) still does. The token
-is not required to be in command position, and a name right after `/` or
-`:` still matches (e.g. `python3 tools/grep src/a.py`, `lint:grep src/`).
+a rule, while a path-qualified one (`/usr/bin/grep`) still does. A name
+right after `:` does not match (`lint:grep`). Additionally, the matched
+name must be in command position — i.e. part of the first token in a shell
+segment (after `|`, `&&`, `||`, `;`, `(`, `` ` ``, or at the start). This
+prevents arguments like `python3 tools/grep src/a.py` from triggering.
 
 Bypass: append `# via:bash-discovery: <reason>` to the command if you
 have a justified reason to use bash for discovery anyway (e.g., a quick
@@ -58,7 +60,7 @@ BLADE_EXT_PATTERN = r"\.blade\.php\b"
 # 直前の `/` は許す（`/usr/bin/grep` のようなパス付き起動を拾う）。直後の `/` は
 # 許さない（`scripts/cat/run.py` のようなディレクトリ名は拾わない）。
 def _cmd(names: str) -> str:
-    return r"(?<![\w.-])(?:" + names + r")(?![\w./-])"
+    return r"(?<![\w.:-])(?:" + names + r")(?![\w./-])"
 
 
 # ---- 判定前に落とすノイズ（誤爆の実例に基づく） ---------------------------
@@ -75,8 +77,9 @@ ARTIFACT_TOKEN = re.compile(
 HEREDOC_BODY = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?^\s*\2\s*$", re.S | re.M)
 HEREDOC_OPEN = re.compile(r"<<-?\s*(['\"]?)\w+\1")
 
-# クォート文字列。grep を含むコマンドでのみ落とす（検索パターンは通常クォート済み、
-# 対象パスは通常裸のため）。`grep -e '...ts' knowledge/x.md` の誤爆を消す。
+# クォート文字列。コミットメッセージ等の引用符内にコマンド名やコード拡張子が
+# 出現する誤爆を防ぐ。パスをクォートするケース（`head "src/app.py"`）は
+# 検出されなくなるが、実用上は裸パスが大半であり誤 block の方が影響が大きい。
 QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
 
 
@@ -85,9 +88,28 @@ def _strip_for_match(command: str) -> str:
     c = HEREDOC_BODY.sub(" ", command)
     c = HEREDOC_OPEN.sub(" ", c)
     c = ARTIFACT_TOKEN.sub(" ", c)
-    if re.search(r"\bgrep\b", c):
-        c = QUOTED.sub(" ", c)
+    c = QUOTED.sub(" ", c)
     return c
+
+
+def _in_command_position(haystack: str, match: re.Match) -> bool:
+    """マッチしたコマンド名がシェルセグメントの先頭トークン内にあるか判定する。
+
+    ``/usr/bin/grep`` のようなパス付き起動は先頭トークンなので True。
+    ``python3 tools/grep`` の ``tools/grep`` は第 2 トークンなので False。
+    """
+    pos = match.start()
+    token_start = pos
+    while token_start > 0 and haystack[token_start - 1] not in (" ", "\t", "\n"):
+        token_start -= 1
+    before = haystack[:token_start].rstrip()
+    if not before:
+        return True
+    if before[-1] in ("|", ";", "(", "`", "{"):
+        return True
+    if len(before) >= 2 and before[-2:] in ("&&", "||"):
+        return True
+    return False
 
 
 # Each rule: (compiled regex, reason, tool_label)
@@ -189,7 +211,8 @@ def main() -> int:
     matched_reason = None
     matched_tool_label = None
     for pattern, reason, tool_label in RULES:
-        if pattern.search(haystack):
+        m = pattern.search(haystack)
+        if m and _in_command_position(haystack, m):
             matched_reason = reason
             matched_tool_label = tool_label
             break

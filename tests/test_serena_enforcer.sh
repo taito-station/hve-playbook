@@ -49,6 +49,11 @@ check allow "オプション名に tail を含む" "docker compose logs --tail 5
 check allow "ディレクトリ名が cat" "python3 scripts/cat/run.py"
 check allow "git log --grep のクォート内のコード名" "git log --grep \"cat src/a.py\""
 
+# 引数・クォート内のコマンド名は allow (Issue #10)
+check allow "引数パスに grep を含む" "python3 tools/grep src/app.py"
+check allow "npm script 名に grep を含む" "npm run lint:grep src/"
+check allow "コミットメッセージ内の head と .py" 'git commit -m "fix head handling in cost-head.py"'
+
 # bypass
 check allow "理由付き bypass" "head -20 src/app.py # via:bash-discovery: 行数確認"
 
