@@ -38,6 +38,8 @@
       "Skill(large-feature-execution)",
       "Skill(writing-skills)",
       "Skill(questionnaire)",
+      "Skill(pdf-read)",
+      "Skill(review-permissions)",
       "Bash(gh pr merge *)"
     ],
     "defaultMode": "acceptEdits"
