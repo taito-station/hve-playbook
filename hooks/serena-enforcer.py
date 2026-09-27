@@ -32,6 +32,7 @@ right after `:` does not match (`lint:grep`). Additionally, the matched
 name must be in command position — i.e. part of the first token in a shell
 segment (after `|`, `&&`, `||`, `;`, `(`, `` ` ``, or at the start). This
 prevents arguments like `python3 tools/grep src/a.py` from triggering.
+A newline or `&` (background operator) also starts a new segment.
 
 Bypass: append `# via:bash-discovery: <reason>` to the command if you
 have a justified reason to use bash for discovery anyway (e.g., a quick
@@ -100,12 +101,12 @@ def _in_command_position(haystack: str, match: re.Match) -> bool:
     """
     pos = match.start()
     token_start = pos
-    while token_start > 0 and haystack[token_start - 1] not in (" ", "\t", "\n", "|", ";", "(", "`", "{"):
+    while token_start > 0 and haystack[token_start - 1] not in (" ", "\t", "\n", "|", ";", "(", "`", "{", "&"):
         token_start -= 1
-    before = haystack[:token_start].rstrip()
+    before = haystack[:token_start].rstrip(" \t")
     if not before:
         return True
-    if before[-1] in ("|", ";", "(", "`", "{"):
+    if before[-1] in ("|", ";", "(", "`", "{", "\n", "&"):
         return True
     if len(before) >= 2 and before[-2:] in ("&&", "||"):
         return True
