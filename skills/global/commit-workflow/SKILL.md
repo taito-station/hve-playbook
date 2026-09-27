@@ -44,14 +44,18 @@ Conventional Commits（`<type>(<scope>): <subject>`、件名はプロジェク�
 ## デバッグログの確認
 
 `git add` の後・コミット前に、ステージした差分にデバッグ出力が混入していないか確認する。
-パターンはプロジェクトの言語・ロガーに合わせる（一例。Python なら `logging\.debug`、Rails なら
-`Rails\.logger\.debug`、Go なら `fmt\.Print`、.NET なら `Console\.WriteLine` 等に差し替える）:
+既定では `console.log` / `console.debug` / `Log::info` / `Log::debug` / `print(` を探す。
+パターンはプロジェクトの言語・ロガーに合わせて、スクリプトの第 1 引数で既定を置き換える。
+awk の POSIX 拡張正規表現なので `\b` / `\s` / `\d` は使えない。既定の検査も残したいときは `|` で含める
+（一例。Python なら `logging\.debug|print\(`、Rails なら `Rails\.logger\.debug`、Go なら `fmt\.Print`、
+.NET なら `Console\.WriteLine`）:
 
 ```bash
-git diff --cached -U0 | awk '/^\+\+\+ /{f=$0; next} /^\+/ && /console\.(log|debug)|Log::(info|debug)|print\(/{print f; print}'
+bash ~/.claude/skills/commit-workflow/scripts/check-debug-log.sh
+bash ~/.claude/skills/commit-workflow/scripts/check-debug-log.sh 'logging\.debug|print\('   # パターン指定
 ```
 
-（ヒットした行だけを、直前のファイル名（`+++` 行）付きで出す。出力が空なら混入なし）
+（ヒットした行だけを、ファイル名（`+++` 行）付きで出す。終了コード 0 で出力が空なら混入なし。終了コードが 0 以外なら検査失敗なので、パターンや git の状態を確認して再実行する）
 
 デバッグ出力（`console.log` / `print` / `Log::info` 等）は本番に残してはいけない。
 エラーログ（`console.error` / `Log::error` 等）は必要に応じて残す。
