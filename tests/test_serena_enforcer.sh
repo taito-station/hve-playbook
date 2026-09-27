@@ -38,6 +38,14 @@ check block "絶対パスで起動した head" "/usr/bin/head -20 src/app.py"
 check block "絶対パスで起動した cat" "/bin/cat src/index.ts"
 check block "絶対パスで起動した grep" "/usr/bin/grep -rn foo src/"
 check block "相対パスで起動した find" "./find src/ -name '*.py'"
+check block "引数パスの後パイプで grep" "python3 tools/grep src/app.py | grep -rn bar tests/"
+check block "サブシェル内の grep" 'echo $(grep -rn foo src/app.py)'
+check block "バッククォート内の grep" 'echo `grep -rn foo src/app.py`'
+check block "改行後の grep" "echo setup
+grep -rn foo src/"
+check block "|| の後の grep" "false || grep -rn foo src/"
+check block "バックグラウンド後の grep" "server & grep -rn TODO src/"
+check block "find . -name でコード拡張子" "find . -name '*.py'"
 
 # ファイル名・オプションの一部なら allow
 check allow "ファイル名に head を含む .py を実行" "python3 /tmp/session-cost-head.py"
@@ -48,6 +56,11 @@ check allow "ファイル名に find を含む .py を実行" "python3 /tmp/find
 check allow "オプション名に tail を含む" "docker compose logs --tail 5 app.py"
 check allow "ディレクトリ名が cat" "python3 scripts/cat/run.py"
 check allow "git log --grep のクォート内のコード名" "git log --grep \"cat src/a.py\""
+
+# 引数・クォート内のコマンド名は allow (Issue #10)
+check allow "引数パスに grep を含む" "python3 tools/grep src/app.py"
+check allow "npm script 名に grep を含む" "npm run lint:grep src/"
+check allow "コミットメッセージ内の head と .py" 'git commit -m "fix head handling in cost-head.py"'
 
 # bypass
 check allow "理由付き bypass" "head -20 src/app.py # via:bash-discovery: 行数確認"
