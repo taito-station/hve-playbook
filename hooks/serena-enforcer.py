@@ -100,7 +100,7 @@ def _in_command_position(haystack: str, match: re.Match) -> bool:
     """
     pos = match.start()
     token_start = pos
-    while token_start > 0 and haystack[token_start - 1] not in (" ", "\t", "\n"):
+    while token_start > 0 and haystack[token_start - 1] not in (" ", "\t", "\n", "|", ";", "(", "`", "{"):
         token_start -= 1
     before = haystack[:token_start].rstrip()
     if not before:
@@ -211,10 +211,12 @@ def main() -> int:
     matched_reason = None
     matched_tool_label = None
     for pattern, reason, tool_label in RULES:
-        m = pattern.search(haystack)
-        if m and _in_command_position(haystack, m):
-            matched_reason = reason
-            matched_tool_label = tool_label
+        for m in pattern.finditer(haystack):
+            if _in_command_position(haystack, m):
+                matched_reason = reason
+                matched_tool_label = tool_label
+                break
+        if matched_reason:
             break
 
     if matched_reason is None:

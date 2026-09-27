@@ -38,6 +38,9 @@ check block "絶対パスで起動した head" "/usr/bin/head -20 src/app.py"
 check block "絶対パスで起動した cat" "/bin/cat src/index.ts"
 check block "絶対パスで起動した grep" "/usr/bin/grep -rn foo src/"
 check block "相対パスで起動した find" "./find src/ -name '*.py'"
+check block "引数パスの後パイプで grep" "python3 tools/grep src/app.py | grep -rn bar tests/"
+check block "サブシェル内の grep" 'echo $(grep -rn foo src/app.py)'
+check block "バッククォート内の grep" 'echo `grep -rn foo src/app.py`'
 
 # ファイル名・オプションの一部なら allow
 check allow "ファイル名に head を含む .py を実行" "python3 /tmp/session-cost-head.py"
