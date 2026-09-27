@@ -2,17 +2,18 @@
 # sync-dotclaude.sh — dotclaude リポの内容を ~/.claude へ冪等に反映する。
 #
 # なぜ必要か:
-#   CLAUDE.md / settings.json / statusline.sh は「ファイル単位の symlink」なので
-#   git pull だけで中身が追従する。しかし skills / hooks は「項目ごとの symlink」で
+#   CLAUDE.md / statusline.sh は「ファイル単位の symlink」なので
+#   git pull だけで中身が追従する。settings.json は copy で同期する（外部ツールの
+#   書き込みがリポに伝播しないように）。しかし skills / hooks は「項目ごとの symlink」で
 #   デプロイしており、リポに *新規追加* された skill・hook は pull しても
 #   ~/.claude 側に symlink が張られない（＝取りこぼす）。
-#   特に settings.json は symlink で即最新化されるため、「新 hook を参照するのに
-#   実体ファイルが無い」状態になると、その hook が発火する全 tool がブロックされる。
+#   特に settings.json が参照する hook の実体ファイルが無い状態になると、
+#   その hook が発火する全 tool がブロックされる。
 #
 # このスクリプトは pull 後に実行して以下を保証する（何度実行しても安全）:
 #   1. skills/global/* と hooks/* の不足 symlink を張る
-#   2. CLAUDE.md / settings.json / statusline.sh の symlink を保証（新規セットアップ兼用）
-#   3. settings.json が参照する hook が全て実在するか検証（全 tool ブロック事故の検知）
+#   2. CLAUDE.md / statusline.sh の symlink を保証、settings.json はコピーで同期（新規セットアップ兼用）
+#   3. settings.json / settings.local.json が参照する hook が全て実在するか検証（全 tool ブロック事故の検知）
 #   4. リポから消えた skill/hook を指す dangling symlink を検知（--prune で除去）
 #
 # 使い方:
@@ -24,7 +25,7 @@
 #
 # 終了コード:
 #   0   正常（不足リンク作成含む。警告・欠落なし）
-#   1   FATAL: settings.json の "command" が参照する hook が実在しない（要即対応）
+#   1   FATAL: settings.json / settings.local.json の "command" が参照する hook が実在しない（要即対応）
 #   2   要手動確認: dangling symlink 残置、または同名実体の居座りスキップ
 #   64  引数エラー（未知フラグ）
 set -euo pipefail
@@ -71,8 +72,28 @@ echo "==> dotclaude 同期: $REPO_DIR -> $CLAUDE_DIR"
 # 1) トップレベルの単体ファイル（新規セットアップ時のみ実効、既存はほぼ ok）
 echo "-- top-level files"
 link_one "$CLAUDE_DIR/CLAUDE.md"     "$REPO_DIR/CLAUDE.md"
-link_one "$CLAUDE_DIR/settings.json" "$REPO_DIR/settings.json"
 link_one "$CLAUDE_DIR/statusline.sh" "$REPO_DIR/statusline.sh"
+
+# settings.json はコピーで同期する（symlink だと外部ツールの書き込みがリポに伝播するため）。
+# マシン固有の hook は settings.local.json に置く。
+if [ -L "$CLAUDE_DIR/settings.json" ]; then
+  rm "$CLAUDE_DIR/settings.json"
+  cp "$REPO_DIR/settings.json" "$CLAUDE_DIR/settings.json"
+  echo "  migrate: settings.json  (symlink → copy に移行)"
+  fixed=$((fixed + 1))
+elif [ -f "$CLAUDE_DIR/settings.json" ]; then
+  if ! cmp -s "$REPO_DIR/settings.json" "$CLAUDE_DIR/settings.json"; then
+    cp "$REPO_DIR/settings.json" "$CLAUDE_DIR/settings.json"
+    echo "  update : settings.json  (リポ版で上書き)"
+    fixed=$((fixed + 1))
+  else
+    okcnt=$((okcnt + 1))
+  fi
+else
+  cp "$REPO_DIR/settings.json" "$CLAUDE_DIR/settings.json"
+  echo "  copy   : settings.json"
+  linked=$((linked + 1))
+fi
 
 # 2) hooks（*.py / *.sh を項目ごとに symlink。既存デプロイと同じく末尾スラッシュ無し）
 echo "-- hooks"
@@ -121,30 +142,38 @@ for dir in "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/scripts"; do
   done
 done
 
-# 6) 致命チェック: settings.json が参照する hook が全て実在するか
-echo "-- settings.json 参照 hook の実在検査"
+# 6) 致命チェック: settings.json / settings.local.json が参照する hook が全て実在するか
+echo "-- settings 参照 hook の実在検査"
 missing_hook=0
 # hook として発火するのは "command" 行のみ。permissions の allow 文字列
 # (例: "Bash(~/.claude/hooks/xxx:*)") は tool ブロックに無関係なので対象外にする。
-refs="$(grep -E '"command"' "$REPO_DIR/settings.json" 2>/dev/null \
-  | grep -oE '(~|\$CLAUDE_HOME|\$HOME)/\.claude/hooks/[A-Za-z0-9._-]+' | sort -u || true)"
-if [ -n "$refs" ]; then
+check_hook_refs() {
+  local label="$1" file="$2"
+  local refs
+  refs="$(grep -E '"command"' "$file" 2>/dev/null \
+    | grep -oE '(~|\$CLAUDE_HOME|\$HOME)/\.claude/hooks/[A-Za-z0-9._-]+' | sort -u || true)"
+  [ -n "$refs" ] || return 0
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
+    local name
     name="$(basename "$ref")"
     if [ ! -e "$CLAUDE_DIR/hooks/$name" ]; then
-      echo "  FATAL  : settings.json が参照する hook が実在しない: $name  (この hook 発火 tool が全ブロックされる)"
+      echo "  FATAL  : $label が参照する hook が実在しない: $name  (この hook 発火 tool が全ブロックされる)"
       missing_hook=$((missing_hook + 1))
     fi
-  done <<EOF
+  done <<HOOKEOF
 $refs
-EOF
+HOOKEOF
+}
+check_hook_refs "settings.json" "$REPO_DIR/settings.json"
+if [ -f "$CLAUDE_DIR/settings.local.json" ]; then
+  check_hook_refs "settings.local.json" "$CLAUDE_DIR/settings.local.json"
 fi
 
 echo
 echo "==> 完了: link=$linked fix=$fixed ok=$okcnt warn=$warncnt prune=$pruned"
 if [ "$missing_hook" -gt 0 ]; then
-  echo "!! settings.json 参照 hook が $missing_hook 件欠落。hooks/ にファイルが存在するか確認してください。" >&2
+  echo "!! settings 参照 hook が $missing_hook 件欠落。hooks/ にファイルが存在するか確認してください。" >&2
   exit 1
 fi
 if [ "$warncnt" -gt 0 ]; then
