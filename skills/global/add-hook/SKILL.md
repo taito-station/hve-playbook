@@ -70,8 +70,10 @@ if __name__ == "__main__":
 
 ### 2. settings.json に配線
 
-`~/.claude/settings.json`(= repo の `settings.json`、symlink)の `hooks.<Event>` に
-追加する。Event と matcher を正しく選ぶ:
+repo の `settings.json` の `hooks.<Event>` に追加する（マシン固有の hook は
+`~/.claude/settings.machine.json` に書く）。`~/.claude/settings.json` は `sync-dotclaude.sh` が
+repo 版と `settings.machine.json` から生成するファイルなので、直接編集しない（次の同期で退避・上書きされる。
+ADR-0006）。Event と matcher を正しく選ぶ:
 
 - `PreToolUse` / `PostToolUse`: matcher は tool 名 (`"Bash"` / `"Write"` 等)、全 tool は `""`
 - `UserPromptSubmit` / `SessionStart` / `PermissionRequest`: matcher は `""` または
@@ -94,6 +96,9 @@ python3 -m py_compile hooks/<name>.py && echo "compile OK"
 #     コマンド文字列にトリガー語を「データとして」埋め込むと destructive-guard 等に
 #     誤反応されるので、payload は python で組み立てて渡す
 # (d) settings 参照 hook が全解決するか (★最重要: 欠落 = 全 tool block の致命傷を検出)
+#     先に sync で ~/.claude/settings.json を再生成する。sync 自身も参照 hook を検査し、
+#     欠落があれば FATAL (exit 1) で配置を止める。exit 1 なら以下に進まず原因を直す
+bash sync-dotclaude.sh
 python3 - <<'PY'
 import json, os, re
 from pathlib import Path

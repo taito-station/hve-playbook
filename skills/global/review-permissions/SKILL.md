@@ -13,8 +13,8 @@ allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
 
 - **一括 yes 禁止**: 必ず 1 クラスタずつ判断を仰ぐ。`AskUserQuestion` を使う
 - **危険パターンガード**: 後述の DANGER_PATTERNS にマッチする提案は、追加前に必ず警告し再確認を取る
-- **allow の書込先は `~/.claude/settings.local.json`**: 累積する個人 allowlist は gitignore 対象の local 設定に書く（`settings.local.json` は Claude Code が user-level の権限設定として `settings.json` とマージ・有効化して読み込むため、gitignore 対象でも allow は効く）。`~/.claude/settings.json` は dotclaude リポへ symlink されている場合があり、そこへ書くと個人 path や machine 固有の allow が公開リポに焼き込まれてしまう。local が無ければ `{"permissions": {"allow": []}}` で新規作成する（hook 登録のような共有 config は引き続き `settings.json` 側）
-- **書き換え前にバックアップ**: `~/.claude/settings.local.json` を編集する前に必ず `.bak.YYYYMMDDHHMMSS` を作る
+- **allow の書込先は `~/.claude/settings.machine.json`**: 累積する個人 allowlist はマシン固有の overlay に書き、書いた後に dotclaude リポの `sync-dotclaude.sh` を実行して `~/.claude/settings.json` を再生成する（手順 (a) 6）。`~/.claude/settings.json` は同期のたびにリポ版 + overlay から再生成されるため、直接書いても次の同期で退避・上書きされる。user レベルの `~/.claude/settings.local.json` は Claude Code に読まれない（ADR-0006）。`settings.machine.json` も Claude Code が直接読むのではなく、sync でマージされて初めて有効になる。overlay が無ければ `{"permissions": {"allow": []}}` で新規作成する（hook 登録のような共有 config はリポの `settings.json` 側）
+- **書き換え前にバックアップ**: `~/.claude/settings.machine.json` を編集する前に必ず `.bak.YYYYMMDDHHMMSS` を作る
 - **既存ファイル絶対上書き禁止**: skill/hook/script 雛形の生成時、同名既存があれば timestamp suffix で別ファイル名にする
 
 ## 動作フロー
@@ -92,7 +92,7 @@ tool_name.startswith("mcp__"):
 
 #### (a) allow パターン追加
 
-1. `~/.claude/settings.local.json` の有無を確認し、あれば Read（無ければ `{"permissions": {"allow": []}}` を起点とし、実ファイルは手順 5 の Python で生成）
+1. `~/.claude/settings.machine.json` の有無を確認し、あれば Read（無ければ `{"permissions": {"allow": []}}` を起点とし、実ファイルは手順 5 の Python で生成）
 2. `permissions.allow` 配列を取得
 3. DANGER_PATTERNS チェック:
    ```
@@ -114,19 +114,19 @@ tool_name.startswith("mcp__"):
    ```
    いずれかにマッチしたら AskUserQuestion で「本当に追加するか」を再確認
 
-4. バックアップ: ファイルが既存なら `cp ~/.claude/settings.local.json ~/.claude/settings.local.json.bak.$(date +%Y%m%d%H%M%S)`（新規作成時はバックアップ不要）
+4. バックアップ: ファイルが既存なら `cp ~/.claude/settings.machine.json ~/.claude/settings.machine.json.bak.$(date +%Y%m%d%H%M%S)`（新規作成時はバックアップ不要）
 5. JSON 読み書きは Python で:
    ```python
    import json
    from pathlib import Path
-   p = Path.home() / ".claude" / "settings.local.json"
+   p = Path.home() / ".claude" / "settings.machine.json"
    text = p.read_text() if p.exists() else ""
    if text.strip():
        try:
            data = json.loads(text)
        except json.JSONDecodeError:
            # 破損 JSON は上書きせず中止 (下記エラーハンドリング規定)
-           raise SystemExit("settings.local.json が壊れています。上書きせず中止します")
+           raise SystemExit("settings.machine.json が壊れています。上書きせず中止します")
    else:
        data = {}   # 空ファイル(0 byte)・不在でも壊れない
    allow = data.setdefault("permissions", {}).setdefault("allow", [])
@@ -136,6 +136,16 @@ tool_name.startswith("mcp__"):
    p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
    ```
    既存のフォーマット維持のため `indent=2` で揃える (新規作成時も同じ indent で出力)
+6. 反映: dotclaude リポの `sync-dotclaude.sh` を実行して `~/.claude/settings.json` を再生成する。リポの場所は `~/.claude/CLAUDE.md` の symlink 先から求め、見つからなければ実行せずユーザーにリポの場所を尋ねる:
+   ```bash
+   SYNC="$(python3 -c 'import os; print(os.path.join(os.path.dirname(os.path.realpath(os.path.expanduser("~/.claude/CLAUDE.md"))), "sync-dotclaude.sh"))')"
+   if [ -L ~/.claude/CLAUDE.md ] && [ -f "$SYNC" ]; then bash "$SYNC"; else echo "sync-dotclaude.sh が見つからない" >&2; false; fi
+   ```
+   終了コードごとの扱い（いずれも出力の FATAL / WARN 行をユーザーに提示する）:
+   - 0: 反映済み
+   - 2: 反映済み。ただし警告あり（直接編集された settings.json の退避、settings.local.json の残存、dangling symlink 等）
+   - 1: allow は反映されていない（settings.machine.json の不正、参照 hook の欠落等）。原因を報告する
+   - それ以外（sync-dotclaude.sh が見つからない場合を含む）: sync を実行できていない。見つからない場合はユーザーにリポの場所を尋ねる
 
 #### (b) skill 化
 
@@ -171,7 +181,7 @@ tool_name.startswith("mcp__"):
 1. スクリプト名 (kebab-case) と概要をユーザーに聞く
 2. 配置先: `~/.claude/scripts/<name>.sh` (dir が無ければ作成)
 3. シェル雛形 (TODO コメント込み) を生成
-4. allow パターンとして `Bash(~/.claude/scripts/<name>.sh:*)` を settings.local.json に追加（(a) と同じ書込先）
+4. allow パターンとして `Bash(~/.claude/scripts/<name>.sh:*)` を settings.machine.json に追加し、sync-dotclaude.sh で反映する（(a) の 4〜6 と同じ手順）
 
 #### (c-3) 都度確認継続
 
@@ -233,13 +243,13 @@ hook 化: 0 件
 都度確認継続: 2 件
 次回送り: 1 件
 
-settings.local.json バックアップ: ~/.claude/settings.local.json.bak.20260526145501
+settings.machine.json バックアップ: ~/.claude/settings.machine.json.bak.20260526145501
 ```
 
 ## エラーハンドリング
 
 - `permission-requests.jsonl` が空 → 「未レビュー件数: 0」で終了
 - JSON パース失敗行はスキップして警告のみ
-- 既存 settings.local.json のバックアップに失敗したら処理中止 (allow 追加はやらない)。新規作成パスはバックアップ対象外なので本ルールは適用されない
-- 既存 settings.local.json が壊れた JSON で `json.loads` が例外を投げたら、上書きせず処理中止してユーザーに報告 (空ファイルは `text.strip()` ガードで `{}` 起点として扱う)
+- 既存 settings.machine.json のバックアップに失敗したら処理中止 (allow 追加はやらない)。新規作成パスはバックアップ対象外なので本ルールは適用されない
+- 既存 settings.machine.json が壊れた JSON で `json.loads` が例外を投げたら、上書きせず処理中止してユーザーに報告 (空ファイルは `text.strip()` ガードで `{}` 起点として扱う)
 - 雛形ファイル作成時、既存があれば timestamp suffix で別ファイル化し、その旨を表示
