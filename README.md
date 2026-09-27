@@ -25,6 +25,8 @@ bash hve-playbook/sync-dotclaude.sh
 
 `sync-dotclaude.sh` は `~/.claude/` に symlink を張る（冪等・何度実行しても安全）。以降は `git pull` + `sync-dotclaude.sh` で最新化。
 
+`~/.claude/settings.json` だけは symlink ではなく、リポの `settings.json` と `~/.claude/settings.machine.json`（マシン固有の hook・permissions 等。任意）をマージした生成物になる。`~/.claude/settings.json` を直接編集しても次の同期で上書きされるため、マシン固有の設定は `settings.machine.json` に書く（user レベルの `~/.claude/settings.local.json` は Claude Code に読まれない。[ADR-0006](knowledge/adr/0006-generate-settings-json-with-machine-overlay.md)）。前回の同期後に `~/.claude/settings.json` が直接編集されていた場合は、`settings.json.bak-<日時>` に退避してから上書きする。生成には `python3` が必要。
+
 ### 2. プロジェクトへの HVE 導入
 
 ```bash
