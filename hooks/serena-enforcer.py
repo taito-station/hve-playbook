@@ -81,7 +81,8 @@ HEREDOC_OPEN = re.compile(r"<<-?\s*(['\"]?)\w+\1")
 # クォート文字列。コミットメッセージ等の引用符内にコマンド名やコード拡張子が
 # 出現する誤爆を防ぐ。パスをクォートするケース（`head "src/app.py"`）は
 # 検出されなくなるが、実用上は裸パスが大半であり誤 block の方が影響が大きい。
-QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+# `-name '*.py'` のクォートは find ルールの検出に必要なため lookbehind で保護する。
+QUOTED = re.compile(r"(?<!-name )(?:'[^']*'|\"[^\"]*\")")
 
 
 def _strip_for_match(command: str) -> str:

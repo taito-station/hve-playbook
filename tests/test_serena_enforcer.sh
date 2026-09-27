@@ -45,6 +45,7 @@ check block "改行後の grep" "echo setup
 grep -rn foo src/"
 check block "|| の後の grep" "false || grep -rn foo src/"
 check block "バックグラウンド後の grep" "server & grep -rn TODO src/"
+check block "find . -name でコード拡張子" "find . -name '*.py'"
 
 # ファイル名・オプションの一部なら allow
 check allow "ファイル名に head を含む .py を実行" "python3 /tmp/session-cost-head.py"
