@@ -17,7 +17,7 @@ PHP 8.4 + Laravel 12 でのコーディング規約。`architecture.md` と併�
 
 ### 型宣言
 
-- 引数・戻り値型を **必ず宣言する**
+- 引数・戻り値型を宣言する
 - `mixed` は原則禁止。どうしても必要な場合のみ理由をコメント
 - `?T`（nullable）は最終手段。NULL を許容するなら設計を見直し、別型・別フローにできないか検討
 - 複数型のユニオン（`int|string`）は API 境界での後方互換用以外では使わない
@@ -125,7 +125,7 @@ final readonly class UserName extends StringValue
 
 ### Backed Enum
 
-列挙は **backed enum** で書く。DB の CHECK 制約 / ENUM 型と必ず同期させる:
+列挙は **backed enum** で書く。DB の CHECK 制約 / ENUM 型と同期させる:
 
 ```php
 enum RecipeStatus: string
@@ -211,7 +211,7 @@ public function handle(RegisterUserRequest $req): RegisterUserResponse
 
 ### コンストラクタインジェクション only
 
-UseCase 層では Service Locator（`app()->make()`）・Facade（`Auth::user()` 等）を **使わない**。すべてコンストラクタで受け取る。
+UseCase 層では Service Locator（`app()->make()`）・Facade（`Auth::user()` 等）を使わない。すべてコンストラクタで受け取る。
 
 ```php
 final class RegisterUserInteractor
@@ -229,7 +229,7 @@ Controller でのファサード使用は許容する（Laravel 慣習との折�
 
 ### Repository 内に閉じ込める
 
-Eloquent モデルは `app/Interface/Persistence/Eloquent/Models/` に置き、UseCase / Domain には **絶対に渡さない**。Repository 内で Eloquent ↔ ドメインモデル変換を行う:
+Eloquent モデルは `app/Interface/Persistence/Eloquent/Models/` に置き、UseCase / Domain には渡さない。Repository 内で Eloquent ↔ ドメインモデル変換を行う:
 
 ```php
 final class UserRepository implements UserRepositoryInterface
@@ -271,7 +271,7 @@ final class UserRepository implements UserRepositoryInterface
 - `tests/Unit/` — Interactor の単体テスト。Repository はモックまたはインメモリ実装で差し替え
 - `tests/Feature/` — HTTP レイヤーから Interactor 経由で実 DB に書き込む統合テスト
 - **Pest** を推奨（PHPUnit でも可）
-- `RefreshDatabase` トレイトで実 PostgreSQL に接続する（`composer.md` の test 設定参照）
+- `RefreshDatabase` トレイトで実 PostgreSQL に接続する
 - ファクトリ（`UserFactory` 等）は `database/factories/` に配置（Laravel 標準）
 
 ## 命名

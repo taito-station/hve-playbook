@@ -35,7 +35,7 @@ app/
 
 ### Domain (`app/Domain/`)
 - エンティティと値オブジェクトのみ。**外部依存なし**（Carbon 等の最小限のみ）
-- Eloquent / Laravel の Facade を **絶対に import しない**
+- Eloquent / Laravel の Facade を import しない
 - バリデーションは値オブジェクトの static factory（`fromString()` 等）に集約
 - ドメインエラーは `App\Domain\Exception\InvalidFormatException` / `InvalidLengthRangeException` のみに留める
 
@@ -85,7 +85,7 @@ Interactor は コンストラクタインジェクションで RepositoryInterf
 
 ## Controller の責務
 
-Controller は薄く保つ。**ビジネスロジックを書かない**:
+Controller は薄く保ち、ビジネスロジックを書かない:
 
 ```php
 final class RegisterUserController

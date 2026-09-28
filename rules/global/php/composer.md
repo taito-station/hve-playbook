@@ -22,7 +22,7 @@ PHP 8.4 + Laravel 12 プロジェクトの `composer.json` 規約と依存管理
 ```
 
 - PHP は `^8.4` でメジャー固定 + マイナー以上を許容
-- Laravel は `^12.0` でメジャー固定。Laravel のメジャーバージョン跨ぎはアップグレード時に必ずリリースノート確認
+- Laravel は `^12.0` でメジャー固定。Laravel のメジャーバージョン跨ぎはアップグレード時にリリースノートを確認する
 
 ### `composer.lock` のコミット
 
@@ -88,7 +88,7 @@ PSR-4 で 4 つのレイヤーを宣言する:
 
 | レイヤー | 依存できる相手 |
 |---|---|
-| `App\Domain` | 外部依存（`ramsey/uuid`, `nesbot/carbon` 等）のみ。**Laravel / Eloquent 禁止** |
+| `App\Domain` | 外部依存（`ramsey/uuid`, `nesbot/carbon` 等）のみ。Laravel / Eloquent に依存しない |
 | `App\UseCase` | `App\Domain` + 外部依存 |
 | `App\Interface\Http` | `App\Domain` + `App\UseCase` + Laravel HTTP |
 | `App\Interface\Persistence` | `App\Domain` + `App\UseCase` + Eloquent / sqlx |
