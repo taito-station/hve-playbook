@@ -20,12 +20,13 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep, AskUserQuestion, WebFetch, W
 ## 設定
 
 - **vault**: `$OBSIDIAN_VAULT` が設定されていればその値、未設定なら
-  `/Users/ito-taito/Library/Mobile Documents/iCloud~md~obsidian/Documents/default`
-  （以下 `{VAULT}` と書く。パスに空白を含むのでシェルでは必ずクォートする）
+  `$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/default`
+  （以下 `{VAULT}` と書く。パスに空白を含むのでシェルではダブルクォートで囲む（`$HOME` を展開させるため）。Read / Write などの
+  ファイル操作ツールには、`$HOME` を展開した絶対パスを渡す）
 - **保存先**: `{VAULT}/study/{テーマ名}/`（存在しなければ初回実行時に自動作成する）
 - **進捗ファイル**: `progress.md`（frontmatter で現在のStep・状態を管理）
 - **各Stepの記録**: `step{N}-{名前}.md`（例: `step0-診断.md`）
-- **テーマ名のサニタイズ**（ディレクトリ名に使う際に必ず適用する。`progress.md` の
+- **テーマ名のサニタイズ**（ディレクトリ名に使う際に適用する。`progress.md` の
   `theme` には元のテーマ名を保存する）:
   1. 不正文字（`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, 改行）はハイフンに置換する
   2. 空白文字（半角スペース・全角スペース・タブ）はハイフンに置換する

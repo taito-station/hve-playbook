@@ -40,7 +40,7 @@ PostgreSQL を対象とするスキーマ設計と命名規約。`migrations.md`
 | 金額・厳密小数 | `NUMERIC(precision, scale)` | 例: `NUMERIC(12, 2)` |
 | 時刻 | `TIMESTAMPTZ` | `TIMESTAMP` (without time zone) は使わない |
 | 日付 | `DATE` | |
-| 列挙 | `CREATE TYPE ... AS ENUM` または `TEXT` + `CHECK (col IN (...))` | アプリ側 enum と必ず同期 |
+| 列挙 | `CREATE TYPE ... AS ENUM` または `TEXT` + `CHECK (col IN (...))` | アプリ側 enum と同期させる |
 | JSON | `JSONB` | `JSON` は使わない |
 
 ## NOT NULL 既定
@@ -68,7 +68,7 @@ deleted_at  TIMESTAMPTZ
 
 ## 外部キーと ON DELETE 戦略
 
-外部キーは必ず明示的な `ON DELETE` 戦略を持つ:
+外部キーには明示的な `ON DELETE` 戦略を持たせる:
 
 | 戦略 | 用途 |
 |---|---|
@@ -119,5 +119,5 @@ CREATE INDEX idx_users_created_at ON users (created_at DESC);
 ```
 
 - 列の縦位置を揃えて読みやすくする
-- 制約は `CONSTRAINT` 名を必ず付ける（命名規則に従う）
+- 制約には `CONSTRAINT` 名を付ける（命名規則に従う）
 - インデックスは `CREATE TABLE` の外で個別に作成する（マイグレーション分割しやすいため）

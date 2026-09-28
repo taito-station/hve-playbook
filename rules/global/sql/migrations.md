@@ -49,7 +49,7 @@ sqlx は適用済みマイグレーションを管理するため、`IF NOT EXIS
 
 ### インデックス追加（本番）
 
-大規模テーブルへのインデックス追加は **`CONCURRENTLY` 必須**。ただし `CONCURRENTLY` はトランザクション外でしか実行できないため、マイグレーションファイルを分けるか、`-- sqlx:no-transaction` を使う。
+大規模テーブルへのインデックス追加は `CONCURRENTLY` を付ける（通常の `CREATE INDEX` は書き込みをロックするため）。ただし `CONCURRENTLY` はトランザクション外でしか実行できないため、マイグレーションファイルを分けるか、`-- sqlx:no-transaction` を使う。
 
 ```sql
 -- 20260425120000_add_recipes_user_id_index.up.sql
