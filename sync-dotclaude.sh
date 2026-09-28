@@ -5,16 +5,18 @@
 #   CLAUDE.md / statusline.sh は「ファイル単位の symlink」なので
 #   git pull だけで中身が追従する。settings.json はリポ版と settings.machine.json
 #   （マシン固有の設定）をマージして生成する（外部ツールの書き込みがリポに伝播しないように）。
-#   しかし skills / hooks は「項目ごとの symlink」で
-#   デプロイしており、リポに *新規追加* された skill・hook は pull しても
+#   しかし skills / hooks / rules / agents は「項目ごとの symlink」で
+#   デプロイしており、リポに *新規追加* された skill・hook・rule・agent は pull しても
 #   ~/.claude 側に symlink が張られない（＝取りこぼす）。
+#   rules / agents は user-level 用の rules/global/・agents/global/ だけを対象にする
+#   （rules/hve・agents/hve-* は setup.sh が導入先プロジェクトにコピーする project-level 資産）。
 #   特に settings.json が参照する hook の実体ファイルが無い状態になると、
 #   その hook が発火する全 tool がブロックされる。
 #
 # このスクリプトは pull 後に実行して以下を保証する（何度実行しても安全）:
-#   1. skills/global/* と hooks/* の不足 symlink を張る
+#   1. skills/global/*・hooks/*・rules/global/*・agents/global/* の不足 symlink を張る
 #   2. CLAUDE.md / statusline.sh の symlink を保証（新規セットアップ兼用）
-#   3. リポから消えた skill/hook を指す dangling symlink を検知（--prune で除去）
+#   3. リポから消えた skill/hook/script/rule/agent を指す dangling symlink を検知（--prune で除去）
 #   4. 生成した settings.json が参照する hook が全て実在するか検証し、実在するときだけ配置する
 #      （全 tool ブロック事故の防止）。前回配置後に settings.json が直接編集されていたら退避する
 #
@@ -47,7 +49,7 @@ done
 
 linked=0; okcnt=0; fixed=0; warncnt=0; pruned=0
 
-mkdir -p "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/skills"
+mkdir -p "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/rules" "$CLAUDE_DIR/agents"
 
 # link_one <target-symlink> <source-in-repo>
 # 既存が正しい symlink なら何もしない。別 symlink なら張り直す。
@@ -188,9 +190,23 @@ if [ -d "$REPO_DIR/scripts" ]; then
   done
 fi
 
-# 5) dangling 検知（リポから消えた skill/hook/script を指す壊れリンク）
+# 4b) user-level rules（カテゴリ単位で symlink。skills と同じく末尾スラッシュ付き）
+echo "-- rules/global"
+for d in "$REPO_DIR"/rules/global/*/; do
+  [ -d "$d" ] || continue
+  link_one "$CLAUDE_DIR/rules/$(basename "$d")" "$d"
+done
+
+# 4c) user-level agents（*.md を項目ごとに symlink）
+echo "-- agents/global"
+for f in "$REPO_DIR"/agents/global/*.md; do
+  [ -e "$f" ] || continue
+  link_one "$CLAUDE_DIR/agents/$(basename "$f")" "$f"
+done
+
+# 5) dangling 検知（リポから消えた skill/hook/script/rule/agent を指す壊れリンク）
 echo "-- dangling リンク検査"
-for dir in "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/scripts"; do
+for dir in "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/scripts" "$CLAUDE_DIR/rules" "$CLAUDE_DIR/agents"; do
   for l in "$dir"/*; do
     [ -L "$l" ] || continue
     tgt="$(readlink "$l")"

@@ -11,7 +11,7 @@ Includes [dotclaude-public](https://github.com/taito-station/dotclaude-public) b
 
 | 役割 | デプロイ方法 | デプロイ先 | 内容 |
 |---|---|---|---|
-| **user-level 基盤** | `sync-dotclaude.sh` (symlink) | `~/.claude/` | hooks, global skills, scripts, settings |
+| **user-level 基盤** | `sync-dotclaude.sh` (symlink) | `~/.claude/` | hooks, global skills, scripts, rules/global, agents/global, settings |
 | **project-level HVE** | `setup.sh` (copy) | target/.claude/ | rules/hve, HVE skills/agents/workflows |
 
 ## セットアップ
@@ -26,6 +26,15 @@ bash hve-playbook/sync-dotclaude.sh
 `sync-dotclaude.sh` は `~/.claude/` に symlink を張る（冪等・何度実行しても安全）。以降は `git pull` + `sync-dotclaude.sh` で最新化。
 
 `~/.claude/settings.json` だけは symlink ではなく、リポの `settings.json` と `~/.claude/settings.machine.json`（マシン固有の hook・permissions 等。任意）をマージした生成物になる。`~/.claude/settings.json` を直接編集しても次の同期で上書きされるため、マシン固有の設定は `settings.machine.json` に書く（user レベルの `~/.claude/settings.local.json` は Claude Code に読まれない。[ADR-0006](knowledge/adr/0006-generate-settings-json-with-machine-overlay.md)）。前回の同期後に `~/.claude/settings.json` が直接編集されていた場合は、`settings.json.bak-<日時>` に退避してから上書きする。生成には `python3` が必要。
+
+`rules/global/`・`agents/global/` も同じく `~/.claude/rules/<category>`・`~/.claude/agents/<name>.md` に symlink する。これらを `~/.claude` に実体で置いていた環境は、sync が WARN でスキップする（exit 2）ので、一度だけ実体を退避して sync をやり直す（[ADR-0007](knowledge/adr/0007-consolidate-user-level-rules-and-agents.md)）:
+
+```bash
+mkdir -p ~/.claude/backups/pre-consolidate
+mv ~/.claude/rules/{git,php,rust,sql,workflow} ~/.claude/agents/impl-sonnet.md \
+   ~/.claude/skills/{brew-update-all,learn,review-doc} ~/.claude/backups/pre-consolidate/
+bash hve-playbook/sync-dotclaude.sh   # exit 0 で終わることを確認
+```
 
 ### 2. プロジェクトへの HVE 導入
 
