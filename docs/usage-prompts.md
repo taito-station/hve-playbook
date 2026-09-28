@@ -23,6 +23,8 @@ Claude Code セッション内でコピー&ペーストして使う。
 セットアップが完了したら /hve-ard で要件定義を開始してください。
 ```
 
+ディレクトリを作って `git init` したあとは、2 節のプロンプトで適用してもよい。
+
 ### パラメータ補足
 
 | 置換箇所 | 説明 | 例 |
@@ -35,37 +37,25 @@ ARD にはこのほか任意パラメータがある（`include_kpi_okr`, `attac
 
 ---
 
-## 2. 既存プロジェクトに追加（`.claude/` なし）
+## 2. 既存プロジェクトに追加
 
-プロジェクトはあるが `.claude/` ディレクトリがまだない場合。
+プロジェクトの Claude Code セッションで次の 1 行を送る（`~/workspace/hve-playbook` は hve-playbook を clone した場所に読み替える）。`.claude/` や CLAUDE.md が既にあるかどうかは問わない。
 
 ```
-このプロジェクトに HVE 設計手法を導入したい。
-
-bash hve-playbook/setup.sh .
-
-対象企業: {企業名}
-対象事業: {事業名}
+~/workspace/hve-playbook/docs/prompts/apply-hve-playbook.md を読んで、このリポジトリに hve-playbook を適用して
 ```
+
+Claude が [`docs/prompts/apply-hve-playbook.md`](prompts/apply-hve-playbook.md) の手順に沿って進める。
+
+- ブランチを切る
+- `setup.sh` を実行する
+- 既存の CLAUDE.md へ差分マージする（食い違いは質問票で確認）
+- `.gitignore` を整える
+- 検証して PR にする
 
 ---
 
-## 3. 既存プロジェクトに追加（`.claude/` あり）
-
-すでに `.claude/` ディレクトリに独自の rules や skills がある場合。`setup.sh` は既存設定を壊さずに HVE ファイルだけを配置する。
-
-```
-このプロジェクトにはすでに .claude/ 設定がある。
-HVE の設計手法（hve-playbook）を追加したい。
-
-bash hve-playbook/setup.sh .
-
-CLAUDE.hve.md が作成された場合は、既存の CLAUDE.md へ手動でマージしてください。
-```
-
----
-
-## 4. ワークフロー実行プロンプト
+## 3. ワークフロー実行プロンプト
 
 ### ARD（要件定義）
 
@@ -139,7 +129,7 @@ AAS 完了後:
 
 ---
 
-## 5. 補助スキル
+## 4. 補助スキル
 
 ### 敵対的レビュー
 
@@ -182,17 +172,17 @@ AAS 完了後:
 
 ---
 
-## 6. Tips
+## 5. Tips
 
 - **途中から再開**: ワークフローが途中で中断した場合、SKILL.md の「実行手順」を見て、完了済みステップの成果物（`docs/` 配下）を確認し、次のステップから手動で指示できる
 - **スコープ縮小**: ARD で全事業を分析すると時間がかかる。`対象事業` を指定して絞るのが実用的
 - **成果物の確認**: 各ステップ完了後に `/hve-review` で品質チェックを挟むと、後工程での手戻りを減らせる
-- **.claude/ を git 管理するか**: プロジェクト固有のカスタマイズを加える場合は git 管理する。playbook そのままなら `.gitignore` に追加して管理外にする
+- **.claude/ を git 管理するか**: HVE 資産は git 管理する（プロジェクト固有の調整と、適用した hve-playbook の版を履歴に残すため）。`.claude/` を ignore していると、再セットアップ時に setup.sh が削除・置き直したファイルを git で復元できない
 - **再セットアップ**: `setup.sh` は冪等に動作する。hve-playbook を更新後に再実行すれば最新ファイルが配置される
 
 ---
 
-## 7. rules/hve/ 運用ガイド
+## 6. rules/hve/ 運用ガイド
 
 `setup.sh` でファイルを配置した後、実際にどう運用するかのガイド。
 rules/hve/ 配下のルールは Claude Code が自動読み込みし、該当タスクで自動適用される。

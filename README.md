@@ -44,6 +44,8 @@ bash hve-playbook/setup.sh /path/to/my-project
 
 対象プロジェクトの `.claude/` に HVE 関連ファイル（rules, skills, agents, workflows）をコピーする。
 
+対象プロジェクトの Claude Code セッションに「`~/workspace/hve-playbook/docs/prompts/apply-hve-playbook.md` を読んで、このリポジトリに hve-playbook を適用して」と送れば（パスは clone した場所に読み替える）、ブランチ作成から setup.sh の実行、CLAUDE.md のマージ、PR 作成（リモートが無ければコミット）までを Claude が進める（[適用プロンプト](docs/prompts/apply-hve-playbook.md)）。
+
 ## HVE 設計ワークフロー
 
 ビジネス要件の定義からソフトウェア詳細設計までを 3 つのワークフローで段階的に進める。
