@@ -2,7 +2,10 @@
 
 ## ステータス
 
-Accepted — 2026-09-27
+Partially superseded by 0009-scope-repo-claude-agents-to-hve — 2026-09-29
+
+- 有効な部分: rules・agents・個人 skill の集約と sync での配布、implement-flow の扱い、このリポジトリの `.claude/rules` を `rules/hve` に向けること、`.claude/skills` の扱い
+- 失効した部分: このリポジトリの `.claude/agents` を `agents/` 全体に向けたままにすること、および `agents/global/` が project-level として探索されるかを確認していないとした記述（決定内容・結果）（ADR-0009 で実測し、`agents/hve-*.md` だけを指す形に変えた）
 
 ## 背景と課題
 
