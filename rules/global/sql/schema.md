@@ -11,7 +11,7 @@ PostgreSQL を対象とするスキーマ設計と命名規約。`migrations.md`
 ## 前提
 
 - DB エンジンは **PostgreSQL** を前提とする。MySQL/SQLite は対象外
-- `gen_random_uuid()` を使う場合は `pgcrypto` 拡張を有効化する
+- `gen_random_uuid()` は PostgreSQL 13 以降なら組み込み。12 以前で使う場合は `pgcrypto` 拡張を有効化する
 
 ## 命名規則
 
@@ -19,7 +19,7 @@ PostgreSQL を対象とするスキーマ設計と命名規約。`migrations.md`
 |---|---|---|
 | テーブル | `snake_case`、複数形 | `users`, `recipe_ingredients` |
 | カラム | `snake_case` | `created_at`, `user_id` |
-| 主キー | `id` 単一カラム固定 | `id` |
+| 主キー | エンティティのテーブルは `id` 単一カラム（多対多の中間テーブルは合成 PK） | `id` |
 | 外部キー | `{参照テーブル単数}_id` | `user_id`, `recipe_id` |
 | インデックス | `idx_{table}_{cols}` | `idx_users_email` |
 | ユニーク制約 | `uq_{table}_{cols}` | `uq_users_email` |
@@ -50,13 +50,15 @@ PostgreSQL を対象とするスキーマ設計と命名規約。`migrations.md`
 
 ## 標準カラム
 
-すべてのテーブルに以下を必ず含める:
+エンティティのテーブルには以下を含める。`id` の型は型ポリシーの主キーの行に従う（`BIGSERIAL` か `UUID DEFAULT gen_random_uuid()`）:
 
 ```sql
-id          BIGSERIAL PRIMARY KEY,
+id          BIGSERIAL PRIMARY KEY,   -- または id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
+
+多対多の中間テーブルは、両側の外部キーの合成 PK と `created_at` を持つ（`id`・`updated_at` は持たない。例は「中間テーブル（多対多）」節）。
 
 論理削除を採用するテーブルのみ追加:
 
@@ -84,6 +86,7 @@ deleted_at  TIMESTAMPTZ
 CREATE TABLE recipe_tag (
     recipe_id  BIGINT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
     tag_id     BIGINT NOT NULL REFERENCES tags(id)    ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (recipe_id, tag_id)
 );
 ```

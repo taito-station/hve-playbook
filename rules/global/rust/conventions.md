@@ -101,7 +101,7 @@ impl<R: Repository> Interactor<R> {
 
 ## sqlx の使い方
 
-- `query_as!` マクロ（コンパイル時 DB 接続が必要）は使わない。`query_as` 関数 + `FromRow` derive で型安全マッピングする
+- `query!` 系マクロ（`query!` / `query_as!` / `query_scalar!` / `query_file!` など。ビルドに DB 接続か `cargo sqlx prepare` のオフラインデータが要る）は使わない。`query_as` 関数 + `FromRow` derive で型安全マッピングする
 - DTO は `interface/rdb-gateway/src/dto/{entity}.rs` に定義し、ドメイン型への変換は `TryFrom` で実装
 - マイグレーションは `deployments/db/migrations/` にリバーシブル形式（`.up.sql` / `.down.sql`）で配置
 
