@@ -91,7 +91,7 @@ PSR-4 で 4 つのレイヤーを宣言する:
 | `App\Domain` | 外部依存（`ramsey/uuid`, `nesbot/carbon` 等）のみ。Laravel / Eloquent に依存しない |
 | `App\UseCase` | `App\Domain` + 外部依存 |
 | `App\Interface\Http` | `App\Domain` + `App\UseCase` + Laravel HTTP |
-| `App\Interface\Persistence` | `App\Domain` + `App\UseCase` + Eloquent / sqlx |
+| `App\Interface\Persistence` | `App\Domain` + `App\UseCase` + Eloquent |
 | `App\Infrastructure` | `App\UseCase`（`JwtConfig` 等の型のため）+ 設定系ライブラリ |
 | `App\Providers` 配下 | 全レイヤー（DI 構築のため） |
 

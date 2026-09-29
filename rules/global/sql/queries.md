@@ -154,8 +154,9 @@ RETURNING id;
 ```rust
 // NG
 for user in &users {
-    let recipes = sqlx::query!("SELECT id FROM recipes WHERE user_id = $1", user.id)
-        .fetch_all(&pool).await?;
+    let recipes = sqlx::query_as::<_, RecipeRow>(
+        "SELECT id, user_id, title FROM recipes WHERE user_id = $1"
+    ).bind(user.id).fetch_all(&pool).await?;
 }
 
 // OK: 一括取得
@@ -181,6 +182,6 @@ SELECT id, created_at, title
 
 Rust 規約 (`~/.claude/rules/rust/conventions.md`) との統一点:
 
-- `query_as!` マクロは使わない（コンパイル時 DB 接続が必要なため）
+- `query!` 系マクロ（`query!` / `query_as!` / `query_scalar!` / `query_file!` など）は使わない（ビルドに DB 接続か、`cargo sqlx prepare` で作るオフラインデータの管理が要るため）
 - `query_as::<_, Row>(...)` 関数 + `FromRow` derive で型安全マッピングする
 - DB 行 → ドメイン型の変換は `interface/rdb-gateway/src/dto/{entity}.rs` の `TryFrom<Row> for Entity` 実装に集約
