@@ -14,10 +14,10 @@ allowed-tools: Read, Edit, Write, Grep, Glob, Bash
 すべて exit 2 で block される**(例: `PreToolUse` Bash hook のファイル欠落 → 全 Bash が
 死ぬ)。本 skill は配線・配備・検証を型化してこれを防ぐ。
 
-**配備**: `~/.claude/hooks/` は repo `hooks/` への **ディレクトリ
-symlink** なので、**repo の `hooks/` に置いた hook は自動で `~/.claude/hooks/` に現れる**
-(個別 symlink を張る必要は無い。README の配備手順参照)。したがって hook 追加の手順は
-「① repo に置く ② settings.json に配線 ③ 検証」に集約される。
+**配備**: `~/.claude/hooks/` には、`sync-dotclaude.sh` が repo `hooks/` の `*.py` / `*.sh` を
+**ファイル単位で symlink** する。repo の `hooks/` に置いただけでは `~/.claude/hooks/` に現れず、
+sync を実行して初めてリンクが張られる。したがって hook 追加の手順は
+「① repo に置く ② settings.json に配線 ③ sync を実行して検証」に集約される。
 
 ## 手順
 
@@ -138,7 +138,10 @@ hook が挙動ポリシーを変える場合は、その判断理由を記録す
 - **settings.json は起動時 snapshot** として読まれる。配線の
   ライブ反映は次回起動分。ただし block hook のファイル欠落は稼働中セッションでも
   顕在化しうるため、手順 3(d) の解決検証は必ず行う。
-- `~/.claude/hooks/` の dir symlink 化により**個別 symlink 作業は不要**。万一 dir symlink
-  でない環境に展開する場合のみ README の配備手順に従う。
+- `~/.claude/hooks/` への symlink は `sync-dotclaude.sh` が張る（手作業で張らない）。hook を
+  追加・改名・削除したら sync を実行する。消えた hook を指すリンクは sync が dangling として
+  知らせ、`--prune` で除去できる。改名・削除するときは、同じ変更の中で settings.json（または
+  settings.machine.json）の配線も直してから sync する（直さないと参照 hook の欠落として FATAL に
+  なり、settings.json が配置されない）。
 - block hook を追加すると、稼働中セッションは再起動するまで反映されない一方、再起動した
   セッション/parallel は即座に新挙動になる。並走環境では全 parallel の再起動タイミングに留意。
