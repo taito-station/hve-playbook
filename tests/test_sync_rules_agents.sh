@@ -8,14 +8,13 @@
 #   - 同名の実体が居座る場合はスキップ + WARN (exit 2)
 #   - このリポジトリ由来で実体が消えた rules / agents の symlink を dangling として検出（--prune で除去）
 #   - 実体を退避したあと再同期すると symlink になり exit 0（既存環境の一度きりの移行）
-#   - このリポジトリ自身の .claude/rules は rules/hve だけを指す（rules/global を project-level で重ねて読ませない）
+#   - このリポジトリ自身の .claude/rules は rules/hve だけ、.claude/agents は agents/hve-*.md だけを指す
+#     （global 配下を project-level で重ねて読ませない。サブディレクトリの agent も読み込まれるため）
 #   - setup.sh は rules/global・agents/global・global skill を導入先にコピーしない
 #     （cq/mdq の導入分岐に入らないよう、python3 をスタブにして実行する）
 
 set -u
-for cmd in python3; do
-    command -v "$cmd" >/dev/null 2>&1 || { echo "[FAIL] 前提: $cmd が必要"; exit 1; }
-done
+command -v python3 >/dev/null 2>&1 || { echo "[FAIL] 前提: python3 が必要"; exit 1; }
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SYNC="$REPO_DIR/sync-dotclaude.sh"
 TMP="$(mktemp -d)"
@@ -83,10 +82,14 @@ run_sync "$H" --prune
 check "--prune: rules を除去" [ ! -L "$H/rules/no-such-category" ]
 check "--prune: agents を除去" [ ! -L "$H/agents/no-such-agent.md" ]
 
-# 4b) このリポジトリ自身の .claude/rules
+# 4b) このリポジトリ自身の .claude/rules・.claude/agents
 check "自リポ: .claude/rules は symlink でない" [ ! -L "$REPO_DIR/.claude/rules" ]
 check "自リポ: .claude/rules/hve は rules/hve を指す" [ "$(readlink "$REPO_DIR/.claude/rules/hve")" = "../../rules/hve" ]
 check "自リポ: .claude/rules 直下は hve だけ" [ "$(ls -A "$REPO_DIR/.claude/rules")" = "hve" ]
+check "自リポ: .claude/agents は symlink でない" [ ! -L "$REPO_DIR/.claude/agents" ]
+check "自リポ: .claude/agents は agents/hve-*.md だけを指す（global を project-level で重ねて読ませない）" \
+    [ "$(cd "$REPO_DIR/.claude/agents" && for f in *; do printf '%s->%s\n' "$f" "$(readlink "$f")"; done)" \
+      = "$(cd "$REPO_DIR/agents" && for f in hve-*.md; do printf '%s->../../agents/%s\n' "$f" "$f"; done)" ]
 
 # 5) setup.sh は global 配下を配らない
 T="$TMP/target"; mkdir -p "$T" "$TMP/stub-bin"
