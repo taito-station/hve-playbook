@@ -7,8 +7,7 @@ Claude Code PreToolUse (matcher: Bash) hook。
 allowlist を read-only 探索動詞 (grep/find/cat/ls/...) や git/gh へ広く広げた
 ことに伴い、**broad allow で自動承認
 されうる「git でも復旧できない / 高被害」なコマンド形だけ** を block する二重防御。
-allow は friction を無くし、危険形はこの hook が止める、という役割分担
-(serena-enforcer が「コード探索 → serena 誘導」を担うのと同じ二重防御パターン)。
+allow は friction を無くし、危険形はこの hook が止める、という役割分担。
 
 block 対象 (いずれも exit 2 で拒否):
 - `find ... -delete`                         : ファイル一括削除 (復旧不可)

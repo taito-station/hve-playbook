@@ -62,7 +62,7 @@ if __name__ == "__main__":
 - **例外は握って exit 0 (fail-open)**。hook のバグで tool を止めない。
 - **block は exit 2** + 理由を stderr に。block hook には **bypass マーカー**
   (`# via:<name>-ok: <非空の理由>`) を設けると、誤検知時の escape hatch になる
-  (serena-enforcer / destructive-guard と同じ流儀)。
+  (destructive-guard と同じ流儀)。
 - 個人パス・プロジェクト名をハードコードしない (public 共有のため。`~` を使う)。
 
 `chmod +x hooks/<name>.py` は任意 (settings は `python3 ~/.claude/hooks/<name>.py` で
