@@ -8,7 +8,7 @@ Accepted — 2026-10-03
 
 これまでコード探索は「serena MCP 優先」とし、PreToolUse hook の `hooks/serena-enforcer.py` が、コードを対象にした grep・find・cat などを block して serena に誘導していた（ADR-0005 では「探索手段への誘導が目的の hook」と分類している）。
 
-2026-10-03 のセッションで、Claude Code に組み込みの `LSP` ツールがあることを確認した。このツールは `goToDefinition`・`findReferences`・`workspaceSymbol`・`incomingCalls` などを持ち、serena の `find_symbol` / `find_referencing_symbols` と役割が重なる。ただし、その言語の LSP server が設定されている必要がある（このマシンでは `rust-analyzer-lsp` plugin を有効化した前例がある）。
+2026-10-03 のセッションで、Claude Code に組み込みの `LSP` ツールがあることを確認した。このツールは `goToDefinition`・`findReferences`・`workspaceSymbol`・`incomingCalls` などを持ち、serena の `find_symbol` / `find_referencing_symbols` と役割が重なる。ただし、その言語の LSP server が設定されている必要がある（言語ごとに LSP plugin を有効化する）。導入先で主に使う言語（PHP など）で LSP plugin が使えるかは未確認。
 
 一方、serena を残すことには次のコストがあった。
 
@@ -40,10 +40,14 @@ Accepted — 2026-10-03
 - `CLAUDE.md`・`rules/hve/tool-usage.md`・各 skill の探索方針を「LSP ツール（plugin がある言語）→ grep で絞って Read」に書き換える
 - HVE プロジェクトでの cq/mdq の優先順位は変えない
 - LSP を強制する hook は新設しない
+- 1 つの PR で hook 行と実体ファイルを同時に削除する。各マシンでは次の手順で移行する
+  1. `git pull --ff-only && ./sync-dotclaude.sh --prune` を 1 回の Bash で実行する。pull と sync を分けると、その間は配置済みの `~/.claude/settings.json` に残った hook 行が消えたファイルを呼び、Bash が全面ブロックされる
+  2. `claude mcp remove serena -s user` で MCP の登録を外す
+  3. `~/.claude/settings.machine.json` に `mcp__serena__*` の allow があれば削除し、sync を再実行する
 
 ### 結果（Consequences）
 
-- 良い結果: serena のツール定義と常駐プロセスが無くなり、worktree による OOM 対策も不要になる。grep に bypass マーカーを付ける作法が無くなる
+- 良い結果: serena のツール定義と常駐プロセスが無くなり、serena の worktree による OOM 対策も不要になる。grep に bypass マーカーを付ける作法が無くなる
 - 悪い結果: LSP plugin が無い言語では、シンボル単位の参照検索ができず grep に頼る。探索の規律は hook による強制から CLAUDE.md の方針に戻るため、無計画な全文検索を機械的には止められない
 
 ## 選択肢の評価（Pros and Cons）
@@ -85,5 +89,5 @@ Accepted — 2026-10-03
 
 ## 関連リンク
 
-- Related: [0005-default-model-opus-alias](0005-default-model-opus-alias.md)（serena-enforcer を誘導目的の hook として分類していた）
+- Related: [0005-default-model-opus-alias](0005-default-model-opus-alias.md)（「意思決定の要因」の hook の分類で serena-enforcer を挙げている。この hook は本 ADR で撤廃したので、その記述は現状を表さない。0005 の決定内容（既定モデル・権限モード）は変わらない）
 - Related: [0006-generate-settings-json-with-machine-overlay](0006-generate-settings-json-with-machine-overlay.md)（hook 実体の欠落による全 tool ブロックを防ぐ sync の検査）

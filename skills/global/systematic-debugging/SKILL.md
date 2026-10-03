@@ -34,7 +34,7 @@ description: |
 - コードの呼び出し元・依存関係の遡及は **組み込みの `LSP` ツールを使う**
   （`findReferences` で参照元、`goToDefinition` で定義）。
   grep の無計画な全文検索でなく、シンボル単位で追う（CLAUDE.md の discovery ポリシー）。
-  その言語の LSP plugin が無いなら、計画的な検索で代替する（無計画な grep は避ける）。
+  その言語の LSP plugin が無いなら、`grep` で対象を絞ってから `Read` する（無計画な全文検索・全読みは避ける）。
 
 ### フェーズ 2: working / broken の差分比較
 

@@ -422,6 +422,16 @@ parallel 専用コンテナ** の二段配置にすると安全:
 自プロジェクトでは初回構築後に `docker stats` で実測し、並走数の上限を
 逆算すること。
 
+### create-pr / review-pr の worktree
+
+`create-pr` / `review-pr` はレビュー用に各リポの `.claude/worktrees/agent-*`
+に一時 git worktree（リポ丸ごとの複製）を作る。`git status` に untracked として
+出ないよう、各 parallel の `.gitignore` に追加しておく:
+
+```gitignore
+.claude/worktrees/
+```
+
 異常終了 (harness ごとの落ち) で残った過去セッションの孤児 worktree は、
 `review-pr` Step 8 の防御的 sweep が次回実行時に掃除する。
 
