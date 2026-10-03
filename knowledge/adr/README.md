@@ -15,3 +15,4 @@
 | [0007](0007-consolidate-user-level-rules-and-agents.md) | user-level の rules・agents・個人 skill をリポジトリ管理に集約する | Partially superseded by 0009-scope-repo-claude-agents-to-hve | 2026-09-27 |
 | [0008](0008-one-commit-per-pr-and-history-based-commit-format.md) | 未 push のブランチは PR 作成時に 1 コミットにまとめ、コミット形式は既存履歴に合わせる | Accepted | 2026-09-29 |
 | [0009](0009-scope-repo-claude-agents-to-hve.md) | このリポジトリの .claude/agents も HVE の agent だけを指す | Accepted | 2026-09-29 |
+| [0010](0010-drop-serena-for-builtin-lsp.md) | serena MCP と serena-enforcer を撤廃し、組み込みの LSP ツールと grep に寄せる | Accepted | 2026-10-03 |

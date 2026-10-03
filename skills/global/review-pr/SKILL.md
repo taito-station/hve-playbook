@@ -1054,7 +1054,7 @@ harness が unlock + remove する**。この worktree の lock を保持
 親 harness が落ちると lock (= 既に死亡した過去 harness の pid) が残り、worktree
 が `.claude/worktrees/` に残置される (`git worktree prune` は **lock 付きの実在
 worktree を対象外とする**ため掃除できない)。累積するとリポ丸ごとの複製がディスク
-を食い、serena の index 対象に入れば **メモリ肥大・OOM** を招く。
+を食う。
 
 そこで Step 8 で **lock の pid が死んでいる孤児 worktree のみ**を掃除する。
 これは「**過去の死亡セッションが残した孤児の防御的掃除**」であり、自セッション

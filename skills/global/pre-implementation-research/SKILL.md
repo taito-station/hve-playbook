@@ -55,15 +55,14 @@ Laravel + laravel-boost MCP を使っているなら `mcp__laravel-boost__databa
 `docs/` 配下に該当する仕様書がある場合は事前に確認する。
 仕様書の内容を再調査しない（仕様書に書かれていない場合のみ追加調査）。
 
-## 既存実装の確認（コード discovery は serena 優先）
+## 既存実装の確認（コード discovery は LSP 優先）
 
-Serena MCP で関連シンボルを探索:
-- `mcp__serena__find_symbol` で対象クラス・メソッドを探す
-- `mcp__serena__find_referencing_symbols` で呼び出し元を確認
+組み込みの `LSP` ツールで関連シンボルを探索（その言語の LSP plugin が有効な場合）:
+- `workspaceSymbol` / `goToDefinition` で対象クラス・メソッドを探す
+- `findReferences` で呼び出し元を確認
 - 既存パターンを把握してから新規実装を始める
 
-`grep` / `find` / `cat` でのコード探索は **serena に置き換える**。
-（user-level の `~/.claude/hooks/serena-enforcer.py` がこれを誘導する）
+LSP が使えない言語では、`grep` で対象を絞ってから `Read` する（無計画な全文検索・全読みはしない）。
 
 ## リサーチが済んだら test-first で実装する
 

@@ -31,10 +31,10 @@ description: |
 - データフローの境界（入力・分岐・外部呼び出し・出力）に計測（ログ / dump / ブレークポイント）を
   仕込み、**症状の出る地点から原因方向へ遡る**。
 - 「どこで期待と実際がズレるか」を 1 点に絞り込む。憶測でなく観測した値で語る。
-- コードの呼び出し元・依存関係の遡及は **serena MCP を使う**
-  （`mcp__serena__find_referencing_symbols` で参照元、`mcp__serena__find_symbol` で定義）。
+- コードの呼び出し元・依存関係の遡及は **組み込みの `LSP` ツールを使う**
+  （`findReferences` で参照元、`goToDefinition` で定義）。
   grep の無計画な全文検索でなく、シンボル単位で追う（CLAUDE.md の discovery ポリシー）。
-  serena MCP 未導入なら、計画的な検索で代替する（無計画な grep は避ける）。
+  その言語の LSP plugin が無いなら、計画的な検索で代替する（無計画な grep は避ける）。
 
 ### フェーズ 2: working / broken の差分比較
 
