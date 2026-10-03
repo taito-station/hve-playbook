@@ -58,7 +58,7 @@ Laravel + laravel-boost MCP を使っているなら `mcp__laravel-boost__databa
 ## 既存実装の確認（コード discovery は LSP 優先）
 
 組み込みの `LSP` ツールで関連シンボルを探索（その言語の LSP plugin が有効な場合）:
-- `workspaceSymbol` / `goToDefinition` で対象クラス・メソッドを探す
+- `workspaceSymbol`（対象言語の任意のファイルを `filePath` に渡す）/ `goToDefinition` で対象クラス・メソッドを探す
 - `findReferences` で呼び出し元を確認
 - 既存パターンを把握してから新規実装を始める
 

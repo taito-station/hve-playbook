@@ -56,7 +56,7 @@
 
 ## コード discovery のポリシー
 
-- シンボルの定義・参照は **組み込みの `LSP` ツール優先**（名前から探すなら `workspaceSymbol`、位置から `goToDefinition` / `findReferences`。その言語の LSP plugin が有効な場合。deferred tool なら ToolSearch で読み込んでから使う）
+- シンボルの定義・参照は **組み込みの `LSP` ツール優先**（名前から探すなら `workspaceSymbol`（対象言語の任意のファイルを `filePath` に渡す）、位置から `goToDefinition` / `findReferences`。その言語の LSP plugin が有効な場合。deferred tool なら ToolSearch で読み込んでから使う）
 - LSP が使えない言語では、`grep` で対象を絞ってから `Read` する。無計画な全文検索・全読みは避ける
 - 既知のファイル名や行番号がわかっている場合の `view` / `Read` は OK
 

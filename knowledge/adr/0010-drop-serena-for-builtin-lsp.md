@@ -41,9 +41,11 @@ Accepted — 2026-10-03
 - HVE プロジェクトでの cq/mdq の優先順位は変えない
 - LSP を強制する hook は新設しない
 - 1 つの PR で hook 行と実体ファイルを同時に削除する。各マシンでは次の手順で移行する
-  1. `git pull --ff-only && ./sync-dotclaude.sh --prune` を 1 回の Bash で実行する。pull と sync を分けると、その間は配置済みの `~/.claude/settings.json` に残った hook 行が消えたファイルを呼び、Bash が全面ブロックされる
-  2. `claude mcp remove serena -s user` で MCP の登録を外す
-  3. `~/.claude/settings.machine.json` に `mcp__serena__*` の allow があれば削除し、sync を再実行する
+  1. `git -C <clone> pull --ff-only && bash <clone>/sync-dotclaude.sh --prune` を 1 回の Bash で実行する。pull に限らず、配備元の clone で作業ツリーの hook ファイルを消しうる git 操作（switch / checkout / rebase / merge）も、同じように `&& bash <clone>/sync-dotclaude.sh --prune` と続けて実行する。git 操作と sync を分けると、その間は配置済みの `~/.claude/settings.json` に残った hook 行が消えたファイルを呼び、Bash が全面ブロックされる
+  2. 全面ブロックされたら、Claude Code の外のターミナルで `bash <clone>/sync-dotclaude.sh --prune` を実行して復旧する
+  3. `claude mcp remove serena -s user` で MCP の登録を外す
+  4. `~/.claude/settings.machine.json` に `mcp__serena__*` の allow があれば削除し、sync を再実行する
+  5. 導入先の HVE プロジェクトでは、`setup.sh` を再実行して `rules/hve/tool-usage.md` を更新する（コピーで配っているため、再実行するまで旧版が残る）
 
 ### 結果（Consequences）
 

@@ -23,7 +23,7 @@ git clone https://github.com/taito-station/hve-playbook.git
 bash hve-playbook/sync-dotclaude.sh
 ```
 
-`sync-dotclaude.sh` は `~/.claude/` に symlink を張る（冪等・何度実行しても安全）。以降は `git -C hve-playbook pull --ff-only && bash hve-playbook/sync-dotclaude.sh --prune` を **1 回のコマンドで** 実行して最新化する。pull と sync を別々に実行すると、hook を削除した更新を取り込んだとき、その間は `~/.claude/settings.json` に残った hook 行が消えたファイルを呼ぶ。その結果、Bash が全面ブロックされる（[ADR-0010](knowledge/adr/0010-drop-serena-for-builtin-lsp.md)）。
+`sync-dotclaude.sh` は `~/.claude/` に symlink を張る（冪等・何度実行しても安全）。以降は `git -C hve-playbook pull --ff-only && bash hve-playbook/sync-dotclaude.sh --prune` を **1 回のコマンドで** 実行して最新化する。この clone で switch / checkout / rebase / merge をするときも、同じく `&& bash hve-playbook/sync-dotclaude.sh --prune` と続ける。git 操作と sync を別々に実行すると、hook を削除した更新を取り込んだとき、その間は `~/.claude/settings.json` に残った hook 行が消えたファイルを呼ぶ。その結果、Bash が全面ブロックされる。そうなったら、Claude Code の外のターミナルで `bash hve-playbook/sync-dotclaude.sh --prune` を実行して復旧する（[ADR-0010](knowledge/adr/0010-drop-serena-for-builtin-lsp.md)）。
 
 `~/.claude/settings.json` だけは symlink ではなく、リポの `settings.json` と `~/.claude/settings.machine.json`（マシン固有の hook・permissions 等。任意）をマージした生成物になる。`~/.claude/settings.json` を直接編集しても次の同期で上書きされるため、マシン固有の設定は `settings.machine.json` に書く（user レベルの `~/.claude/settings.local.json` は Claude Code に読まれない。[ADR-0006](knowledge/adr/0006-generate-settings-json-with-machine-overlay.md)）。前回の同期後に `~/.claude/settings.json` が直接編集されていた場合は、`settings.json.bak-<日時>` に退避してから上書きする。生成には `python3` が必要。
 

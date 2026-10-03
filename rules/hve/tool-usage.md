@@ -12,7 +12,8 @@ HVE プロジェクトでのコード/ドキュメント探索ツールの利用
    - SQLite + BM25 ベースのローカル検索エンジン
 3. **LSP ツール**: シンボル検索・参照検索に使用（その言語の LSP plugin が有効な場合）
    - Claude Code 組み込みの `LSP` ツール（`goToDefinition`, `findReferences`, `workspaceSymbol`）
-4. **grep / find**: cq/mdq/LSP が利用できない場合のフォールバック
+   - deferred tool なら ToolSearch で読み込んでから使う。`workspaceSymbol` も対象言語の任意のファイルを `filePath` に渡す
+4. **grep / find**: cq/mdq/LSP が利用できない場合のフォールバック。`grep` で対象を絞ってから `Read` する（無計画な全文検索・全読みはしない）
 
 ## 利用判断
 

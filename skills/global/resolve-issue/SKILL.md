@@ -1,7 +1,7 @@
 ---
 name: resolve-issue
 description: GitHub Issueの対応をパス別（bug/feature/ops）に最適化されたフローで実行します。Issue番号を指定して、mainの最新取得・実装・テスト・PR作成・レビューまでを自動で行います。「issue 439を対応して」「issue #402に取り掛かって」「/resolve-issue 123」のような自然言語で起動します。
-allowed-tools: Read, Grep, Glob, Bash, Edit, Write, Agent, mcp__claude_ai_Gmail__search_threads
+allowed-tools: Read, Grep, Glob, Bash, Edit, Write, Agent, LSP, mcp__claude_ai_Gmail__search_threads
 ---
 
 # Issue対応フロー
@@ -105,7 +105,7 @@ if ERRORS is not empty:
    - 調査結果を Issue コメントに記録（**PII マスキング必須**: 顧客名・個人メールアドレス・電話番号等は記載しない。件数・状態名・ID のみを記載する）
 
 3. **原因特定 + 修正方針**:
-   - LSP ツール（`findReferences` / `goToDefinition`）でコードを調査し、原因を特定
+   - LSP ツール（`findReferences` / `goToDefinition`）でコードを調査し、原因を特定（その言語の LSP plugin が無いなら、`grep` で対象を絞ってから `Read` する）
    - 修正方針を Issue コメントに記録
 
 4. **パス前提の再評価**:
@@ -491,7 +491,7 @@ if ERRORS is not empty:
 ### Step 4: ブラウザテスト
 
 1. **影響範囲の自動推定**:
-   - LSP ツールの `documentSymbol` で変更したシンボルを特定し、各シンボルに `findReferences` をかけて参照元をたどり、影響しうる画面を特定
+   - LSP ツールの `documentSymbol` で変更したシンボルを特定し、各シンボルに `findReferences` をかけて参照元をたどり、影響しうる画面を特定（その言語の LSP plugin が無いなら、変更したシンボル名を `grep` して参照元をたどる）
    - 直接変更した画面だけでなく、**間接的に影響する画面**もテスト対象に含める
 
 2. **ブラウザテストケース追加**:
