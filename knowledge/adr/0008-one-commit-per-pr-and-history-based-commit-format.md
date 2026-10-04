@@ -2,7 +2,10 @@
 
 ## ステータス
 
-Accepted — 2026-09-29
+Partially superseded by 0014-knowledge-check-scripts-and-sha-follow-up — 2026-10-04
+
+- 有効な部分: 未 push のブランチを PR 作成時に 1 コミットにまとめること、コミット形式を既存履歴に合わせること
+- 失効した部分: 未 push のブランチから作った PR が常に 1 コミットになること。knowledge 文書の `distilled_from_sha` が squash で履歴から外れたときは、sha の追従コミットを 1 つ積む（ADR-0014）
 
 ## 背景と課題
 

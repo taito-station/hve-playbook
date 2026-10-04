@@ -930,6 +930,12 @@ review-only モードでも skip。
 
 レビューループで commit した修正をリモートに反映し、PR 本文を更新する:
 
+push の前に、Step 1 の rebase で `distilled_from_sha` が履歴から外れた knowledge 文書を追従させる。
+手順は create-pr の Step 6.1 と同じ（`bump-distilled-sha.py --follow-rewritten "origin/$BASE"` を実行し、書き換えた文書があれば
+追従コミットを積む。終了コード 2 なら push せず `PUSH_FAILED=True` にして Step 7 で報告、1 なら追従できなかった文書を
+Step 7 の最終報告に「蒸留し直しが要る文書」として載せる。`docs/temp/.follow.log` は Step 8 で消す）。knowledge の検査スクリプト（`.claude/scripts/hve/` か `hve-scripts/` の `bump-distilled-sha.py`）が
+無いリポジトリでは何もしない。
+
 **経路 B の force push は `--force-with-lease` のみ。`--force` は禁止。**
 
 ```bash
@@ -1018,6 +1024,9 @@ browser-regression escalate / review-only 投稿完了) でも、Step 7 完了�
 # 全モード共通: レビュー diff ファイルを削除 (経路A は create-pr Step 9 でも
 # 削除するが、経路B / review-only ではここが唯一のクリーンアップポイント)
 rm -f "$REPO_ROOT"/docs/temp/review-*.diff
+# 経路 B の sha 追従（Step 6.5）のログ。経路 A では create-pr Step 9 が消す
+if [ "$OWNED_BODY_FILE" = "True" ]:
+    rm -f "$REPO_ROOT/docs/temp/.follow.log"
 
 # fix モード: 本 skill 所有の PR 本文ファイルを削除
 # (経路 B で push できなかった場合は、手動 push 後の gh pr edit に要るので残す。Step 7 の案内参照)

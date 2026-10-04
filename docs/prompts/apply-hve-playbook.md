@@ -21,7 +21,7 @@
 - 対象は、いま開いているリポジトリのルート（`git rev-parse --show-toplevel`）。以下 `<target>` と書く。
 - 配置は hve-playbook の `setup.sh` が行う。手作業でファイルをコピーしない（再実行で hve-playbook の版に揃えられるようにするため）。
 - `setup.sh` が変更するのは次のとおり。
-  - `<target>/.claude/rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js` を**削除してから**置き直す。
+  - `<target>/.claude/rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`・`scripts/hve/` を**削除してから**置き直す。
   - `<target>/.claude/rules/hve-local/`（プロジェクト固有の補足）には触れない。書式は `.claude/rules/hve/local-overrides.md`。
   - `<target>/.claude/CLAUDE.md` が無ければ、HVE 方法論をそのまま `.claude/CLAUDE.md` として作る。あれば `.claude/CLAUDE.md` は変えず、`.claude/CLAUDE.hve.md` を作る・上書きする。
   - `<target>/docs/` を作る（空のディレクトリ）。
@@ -51,7 +51,7 @@
   - `.claude/CLAUDE.md`・`.claude/CLAUDE.hve.md`・ルートの `CLAUDE.md`
 - **symlink を確かめる**: `find <target>/.claude -maxdepth 2 -type l`（`<target>/.claude` 自体が symlink かも `test -L` で確かめる）。symlink があれば、setup.sh はリンク先（リポジトリの外や `~/.claude` の場合もある）で削除・上書きを行い、git の検出もすり抜ける。リンク先を示してここで止め、ユーザーに確認する。
 - **git 管理外の HVE 資産を守る**: 未追跡のファイル（ignore されているものも、単に未コミットのものも）は、`setup.sh` が削除・上書きすると git で復元できない。`git -C <target> ls-files --others -- .claude` で未追跡のファイルをすべて列挙する（除外指定を付けないので ignore されたものも出る）。
-  - 前提に挙げた削除対象（`rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`）か `.claude/CLAUDE.hve.md` が含まれていれば、`setup.sh` の前に `<target>/work/hve-backup-<日時>/` へ同じ相対パスでコピーして退避する。
+  - 前提に挙げた削除対象（`rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`・`scripts/hve/`）か `.claude/CLAUDE.hve.md` が含まれていれば、`setup.sh` の前に `<target>/work/hve-backup-<日時>/` へ同じ相対パスでコピーして退避する。
 - cq/mdq が導入済みかを確かめる（`python3 -m cq --help` と `python3 -m mdq --help` が両方とも成功するか）。
   - 未導入なら、`setup.sh` が `pip install -e`（既存の clone が無ければ外部リポジトリの `git clone` も）を行うことをユーザーに伝え、了承を得てから進める。
   - 了承が得られなければ、ここで止めて報告する（`setup.sh` には導入を省く方法が無い）。
@@ -116,6 +116,9 @@ bash <hve-playbook>/setup.sh <target>
   !/.claude/workflows/
   /.claude/workflows/*
   !/.claude/workflows/hve-*.js
+  !/.claude/scripts/
+  /.claude/scripts/*
+  !/.claude/scripts/hve/
   ```
 - `.gitignore` に次が無ければ足す。
   - `work/`（HVE の一時作業ファイル。手順 2 の退避先もここ）

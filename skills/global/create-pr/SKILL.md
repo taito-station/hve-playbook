@@ -546,6 +546,45 @@ fi
   squash 時のメッセージ生成で必ず含める
 - コミットメッセージは `commit-workflow` skill の規約に従う
 
+### Step 6.1: distilled_from_sha の追従 (knowledge の検査スクリプトがあるときだけ)
+
+squash（Step 6）や rebase（Step 2、review-pr の各巡）は、knowledge 文書の `distilled_from_sha` が
+指していたコミットを HEAD の履歴から外す。手元には古いコミットが残るので検査は通るが、push 後に
+新しく clone すると sha を解決できず CI が落ちる。コミットは自分の sha を含められないので、外れた
+文書はもう 1 コミット積んで追従させる（HVE の knowledge-maturity「sha の追従」、ADR 0014）。
+
+`bump-distilled-sha.py --follow-rewritten` が対象を選ぶ: この PR で変えた文書のうち、sha が HEAD から
+辿れず、かつ旧 sha と HEAD で sources の中身が同じもの（squash・rebase で外れただけ）を HEAD へ追従させる。
+旧 sha のあとに source が変わった文書は追従せず報告する（本当の stale を隠さないため）。
+
+```bash
+BUMP=""
+for p in "$REPO_ROOT/.claude/scripts/hve/bump-distilled-sha.py" "$REPO_ROOT/hve-scripts/bump-distilled-sha.py"; do
+    if [ -f "$p" ]; then BUMP="$p"; break; fi
+done
+if [ -n "$BUMP" ]; then
+    python3 "$BUMP" --follow-rewritten "origin/$BASE" > "$REPO_ROOT/docs/temp/.follow.log"
+    FOLLOW_RC=$?
+    cat "$REPO_ROOT/docs/temp/.follow.log"
+    if [ "$FOLLOW_RC" -eq 2 ]; then
+        echo "[create-pr] sha の追従を判定できません（git の失敗・引数不正）。push せずに止めます"
+        中断 (skill return)
+    fi
+    # 「✓ <文書>: <旧 sha> → <新 sha>」行から、bump が書き換えた文書だけを拾う（bump の出力の契約）
+    FOLLOWED=$(sed -n 's/^✓ \(.*\): [0-9a-f]* → .*/\1/p' "$REPO_ROOT/docs/temp/.follow.log")
+    if [ -n "$FOLLOWED" ]; then
+        printf '%s\n' "$FOLLOWED" | while IFS= read -r f; do git add -- "$f"; done
+        git commit -m "chore: distilled_from_sha を追従
+
+Co-Authored-By: ..."
+    fi
+fi
+```
+
+- `FOLLOW_RC` が 1 のときは、追従できなかった文書（旧 sha のあとに source が変わった・旧 sha が見つからない）がある。push は続けるが、その文書は CI の stale 検査で落ちるので、Step 8 の最終報告に「蒸留し直しが要る文書」として載せる
+- この追従コミットは ADR 0008（未 push のブランチは 1 コミット）の例外で、PR は 2 コミットになる
+- `docs/temp/.follow.log` は Step 9 で消す
+
 ### Step 7: push + PR 作成
 
 3 つの小節に分かれる。**経路 B (force push) だけを独立した見出しにしてある**のは、
@@ -618,6 +657,7 @@ fi
 - 各巡の auto-fix 件数
 - ブラウザテストの実施状況と最終結果
 - escalate された指摘 (あれば内容と該当指摘箇所)
+- sha の追従（Step 6.1）: 追従コミットを積んだ文書と、追従できず蒸留し直しが要る文書 (あれば)
 - 残コミット履歴の概要
 - セッション費用（下記で取得）
 
@@ -632,7 +672,7 @@ fi
 ### Step 9: クリーンアップ
 
 ```bash
-rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/review-"*.diff "$REPO_ROOT/docs/temp/.cost-snapshot"
+rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/review-"*.diff "$REPO_ROOT/docs/temp/.cost-snapshot" "$REPO_ROOT/docs/temp/.follow.log"
 # -f で冪等性確保 (review-pr 経路 B 起動時など別 skill が先に消すケースに
 # 耐える)。sidecar (.pr-body.owner) も同時に消すことで、次回 PR 作成時の
 # 所有権判定が確実に「経路 A の新規作成」として始まる。

@@ -93,7 +93,19 @@ description: 成果物管理規律 — ファイル配置・更新ポリシー�
 
 ### 機械検査
 
-merge-base 基準（3 ドット）の diff で、変更のあった決定ログのファイルを並べ、1 ファイルずつ hunk を確かめる:
+`check-decision-log.py`（setup.sh が `.claude/scripts/hve/` に配る。hve-playbook 自身では `hve-scripts/`）で検査する。方式は自動で判定し、両方式が混在していれば両方を検査する。
+
+```bash
+python3 .claude/scripts/hve/check-decision-log.py                       # merge-base と作業ツリーを比べる
+python3 .claude/scripts/hve/check-decision-log.py --head <commit>       # pre-push・CI ではコミットを渡す
+```
+
+- 独立ファイル方式: ADR の削除・改名と、一覧 README の行の削除は error。ステータス節の外の変更、README のステータス列以外の変更、README と ADR のステータスの食い違いは警告（誤字修正かどうかは人が確かめる）
+- インライン方式: `## 決定ログ` 節が base の節の末尾への追記になっていなければ error（改変・削除・途中への挿入・節や文書の削除）
+- merge-base が取れない（ref が無い・shallow clone）ときは exit 2。CI では全履歴を取得する
+- `--warn-only` で違反があっても exit 0 にできる
+
+スクリプトが使えないときは、merge-base 基準（3 ドット）の diff で、変更のあった決定ログのファイルを並べ、1 ファイルずつ hunk を確かめる:
 
 ```bash
 # 独立ファイル方式
@@ -109,7 +121,7 @@ git diff --text origin/main...HEAD -- "<file>"
 - 既存エントリへの行の挿入（インライン方式の既存エントリへの追記、エントリ間への挿入、独立ファイル方式の旧 ADR のステータス節以外への追記）は `+` 行にしか出ないので、hunk の位置も確かめる
 - 2 ドット（`origin/main..HEAD`）は使わない。作業ブランチを切ったあとに main へ入った決定が、削除行として出る
 - `--no-renames` はファイル名の付け替え（採番の付け替え）を削除と追加として出すため、`--text` は `.gitattributes` でバイナリ扱いにされても中身を出すため、`core.quotePath=false` は日本語などのファイル名を引用符・エスケープなしで出し、そのまま次のコマンドに渡せるようにするために付ける
-- pre-push hook や CI に組み込むときは、出力を表示して人が確かめる（出力の有無だけで fail にすると、正規の supersede でも落ちる）。コマンド自体の失敗（merge-base が取れないなど、終了コード 0 以外）は fail にする
+- これらの手のコマンドを pre-push hook や CI に組み込むときは、出力を表示して人が確かめる（出力の有無だけで fail にすると、正規の supersede でも落ちる）。コマンド自体の失敗（merge-base が取れないなど、終了コード 0 以外）は fail にする
 
 ## fan-out ステップの制約
 
