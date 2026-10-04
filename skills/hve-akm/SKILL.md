@@ -69,7 +69,7 @@ stale な各ファイルについて、source の変更を knowledge 本文に�
    - source にない情報（既存の蒸留結果）は維持する
 3. 決定を伴う変更がある場合は、決定ログ（`knowledge/adr/`）に新エントリを追加する
 4. frontmatter の `distilled_from_sha` を新しい sha に更新する
-5. frontmatter の `updated` を当日日付に更新する
+5. frontmatter の `updated` は、本文が実質的に変わった場合だけ当日日付に更新する（`distilled_from_sha` だけの追従では触らない。判断は `rules/hve/knowledge-maturity.md` の「`updated` の規則」に従う）
 
 **蒸留対象が 3 本以上の場合**: サブエージェントに委譲する（1 エージェント 1 ファイル）
 
@@ -95,7 +95,7 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 | 重大度 | 対応 |
 |---|---|
 | 軽微（表記揺れ、フォーマット不備） | その場で修正 |
-| 重大（事実の矛盾、SoT 違反） | 該当文書の status を `Conflict` に変更し、ユーザーに報告して STOP |
+| 重大（事実の矛盾、SoT 違反） | 該当文書の status を `Conflict` に変更し、ユーザーに報告して STOP。`distilled_from_sha` と `updated` の扱いは `rules/hve/knowledge-maturity.md` の「status の 3 段階」に従う（Step 2 で進めた sha は元に戻す） |
 
 ### Step 4: カバレッジ分析
 
