@@ -148,7 +148,7 @@ Step 8: PR 作成
 - 実装で確定知の前提が変わったら同じ PR で Knowledge を更新する
   - HVE の Knowledge は `knowledge/` および `docs/`
 - 設計判断を伴う変更は決定ログに同じ PR で追記する
-  - HVE の決定ログは `knowledge/adr/`
+  - HVE の決定ログは artifact-management の「決定ログの不変性」で定めた置き場所（既定は `knowledge/adr/`。インライン方式を宣言したプロジェクトは各 knowledge の `## 決定ログ` 節）
 - Knowledge 更新で矛盾が生じた場合 → STOP（Conflict 宣言、人間判断）
 - `.claude/rules/hve-local/implement-flow.md` にプロジェクト固有の検証コマンド（stale 検査など）が列挙されていれば、ここで実行する。失敗したら直してから Step 8 へ進む（直せなければ STOP）
 

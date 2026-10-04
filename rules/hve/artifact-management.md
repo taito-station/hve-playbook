@@ -36,36 +36,71 @@ description: 成果物管理規律 — ファイル配置・更新ポリシー�
 
 ## 決定ログの不変性
 
-決定ログ（`knowledge/adr/`）は **append-only** で運用する。
+決定ログは **append-only** で運用する。置き方は独立ファイル方式（既定）とインライン方式の 2 つ。
 
 ### 原則
 
-- 既存エントリを書き換えない（誤字修正を除く）
+- 既存エントリを書き換えない。例外は方式ごとに「書き換えてよい範囲」で定める
 - 決定を覆すときは新エントリを追加し、旧エントリを supersede した旨を記載する
 - 削除は禁止
+- 更新漏れは implement-flow Step 7（Knowledge 同期）で防ぐ
 
 ### 配置
 
-独立ファイル方式を採用する。`knowledge/adr/` に 1 決定 1 ファイルで配置する。
+| 方式 | 置き場所 | 採り方 |
+|---|---|---|
+| 独立ファイル（既定） | `knowledge/adr/` に 1 決定 1 ファイル | 宣言は要らない |
+| インライン | 決定が効く `knowledge/*.md` の末尾の `## 決定ログ` 節 | `.claude/rules/hve-local/artifact-management.md` に「artifact-management の「配置」を補足」の節を設けて宣言する（書式は local-overrides.md） |
 
-- `ls knowledge/adr/` で全決定を一覧できる
-- 必要な ADR だけ読めばよく、トークン効率が良い
-- 更新漏れは implement-flow Step 7（Knowledge 同期）で防ぐ
+- 独立ファイル方式は `ls knowledge/adr/` で全決定を一覧でき、必要な ADR だけ読めばよい
+- インライン方式は、決定とそれが効く文書を同じファイルで読める。すでにこの方式で運用している導入先が続けるための選択肢で、新しく始めるプロジェクトは独立ファイル方式を使う
+
+### 書き換えてよい範囲
+
+| 方式 | 書き換えてよいもの |
+|---|---|
+| 独立ファイル | 旧 ADR の `## ステータス` 節（supersede・非推奨にしたときのステータス値と、有効な部分・失効した部分の記述）、一覧 `knowledge/adr/README.md` のステータス列、誤字修正 |
+| インライン | なし（誤字修正も不可）。supersede は新しいエントリで表し、旧エントリは書き換えない |
 
 ### 書式
 
-documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
+独立ファイル方式は documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
+
+インライン方式は 1 エントリを見出し `### <ID>: 要約 (YYYY-MM-DD) — ステータス` と、その下の `####` の節で書く。節と MADR の章の対応:
+
+| インライン方式の節 | MADR の章 |
+|---|---|
+| 見出しのステータス、`#### ステータス`（任意） | ステータス |
+| `#### コンテキスト` | 背景と課題・意思決定の要因 |
+| `#### 決定` | 決定内容 |
+| `#### 理由` | 決定内容の採用理由 |
+| `#### 却下した代替案` | 検討した選択肢・選択肢の評価 |
+| `#### 影響` | 結果（Consequences） |
+
+- 新しいエントリはコンテキスト・決定・理由・影響を書き、代替案を検討したときは却下した代替案も書く（implement-flow Step 3 はこの節を読む）
+- 表にない節（関連・再現方法など）を足してよい
+- この規則より前に書かれたエントリには遡って適用しない（追記のみなので直せない）
+
+### ID とステータス語
+
+- ID: 独立ファイル方式は documentation-standards の採番（4 桁連番）に従う。インライン方式の既定は `ADR NNNN`（リポジトリ全体の 4 桁連番）で、導入先は hve-local で別の形式と採番（issue 番号など）を宣言してよい
+- ステータス語: 既定は documentation-standards のステータス値。導入先は方式を問わず、hve-local で独自の語を定めてよい。ステータス値に対応する語は、その対応も書く
 
 ### 機械検査
 
-git diff で既存エントリの改変を検出する:
+merge-base 基準（3 ドット）の diff で、削除・変更された行を出す:
 
 ```bash
-# 決定ログの既存行が削除・変更されていないか確認（PR スコープ）
-git diff origin/main..HEAD -- knowledge/adr/ | grep '^-' | grep -v '^---'
+# 独立ファイル方式: 出た行が「書き換えてよい範囲」に収まるかを確かめる
+git diff origin/main...HEAD -- knowledge/adr/ | grep '^-' | grep -v '^---'
+
+# インライン方式: 出た行のうち `## 決定ログ` 節の中のものは違反
+git diff origin/main...HEAD -- knowledge/ | grep '^-' | grep -v '^---'
 ```
 
-pre-push hook や CI で実行することを推奨する。
+- 2 ドット（`origin/main..HEAD`）は使わない。作業ブランチを切ったあとに main へ入った決定が、削除行として出る
+- 出た行が許される範囲か（独立ファイル方式の誤字修正か、インライン方式の `## 決定ログ` 節の外か）は、diff の hunk を見て人が判定する
+- pre-push hook や CI で実行することを推奨する
 
 ## fan-out ステップの制約
 

@@ -18,3 +18,4 @@
 | [0010](0010-drop-serena-for-builtin-lsp.md) | serena MCP と serena-enforcer を撤廃し、組み込みの LSP ツールと grep に寄せる | Accepted | 2026-10-03 |
 | [0011](0011-advance-updated-only-on-substantive-change.md) | knowledge の updated は本文または status が実質的に変わったときだけ進める | Accepted | 2026-10-04 |
 | [0012](0012-project-local-overrides-in-hve-local.md) | プロジェクト固有の補足は .claude/rules/hve-local/ に書く | Accepted | 2026-10-04 |
+| [0013](0013-decision-log-file-or-inline-modes.md) | 決定ログは独立ファイル方式を既定とし、インライン方式を宣言で選べるようにする | Accepted | 2026-10-04 |
