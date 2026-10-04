@@ -3,10 +3,6 @@
 このファイルはすべての Claude Code セッションで読み込まれる user-level の global 設定。
 `~/.claude/CLAUDE.md` に配置（または dotclaude リポからシンボリックリンク）。
 
-## 基本情報
-
-- 言語は日本語とする
-
 ## 役割
 
 - テックリード
