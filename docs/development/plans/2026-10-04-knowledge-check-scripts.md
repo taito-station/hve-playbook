@@ -18,7 +18,8 @@ knowledge の標準は、stale 検出と決定ログの不変性検査を「プ�
 | 配置 | 配置元 `hve-scripts/`（`scripts/*.py` は sync-dotclaude.sh が `~/.claude/scripts/` に配るので混ぜない）→ setup.sh が導入先の `.claude/scripts/hve/` に削除してからコピー | 同上 |
 | hook | 2 本とも同梱し、settings.json への配線は導入先が手で行う。影響警告の hook は、PostToolUse で有効な出力形式に直す | 2026-10-04 回答 |
 | Conflict | status が Conflict の文書は stale と分けて「解消待ち」と報告し、失敗にしない。bump も Conflict の文書を飛ばす（ADR 0011） | 2026-10-04 回答、#28 の申し送り |
-| 独立ファイル方式の範囲外の変更 | 既存 ADR の `## ステータス` 節の外の変更は警告（exit 0）。ADR ファイルの削除・改名と一覧 README の行の削除は error。README のステータス列以外の変更は警告（敵対的レビュー M5 で error から変更。改訂版の計画として承認済み） | 2026-10-04 回答、改訂版の承認 |
+| 独立ファイル方式の範囲外の変更 | 既存 ADR の `## ステータス` 節の外の、同じ行の中の差し替えは警告（exit 0）。節の外での行の追加・削除、ADR ファイルの削除・改名、一覧 README の行の削除は error。README のステータス列以外の変更は警告 | 2026-10-04 回答、改訂版の承認、PR #41 レビュー F8 の回答（2026-10-05） |
+| GitHub のマージ方式 | knowledge 文書を持つリポジトリは PR を merge commit でマージする（squash・rebase merge では追従した sha が main から辿れない）。hve-playbook のリポジトリ設定の変更は別 issue | PR #41 レビュー F20 の回答（2026-10-05） |
 | dogfood | `knowledge/adr/` は frontmatter 標準の対象外と明記する。tests/ でこのリポジトリに対して両検査を流し、hve-playbook 自身の pre-push にも配線する | 2026-10-04 回答 |
 | 決定ログの方式 | #26（ADR 0013）の 2 方式を扱う。インライン方式でも `knowledge/adr/` に ADR が残っていれば独立ファイル方式の検査も当てる | #26 の申し送り |
 | squash・rebase との両立 | create-pr の squash の後と、push 済みブランチの rebase の後に、この PR で変えた文書が stale なら bump して「sha 追従コミット」を 1 つ積む。ADR 0008（1 PR 1 コミット）に例外として足す（0008 は Partially superseded） | 2026-10-04 回答（敵対的レビュー C1） |

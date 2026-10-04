@@ -933,7 +933,7 @@ review-only モードでも skip。
 push の前に、Step 1 の rebase で `distilled_from_sha` が履歴から外れた knowledge 文書を追従させる。
 手順は create-pr の Step 6.1 と同じ（`bump-distilled-sha.py --follow-rewritten "origin/$BASE"` を実行し、書き換えた文書があれば
 追従コミットを積む。終了コード 2 なら push せず `PUSH_FAILED=True` にして Step 7 で報告、1 なら追従できなかった文書を
-Step 7 の最終報告に「蒸留し直しが要る文書」として載せる。`docs/temp/.follow.log` は Step 8 で消す）。knowledge の検査スクリプト（`.claude/scripts/hve/` か `hve-scripts/` の `bump-distilled-sha.py`）が
+Step 7 の最終報告に「蒸留し直しが要る文書」として載せる。`docs/temp/.follow.log` は Step 8 で消す）。rebase のたびに追従コミットが 1 つ増える。knowledge の検査スクリプト（`.claude/scripts/hve/` か `hve-scripts/` の `bump-distilled-sha.py`）が
 無いリポジトリでは何もしない。
 
 **経路 B の force push は `--force-with-lease` のみ。`--force` は禁止。**

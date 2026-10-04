@@ -33,14 +33,18 @@ checker（`check-knowledge.py`）は `Path(__file__).resolve().parent` から呼
   - STALE が無いとき: 標準出力に「STALE な文書は無い」
   - dry-run の各行は先頭に「（dry-run）」
   - `--follow-rewritten` で追従が要る文書が無いとき: 標準出力に「追従が要る文書は無い」
+  - 追従・bump で書き換えた文書: `✓ <文書>: <旧 sha> → <新 sha>`
+    （create-pr Step 6.1 がこの行から書き換えた文書を拾う）
 
 **`--follow-rewritten <base-ref>`**（squash・rebase の後の sha 追従。ADR 0014）:
 
 squash や rebase をすると、文書の `distilled_from_sha` が指していたコミットが HEAD の履歴
-から外れる。ローカルにはまだ古いコミットが残っているので checker は stale と言わないことが
-あるが、push 後に新しく clone すると sha を解決できず CI が落ちる。このモードは「本当に
-source が変わった stale」と「squash・rebase で sha が外れただけ」を切り分けて、後者だけを
-HEAD へ追従させる。
+から外れる。手元では通ることがある（source が PR 内で変わっていないとき。distilled_from_sha
+が指す古いコミットオブジェクト自体はまだ解決できるので、祖先判定は HEAD の履歴に残っているか
+どうかに関係なく成立する）が、新しく clone すると sha を解決できず CI が落ちる。逆に PR 内で
+source まで変えて squash すると、手元でもすぐ STALE になる（本当の stale を隠さない）。この
+モードは「本当に source が変わった stale」と「squash・rebase で sha が外れただけ」を切り分け
+て、後者だけを HEAD へ追従させる。
 
   1. 対象候補: `git diff --name-only <base-ref>...HEAD` に出る、checker（`--dir`・`--exclude`
      の既定。`--` 以降の転送引数があればそれに従う）の対象のうち、frontmatter を持ち
@@ -115,21 +119,38 @@ RE_STATUS = re.compile(
 RE_STALE_LINE = re.compile(r"^✗\s+(\S+?):\s+STALE\s+←\s+(\S+)")
 # 末尾の集計行（`✗ 3 件の不整合（警告 1 件 / 解消待ち 0 件）`）。個別の error と区別する。
 RE_SUMMARY_LINE = re.compile(r"^✗\s+\d+\s*件の不整合")
+# `--follow-rewritten` で git に渡す前に検証する sha の形式（F3）。壊れた・偽装された
+# 値をそのまま git コマンドの引数に渡さない。
+RE_SHA_FORMAT = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def run_git(args: "list[str]", *, cwd: "Path | None" = None) -> "subprocess.CompletedProcess[str]":
+    """bump が行う git 呼び出しの単一入口（F2）。他の git 呼び出しはすべてここを通す。
+
+    `-c core.quotePath=false` を必ず付ける。既定（quotePath=true）だと日本語などの
+    非 ASCII パスが `"\\346\\227..."` という 8 進数エスケープのクォート表記で出力され、
+    `git diff --name-only` の結果や終点一致の比較が外れて、`--follow-rewritten` の
+    追従対象から黙って漏れる。
+    `git diff` を呼ぶときは `--no-ext-diff --no-textconv` も付け、外部 diff ドライバ・
+    textconv 変換に出力を歪められないようにする。
+    """
+    cmd = ["git", "-c", "core.quotePath=false"]
+    if args and args[0] == "diff":
+        cmd += [args[0], "--no-ext-diff", "--no-textconv", *args[1:]]
+    else:
+        cmd += list(args)
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
 
 def repo_root() -> Path:
-    proc = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
-    )
+    proc = run_git(["rev-parse", "--show-toplevel"])
     if proc.returncode != 0:
         sys.exit("git リポジトリの中で実行する")
     return Path(proc.stdout.strip())
 
 
 def head_sha_full(root: Path) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True
-    )
+    proc = run_git(["rev-parse", "HEAD"], cwd=root)
     if proc.returncode != 0:
         sys.exit("HEAD を解決できない（コミットが 1 つも無い？）")
     return proc.stdout.strip()
@@ -205,6 +226,29 @@ def find_status(text: str) -> "str | None":
     return match.group(1) if match else None
 
 
+def is_old_source_map_format(text: str, matched: "re.Match[str]") -> bool:
+    """旧標準（source ごとのマップ）形式かを判定する（F1、ADR 0014）。
+
+    旧形式は `distilled_from_sha:` の値を空にしたうえで、直後にインデントされた
+    `<source のパス>: <sha>` の子行が続く（単一 sha ではなく source ごとに sha を持つ）。
+    これをそのまま単一行の scalar として書き換えると、子行だけが取り残されて壊れた
+    YAML になる（`distilled_from_sha: "<sha>"` の直後に意味のないインデント行が残る）。
+    """
+    if matched.group(2):
+        return False  # 値が空でなければ新形式（単一 sha）
+    line_no = text.count("\n", 0, matched.start())
+    lines = text.splitlines()
+    if line_no + 1 >= len(lines):
+        return False
+    next_line = lines[line_no + 1]
+    if not next_line[:1] in (" ", "\t"):
+        return False  # 次行がインデントされていない＝子行ではない
+    stripped = next_line.strip()
+    if not stripped or stripped.startswith("#") or stripped.startswith("-"):
+        return False  # 空行・コメント・リスト項目は子マップではない
+    return ":" in stripped
+
+
 def read_doc(path: Path) -> str:
     # newline="" で改行コードを保つ。既定だと CRLF の文書が丸ごと LF に正規化され、
     # 1 行のはずの差分が全行差分に化ける。
@@ -241,10 +285,7 @@ def run_follow_rewritten(root: Path, base_ref: str, checker_args: "list[str]", d
 
     docstring の「`--follow-rewritten <base-ref>`」を実装する。
     """
-    diff_proc = subprocess.run(
-        ["git", "diff", "--name-only", f"{base_ref}...HEAD"],
-        cwd=root, capture_output=True, text=True,
-    )
+    diff_proc = run_git(["diff", "--name-only", f"{base_ref}...HEAD"], cwd=root)
     if diff_proc.returncode != 0:
         print(
             f"git diff --name-only {base_ref}...HEAD が失敗した: {diff_proc.stderr.strip()}",
@@ -260,7 +301,10 @@ def run_follow_rewritten(root: Path, base_ref: str, checker_args: "list[str]", d
         print("checker への転送引数が不正", file=sys.stderr)
         return 2
     exclude_patterns = ns.exclude if ns.exclude is not None else list(checker_mod.DEFAULT_EXCLUDE)
-    target_dir = (root / ns.dir).resolve()
+    # checker 自身も --dir 省略時は "knowledge" にフォールバックする（argparse の
+    # default は None で、既定値の解決は checker の main() 側が行う）。ここでも
+    # 同じ既定値を使う。
+    target_dir = (root / (ns.dir if ns.dir is not None else "knowledge")).resolve()
 
     # 対象候補: diff に出るファイルのうち、checker の走査対象（--dir・--exclude）に入り、
     # frontmatter を持ち distilled_from_sha が空でない文書。
@@ -297,16 +341,20 @@ def run_follow_rewritten(root: Path, base_ref: str, checker_args: "list[str]", d
             continue
 
         old_sha = matched.group(2)
-        is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", old_sha, "HEAD"],
-            cwd=root, capture_output=True, text=True,
+        if not RE_SHA_FORMAT.match(old_sha):
+            # 形式が不正な値を git の引数にそのまま渡さない（F3）。
+            print(f"✗ {rel}: distilled_from_sha の sha の形式が不正（{old_sha!r}）", file=sys.stderr)
+            failed += 1
+            continue
+
+        is_ancestor = run_git(
+            ["merge-base", "--is-ancestor", old_sha, "HEAD"], cwd=root
         ).returncode == 0
         if is_ancestor:
             continue  # HEAD の履歴に残っている。追従は不要
 
-        resolvable = subprocess.run(
-            ["git", "rev-parse", "--verify", f"{old_sha}^{{commit}}"],
-            cwd=root, capture_output=True, text=True,
+        resolvable = run_git(
+            ["rev-parse", "--verify", f"{old_sha}^{{commit}}"], cwd=root
         ).returncode == 0
         if not resolvable:
             print(
@@ -319,10 +367,7 @@ def run_follow_rewritten(root: Path, base_ref: str, checker_args: "list[str]", d
         # 旧 sha のあとに source が変わっていないかを確かめる（本当の stale を隠さない）。
         source_changed = False
         for src in sources:
-            diff_rc = subprocess.run(
-                ["git", "diff", "--quiet", old_sha, "HEAD", "--", src],
-                cwd=root, capture_output=True, text=True,
-            ).returncode
+            diff_rc = run_git(["diff", "--quiet", old_sha, "HEAD", "--", src], cwd=root).returncode
             if diff_rc != 0:
                 source_changed = True
                 break
@@ -454,11 +499,7 @@ def main(argv: "list[str]") -> int:
         # **解決結果を書く**。ユーザ入力をそのまま書くと `--sha HEAD` で
         # `distilled_from_sha: "HEAD"` になり、その文書の stale 判定が恒久的に無効化される
         # （HEAD は常に「今」を指すので何を変えても STALE にならない）。
-        resolved = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--verify", f"{sha}^{{commit}}"],
-            capture_output=True,
-            text=True,
-        )
+        resolved = run_git(["rev-parse", "--verify", f"{sha}^{{commit}}"], cwd=root)
         if resolved.returncode != 0:
             print(f"--sha が解決できない: {sha}", file=sys.stderr)
             return 2
@@ -494,6 +535,12 @@ def main(argv: "list[str]") -> int:
             # 放置すると「bump しても STALE が消えない」無言のループになる。
             print(f"✗ {rel}: frontmatter に distilled_from_sha が {len(found)} 行ある", file=sys.stderr)
             return 1
+        if is_old_source_map_format(text, found[0]):
+            print(
+                f"✗ {rel}: 旧形式（source ごとのマップ）は扱えない。単一 sha に書き直す（ADR 0014）",
+                file=sys.stderr,
+            )
+            return 1
         targets.append((rel, path, text, found[0]))
 
     for rel in skipped_conflicts:
@@ -513,11 +560,7 @@ def main(argv: "list[str]") -> int:
         old_body_at_sha = None
         if old_sha:
             root_rel = path.resolve().relative_to(root.resolve()).as_posix()
-            proc = subprocess.run(
-                ["git", "-C", str(root), "show", f"{old_sha}:{root_rel}"],
-                capture_output=True,
-                text=True,
-            )
+            proc = run_git(["show", f"{old_sha}:{root_rel}"], cwd=root)
             if proc.returncode == 0:
                 old_body_at_sha = body_after_frontmatter(proc.stdout)
         result = bump(path, text, matched, target_sha)

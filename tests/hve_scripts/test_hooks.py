@@ -97,6 +97,11 @@ def test_session_hook_no_stale_is_silent() -> None:
 
 
 def test_session_hook_reports_stale_count_and_usage() -> None:
+    """stale な文書を hve-akm での蒸留し直しへ案内し、文書パスを列挙する（F10）。
+
+    `--all-stale` で追従させる案内は出さない（追従は sha を外形的に揃えるだけで、
+    source の差分を本文にマージしないため、stale の解消にはならない）。
+    """
     repo = new_repo()
     try:
         dest = install_hve_scripts(repo)
@@ -113,7 +118,31 @@ def test_session_hook_reports_stale_count_and_usage() -> None:
         code, out = run_session_hook(repo, dest / SESSION_HOOK_REL)
         assert code == 0, out
         assert "2 件" in out, out
-        assert "bump-distilled-sha.py --all-stale" in out, out
+        assert "hve-akm" in out, out
+        assert "--all-stale で追従する" not in out, out
+        assert "  - knowledge/a.md" in out, out
+        assert "  - knowledge/b.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_session_hook_reports_non_stale_errors_when_zero_stale() -> None:
+    """stale が 0 件でも、checker に STALE 以外の error が残っていれば 1 行で知らせる
+    （追加指摘）。これまでは stale_count が 0 のため何も出さず、error の存在が
+    黙って握りつぶされていた。"""
+    repo = new_repo()
+    try:
+        dest = install_hve_scripts(repo)
+        sha = baseline(repo)
+        write_doc(repo, "knowledge/b.md", status=None, sources=[FIRST_ADR], distilled_from_sha=sha)
+        commit_all(repo, "status を欠落させた文書を追加")
+
+        code, out = run_session_hook(repo, dest / SESSION_HOOK_REL)
+        assert code == 0, out
+        assert out != "", "STALE 以外の error があるのに何も出していない"
+        assert "STALE 以外の error" in out, out
+        assert "check-knowledge.py" in out, out
+        assert out.count("\n") == 0, f"1 行のはずが複数行: {out!r}"
     finally:
         shutil.rmtree(repo)
 
@@ -130,17 +159,46 @@ def test_session_hook_outside_git_repo_is_silent() -> None:
 
 
 def test_session_hook_indeterminate_bump_reports_one_line() -> None:
-    """knowledge/ が無い → checker が判定不能（exit 2）で落ち、hook は 1 行だけ出す。"""
-    repo = Path(tempfile.mkdtemp(prefix="hooks-indeterminate-"))
+    """shallow clone で sha を解決できない → checker が判定不能（exit 2）で落ち、hook は 1 行だけ出す。
+
+    knowledge/ が無いだけなら対象 0 本で exit 0 になる（check-knowledge.py の既定）ので、
+    判定不能は履歴の足りない shallow clone で作る。
+    """
+    base = Path(tempfile.mkdtemp(prefix="hooks-indeterminate-"))
     try:
-        run_git(repo, "init", "-q", "-b", "main")
+        origin = base / "origin"
+        origin.mkdir()
+        run_git(origin, "init", "-q", "-b", "main")
+        run_git(origin, "config", "user.email", "test@example.invalid")
+        run_git(origin, "config", "user.name", "test")
+        run_git(origin, "config", "commit.gpgsign", "false")
+        (origin / "docs-original").mkdir()
+        (origin / "docs-original" / "src.md").write_text("v1\n", encoding="utf-8")
+        run_git(origin, "add", "-A")
+        run_git(origin, "commit", "-q", "-m", "source")
+        first = run_git(origin, "rev-parse", "HEAD").strip()
+        doc = origin / "knowledge" / "a.md"
+        doc.parent.mkdir()
+        doc.write_text(
+            "---\ntitle: a\nstatus: Confirmed\nkind: knowledge\nsources:\n"
+            f"  - docs-original/src.md\ndistilled_from_sha: \"{first}\"\n"
+            "updated: \"2026-10-04\"\n---\n\n# a\n",
+            encoding="utf-8",
+        )
+        run_git(origin, "add", "-A")
+        run_git(origin, "commit", "-q", "-m", "doc")
+        repo = base / "shallow"
+        subprocess.run(
+            ["git", "clone", "-q", "--depth", "1", f"file://{origin}", str(repo)],
+            check=True, capture_output=True,
+        )
         dest = install_hve_scripts(repo)
         code, out = run_session_hook(repo, dest / SESSION_HOOK_REL)
         assert code == 0, out
         assert out != "", "判定不能のとき 1 行出るはず"
         assert out.count("\n") == 0, f"1 行のはずが複数行: {out!r}"
     finally:
-        shutil.rmtree(repo)
+        shutil.rmtree(base)
 
 
 # --- check-knowledge-impact.py ------------------------------------------------

@@ -146,6 +146,18 @@ def write_doc(
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def write_raw_frontmatter_doc(
+    repo: Path, rel: str, frontmatter_lines: "list[str]", body: str = "本文。\n"
+) -> None:
+    """`write_doc` と違い frontmatter 行をそのまま書く（裸の `key:` や旧マップ形式を作るため。
+    `write_doc` は空値を常にクォートするので、裸の `key:`（値なし）を作れない）。
+    """
+    lines = ["---", *frontmatter_lines, "---", "", body]
+    path = repo / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def baseline(repo: Path) -> str:
     """1 文書（sources は FIRST_ADR）だけの、error 0 で通る状態を作って sha を返す。"""
     write_doc(repo, "knowledge/a.md", sources=[FIRST_ADR], distilled_from_sha="HEAD")
@@ -248,6 +260,164 @@ def test_custom_required_list_is_honored() -> None:
         shutil.rmtree(repo)
 
 
+# --- F1/F3: 空リスト（裸の key:）・distilled_from_sha の形式 -------------------
+
+
+def test_bare_distilled_from_sha_is_empty_error() -> None:
+    """裸の `distilled_from_sha:`（値なし）は parser 上は空リストになるが「空」として検出する。"""
+    repo = new_repo()
+    try:
+        baseline(repo)
+        write_raw_frontmatter_doc(
+            repo, "knowledge/b.md",
+            [
+                "title: b",
+                "status: Confirmed",
+                "kind: knowledge",
+                "sources:",
+                f"  - {FIRST_ADR}",
+                "distilled_from_sha:",
+                'updated: "2026-10-04"',
+            ],
+        )
+        commit_all(repo, "distilled_from_sha を裸で書く")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "knowledge/b.md: 必須項目 distilled_from_sha が空" in out, out
+        assert "形式が不正" not in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_bare_title_is_empty_error() -> None:
+    """裸の `title:`（値なし）も同様に「空」として検出する。"""
+    repo = new_repo()
+    try:
+        sha = baseline(repo)
+        write_raw_frontmatter_doc(
+            repo, "knowledge/b.md",
+            [
+                "title:",
+                "status: Confirmed",
+                "kind: knowledge",
+                "sources:",
+                f"  - {FIRST_ADR}",
+                f'distilled_from_sha: "{sha}"',
+                'updated: "2026-10-04"',
+            ],
+        )
+        commit_all(repo, "title を裸で書く")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "knowledge/b.md: 必須項目 title が空" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_old_map_format_distilled_from_sha_is_error() -> None:
+    """旧標準の source ごとのマップ形式（ADR 0014 で廃止）は形式エラーにする。"""
+    repo = new_repo()
+    try:
+        baseline(repo)
+        write_raw_frontmatter_doc(
+            repo, "knowledge/b.md",
+            [
+                "title: b",
+                "status: Confirmed",
+                "kind: knowledge",
+                "sources:",
+                f"  - {FIRST_ADR}",
+                "distilled_from_sha:",
+                f"  {FIRST_ADR}: abcdef1234567890",
+                'updated: "2026-10-04"',
+            ],
+        )
+        commit_all(repo, "distilled_from_sha を旧マップ形式で書く")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "distilled_from_sha の形式が不正" in out, out
+        assert "ADR 0014" in out, out
+        assert "必須項目 distilled_from_sha が空" not in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_list_format_distilled_from_sha_is_error() -> None:
+    """`distilled_from_sha` が list 形式（ブロックリスト）でも形式エラーにする。"""
+    repo = new_repo()
+    try:
+        baseline(repo)
+        write_raw_frontmatter_doc(
+            repo, "knowledge/b.md",
+            [
+                "title: b",
+                "status: Confirmed",
+                "kind: knowledge",
+                "sources:",
+                f"  - {FIRST_ADR}",
+                "distilled_from_sha:",
+                "  - abcdef1",
+                'updated: "2026-10-04"',
+            ],
+        )
+        commit_all(repo, "distilled_from_sha を list 形式で書く")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "distilled_from_sha の形式が不正" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_distilled_from_sha_mutable_ref_is_error() -> None:
+    """`HEAD` / `main` のような可変参照は stale 判定を無効化するので error にする。"""
+    repo = new_repo()
+    try:
+        baseline(repo)
+        for bad in ("HEAD", "main"):
+            write_doc(repo, "knowledge/b.md", sources=[FIRST_ADR], distilled_from_sha=bad)
+            commit_all(repo, f"distilled_from_sha を {bad} にする")
+            code, out = check(repo)
+            assert code == 1, out
+            assert "sha 形式でない" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_distilled_from_sha_invalid_hex_format_is_error() -> None:
+    """大文字 16 進・6 桁（7 桁未満）は正規表現に合わないので error にする。"""
+    repo = new_repo()
+    try:
+        baseline(repo)
+        for bad in ("ABCDEF1", "abcdef"):
+            write_doc(repo, "knowledge/b.md", sources=[FIRST_ADR], distilled_from_sha=bad)
+            commit_all(repo, f"distilled_from_sha を {bad} にする")
+            code, out = check(repo)
+            assert code == 1, out
+            assert "sha 形式でない" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_distilled_from_sha_seven_and_forty_digit_hex_pass() -> None:
+    """7 桁・40 桁の小文字 16 進は正規表現に合うので通る（境界値）。"""
+    repo = new_repo()
+    try:
+        baseline(repo)
+        full_sha = run_git(repo, "rev-parse", "HEAD")
+        write_doc(repo, "knowledge/a.md", sources=[FIRST_ADR], distilled_from_sha=full_sha[:7])
+        commit_all(repo, "7 桁の sha にする")
+        code, out = check(repo)
+        assert code == 0, out
+
+        full_sha2 = run_git(repo, "rev-parse", "HEAD")
+        write_doc(repo, "knowledge/a.md", sources=[FIRST_ADR], distilled_from_sha=full_sha2)
+        commit_all(repo, "40 桁の sha にする")
+        code, out = check(repo)
+        assert code == 0, out
+    finally:
+        shutil.rmtree(repo)
+
+
 # --- sources の実在・正規形・大文字小文字 ------------------------------------
 
 
@@ -321,6 +491,27 @@ def test_source_case_mismatch_is_error() -> None:
             assert "sources のパスが実在しない" in out, out
     finally:
         shutil.rmtree(repo)
+
+
+def test_source_symlink_outside_repo_is_error() -> None:
+    """F14: symlink の解決先がリポジトリの外を指している場合は error にする。"""
+    repo = new_repo()
+    outside_dir = Path(tempfile.mkdtemp(prefix="check-knowledge-outside-"))
+    try:
+        sha = baseline(repo)
+        outside_file = outside_dir / "secret.md"
+        outside_file.write_text("外部ファイル\n", encoding="utf-8")
+        link = repo / "docs-original" / "escape.md"
+        os.symlink(outside_file, link)
+        write_doc(repo, "knowledge/a.md", sources=["docs-original/escape.md"],
+                  distilled_from_sha=sha)
+        commit_all(repo, "symlink で外部ファイルを source にする")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "sources がリポジトリの外を指している" in out, out
+    finally:
+        shutil.rmtree(repo)
+        shutil.rmtree(outside_dir, ignore_errors=True)
 
 
 # --- 空 sources ---------------------------------------------------------------
@@ -487,11 +678,25 @@ def test_custom_exclude_pattern_is_honored() -> None:
 
 
 def test_missing_target_directory_exits_2() -> None:
+    """F19: `--dir` を明示指定してそれが無い場合は従来どおり exit 2。"""
     repo = new_repo()
     try:
         baseline(repo)
         code, out = check(repo, "--dir", "does-not-exist")
         assert code == 2, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_default_dir_missing_exits_zero_with_zero_targets() -> None:
+    """F19: `--dir` を明示しなかったとき、既定の knowledge/ が無ければ対象 0 本で exit 0。"""
+    repo = new_repo()
+    try:
+        shutil.rmtree(repo / "knowledge")
+        code, out = check(repo)
+        assert code == 0, out
+        assert "0 本" in out, out
+        assert "knowledge/ が無いので対象なし" in out, out
     finally:
         shutil.rmtree(repo)
 

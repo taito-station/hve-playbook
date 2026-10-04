@@ -549,7 +549,7 @@ fi
 ### Step 6.1: distilled_from_sha の追従 (knowledge の検査スクリプトがあるときだけ)
 
 squash（Step 6）や rebase（Step 2、review-pr の各巡）は、knowledge 文書の `distilled_from_sha` が
-指していたコミットを HEAD の履歴から外す。手元には古いコミットが残るので検査は通るが、push 後に
+指していたコミットを HEAD の履歴から外す。手元では検査が通ることがあっても、push 後に
 新しく clone すると sha を解決できず CI が落ちる。コミットは自分の sha を含められないので、外れた
 文書はもう 1 コミット積んで追従させる（HVE の knowledge-maturity「sha の追従」、ADR 0014）。
 
@@ -574,7 +574,7 @@ if [ -n "$BUMP" ]; then
     FOLLOWED=$(sed -n 's/^✓ \(.*\): [0-9a-f]* → .*/\1/p' "$REPO_ROOT/docs/temp/.follow.log")
     if [ -n "$FOLLOWED" ]; then
         printf '%s\n' "$FOLLOWED" | while IFS= read -r f; do git add -- "$f"; done
-        git commit -m "chore: distilled_from_sha を追従
+        git commit -m "<件名: commit-workflow の規約（既存履歴の形式）で、knowledge 文書の distilled_from_sha を追従したことを書く>
 
 Co-Authored-By: ..."
     fi
@@ -582,7 +582,8 @@ fi
 ```
 
 - `FOLLOW_RC` が 1 のときは、追従できなかった文書（旧 sha のあとに source が変わった・旧 sha が見つからない）がある。push は続けるが、その文書は CI の stale 検査で落ちるので、Step 8 の最終報告に「蒸留し直しが要る文書」として載せる
-- この追従コミットは ADR 0008（未 push のブランチは 1 コミット）の例外で、PR は 2 コミットになる
+- この追従コミットは ADR 0008（未 push のブランチは 1 コミット）の例外で、未 push のブランチから作った PR は 2 コミットになる。push 済みのブランチは rebase のたびに追従コミットが 1 つ増える
+- `--follow-rewritten` が使えない（exit 2 で「不明なオプション」など）なら、導入先の `.claude/scripts/hve/` が古い写しなので、setup.sh の再適用を案内する
 - `docs/temp/.follow.log` は Step 9 で消す
 
 ### Step 7: push + PR 作成

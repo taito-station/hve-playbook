@@ -9,13 +9,21 @@
 
 検査項目:
   1. `--required`（既定 title,status,kind,sources,distilled_from_sha,updated）の
-     frontmatter 項目が欠落・空でないか                                      [error]
-  2. sources に列挙したパスがリポジトリ相対の正規形で、実在し、大文字小文字まで
-     実ファイルと一致するか                                                  [error]
-  3. sources が空か（既定は error。`--allow-empty-sources-with-decision-log` を
+     frontmatter 項目が欠落・空でないか。値が空リスト（裸の `key:`）・空の dict
+     でも「空」として扱う（`sources` は専用の (4) に委ねて二重報告しない）     [error]
+  2. `distilled_from_sha` が文書ごとに 1 つの sha（str）になっているか。旧標準の
+     source ごとのマップ形式（`distilled_from_sha:` の下にインデントされた
+     `path: sha` 行）や list 形式は error（ADR 0014）。str であっても
+     `^[0-9a-f]{7,40}$`（小文字 16 進・7〜40 桁）に合わない値（`HEAD`・`main` 等の
+     可変参照、大文字 16 進、短すぎる値）は error。ただし
+     `--allow-empty-sources-with-decision-log` で空が許される文書は除く        [error]
+  3. sources に列挙したパスがリポジトリ相対の正規形で、実在し、大文字小文字まで
+     実ファイルと一致し、シンボリックリンクの解決先がリポジトリの外を指して
+     いないか                                                                 [error]
+  4. sources が空か（既定は error。`--allow-empty-sources-with-decision-log` を
      付けたときだけ、本文に `## 決定ログ` 見出し（行頭・コードフェンス外）を持つ
      文書は sources・distilled_from_sha が空・欠落でもよい）                  [error]
-  4. stale: 各 source の最後の「内容変更」コミットが、文書の `distilled_from_sha`
+  5. stale: 各 source の最後の「内容変更」コミットが、文書の `distilled_from_sha`
      を解決した commit の祖先かどうか（`git merge-base --is-ancestor`）       [error]
 
 「内容変更ではない」として遡る（stale 判定の遡上をスキップする）のは次の 3 種類:
@@ -39,11 +47,16 @@ status が `Conflict` の文書は、stale 判定の結果を error にせず「
                       [--required a,b,c] [--allow-empty-sources-with-decision-log]
                       [--warn-only] [--max-pages N] [--max-renames N]
 
+  `--dir` を省略すると既定で `knowledge/` を検査する。既定の `knowledge/` が
+  存在しない場合は対象 0 本として exit 0 にする（`--dir` を明示指定して存在
+  しない場合は exit 2）。
+
 終了コード:
-  0: 違反なし
+  0: 違反なし（`--dir` を省略し既定の knowledge/ が存在しない場合も対象 0 本として 0）
   1: 違反あり（--warn-only を付けると 0 に落ちる）
-  2: 判定不能（shallow clone で履歴が足りない・git リポジトリ外・引数不正など。
-     --warn-only でも 0 にはならない）
+  2: 判定不能（shallow clone で履歴が足りない・git リポジトリ外・`--dir` を明示
+     指定したディレクトリが存在しない・引数不正など。--warn-only でも 0 には
+     ならない）
 """
 
 from __future__ import annotations
@@ -100,6 +113,14 @@ RE_LIST_HEAD = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*$")
 RE_LIST_ITEM = re.compile(r"^\s+-\s+(\S+)")
 RE_FLOW_LIST = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*\[([^\]]*)\]\s*(?:#.*)?$")
 RE_SCALAR = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*):\s*"?([^"#]*?)"?\s*(?:#.*)?$')
+
+# 旧標準の source ごとのマップ形式（`distilled_from_sha:` の下にインデントされた
+# `path: sha` 行。ADR 0014 で廃止）を検出する。ブロックリストの `- item` 行は
+# 除外する（先頭が `-` の行は list 形式として別途 isinstance(..., list) で検出）。
+RE_OLD_MAP_ENTRY = re.compile(r"^\s+[^\s:#-][^:]*:\s*\S")
+# distilled_from_sha の値が取り得る形式。小文字 16 進・7〜40 桁（HEAD/main 等の
+# 可変参照や大文字 16 進・短すぎる値を拒むことで stale 判定の無効化を防ぐ）。
+RE_SHA = re.compile(r"^[0-9a-f]{7,40}$")
 
 
 def parse_frontmatter(text: str) -> dict:
@@ -372,6 +393,19 @@ def case_exact(path: Path, root: Path) -> bool:
     return True
 
 
+def resolves_outside_repo(resolved: Path, root: Path) -> bool:
+    """`resolved`（symlink 解決後の絶対パス）がリポジトリ `root` の外を指すか。
+
+    `repo_relative_path_error` は書かれた文字列を字面で見るだけなので、相対パスの
+    まま書かれた symlink がリポジトリ外の実ファイルを指すケースは通り抜ける。
+    """
+    try:
+        resolved.relative_to(root)
+        return False
+    except ValueError:
+        return True
+
+
 def repo_relative_path_error(raw: str) -> "str | None":
     """`sources` に書けるパスでない理由を返す（正常なら None）。"""
     if raw.startswith("/") or ".." in Path(raw).parts:
@@ -430,13 +464,16 @@ def build_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
-        "--dir", default="knowledge",
-        help="検査対象ディレクトリ（リポジトリルート相対。既定: knowledge。再帰的に走査する）",
+        "--dir", default=None,
+        help="検査対象ディレクトリ（リポジトリルート相対。既定: knowledge。再帰的に走査する。"
+             "既定の knowledge/ が存在しない場合は対象 0 本として exit 0 にする。"
+             "明示指定したディレクトリが存在しない場合は exit 2 にする）",
     )
     parser.add_argument(
         "--exclude", action="append", default=None,
         help="除外パターン（--dir からの相対。末尾 `/` でディレクトリ接頭辞。"
-             "複数指定可。既定: adr/ README.md）",
+             "複数指定可。指定すると既定（adr/ と README.md）を置き換える。"
+             "既定を残すときは併せて指定する）",
     )
     parser.add_argument(
         "--required", default=DEFAULT_REQUIRED,
@@ -473,19 +510,26 @@ def main(argv: "list[str] | None" = None) -> int:
     exclude_patterns = args.exclude if args.exclude is not None else list(DEFAULT_EXCLUDE)
     required_keys = [k.strip() for k in args.required.split(",") if k.strip()]
 
-    target_dir = root / args.dir
+    dir_explicit = args.dir is not None
+    target_dir_rel = args.dir if dir_explicit else "knowledge"
+    target_dir = root / target_dir_rel
+
+    default_dir_missing = False
     if not target_dir.is_dir():
-        print(f"検査対象ディレクトリが見つからない: {args.dir}", file=sys.stderr)
-        return 2
+        if dir_explicit:
+            print(f"検査対象ディレクトリが見つからない: {target_dir_rel}", file=sys.stderr)
+            return 2
+        default_dir_missing = True  # --dir 省略時は対象 0 本として続行する（exit 0）
 
     targets: list[Path] = []
-    for p in sorted(target_dir.rglob("*.md")):
-        if not p.is_file():
-            continue
-        rel_to_dir = p.relative_to(target_dir).as_posix()
-        if is_excluded(rel_to_dir, exclude_patterns):
-            continue
-        targets.append(p)
+    if not default_dir_missing:
+        for p in sorted(target_dir.rglob("*.md")):
+            if not p.is_file():
+                continue
+            rel_to_dir = p.relative_to(target_dir).as_posix()
+            if is_excluded(rel_to_dir, exclude_patterns):
+                continue
+            targets.append(p)
 
     shallow = is_shallow()
     errors: list[str] = []
@@ -501,9 +545,20 @@ def main(argv: "list[str] | None" = None) -> int:
             errors.append(f"{rel}: frontmatter が無い")
             continue
 
-        _, body = split_frontmatter(text)
+        fm_raw, body = split_frontmatter(text)
         has_decision_log = has_decision_log_heading(body)
         allow_empty = args.allow_empty_sources_with_decision_log and has_decision_log
+
+        # distilled_from_sha の形式判定。旧マップ形式は parse_frontmatter 上では
+        # 空リストに潰れてしまうので、raw frontmatter のインデント行を別途見る。
+        distilled_value = fm.get("distilled_from_sha")
+        distilled_raw_block = frontmatter_blocks(fm_raw or "").get("distilled_from_sha", "")
+        distilled_is_old_map = any(
+            RE_OLD_MAP_ENTRY.match(line) for line in distilled_raw_block.splitlines()[1:]
+        )
+        distilled_malformed = distilled_is_old_map or (
+            isinstance(distilled_value, list) and len(distilled_value) > 0
+        )
 
         # (1) 必須項目
         for key in required_keys:
@@ -512,30 +567,55 @@ def main(argv: "list[str] | None" = None) -> int:
             if key not in fm:
                 errors.append(f"{rel}: 必須項目 {key} が無い")
                 continue
+            if key == "sources":
+                continue  # 空判定は (4) の専用チェックに委ねる（二重報告しない）
+            if key == "distilled_from_sha" and distilled_malformed:
+                continue  # 形式エラーとして別途報告する（二重報告しない）
             value = fm[key]
-            if isinstance(value, str) and value.strip() == "":
+            if isinstance(value, str):
+                if value.strip() == "":
+                    errors.append(f"{rel}: 必須項目 {key} が空")
+            elif isinstance(value, (list, dict)) and not value:
                 errors.append(f"{rel}: 必須項目 {key} が空")
 
-        # (3) 空 sources（key が無い場合は上の必須項目チェックに委ねて二重報告しない）
+        # (2) distilled_from_sha の形式（旧マップ形式・list 形式、または sha 以外の
+        # 値。allow_empty で空が免除される文書は、値が実際に空ならここで何もしない）
+        if distilled_malformed:
+            errors.append(
+                f"{rel}: distilled_from_sha の形式が不正"
+                "（文書ごとに 1 つの sha で書く。ADR 0014）"
+            )
+        elif isinstance(distilled_value, str) and distilled_value.strip():
+            if not RE_SHA.match(distilled_value.strip()):
+                errors.append(
+                    f"{rel}: distilled_from_sha が sha 形式でない"
+                    "（7〜40 桁の小文字 16 進で書く。HEAD/main 等の可変参照は使えない）"
+                    f" → {distilled_value.strip()}"
+                )
+
+        # (4) 空 sources（key が無い場合は上の必須項目チェックに委ねて二重報告しない）
         sources: "list[str]" = fm.get("sources", [])
         if "sources" in fm and not sources and not allow_empty:
             errors.append(f"{rel}: sources が空（由来を辿れない）")
 
-        # (2) sources の実在・正規形・大文字小文字（空・欠落のどちらでも、列挙された
-        # 要素だけは常に検査する）
+        # (3) sources の実在・正規形・大文字小文字・symlink の解決先（空・欠落の
+        # どちらでも、列挙された要素だけは常に検査する）
         for src in sources:
             path_error = repo_relative_path_error(src)
             if path_error:
                 errors.append(f"{rel}: sources は{path_error} → {src}")
             elif not (root / src).is_file():
                 errors.append(f"{rel}: sources のパスが実在しない → {src}")
+            elif resolves_outside_repo((root / src).resolve(), root.resolve()):
+                errors.append(f"{rel}: sources がリポジトリの外を指している → {src}")
             elif not case_exact((root / src).resolve(), root.resolve()):
                 errors.append(f"{rel}: sources の大文字小文字が実ファイルと違う → {src}")
 
         # 免除は sources と distilled_from_sha が揃って空のときだけ。sources を
         # 持つのに sha が無いと stale 判定から黙って外れるので error にする
-        # （免除でないときは上の必須項目チェックが報告済み）。
-        if allow_empty and sources and not fm.get("distilled_from_sha", ""):
+        # （免除でないときは上の必須項目チェックが報告済み。形式が不正なときは
+        # 上の (2) が報告済みなので二重報告しない）。
+        if allow_empty and sources and not distilled_malformed and not distilled_value:
             errors.append(f"{rel}: sources があるのに distilled_from_sha が無い")
 
         status = fm.get("status", "")
@@ -545,10 +625,12 @@ def main(argv: "list[str] | None" = None) -> int:
             pending_conflicts.append(rel)
             continue
 
-        # (4) stale。sources・distilled_from_sha のどちらかが無ければ判定しない
-        # （allow_empty による免除時はこれが意図した状態。免除でない欠落は上の
-        # 必須項目チェックで既に error 済みなので、ここで重複報告しない）。
-        distilled = fm.get("distilled_from_sha", "")
+        # (5) stale。sources・distilled_from_sha のどちらかが無ければ判定しない
+        # （allow_empty による免除時はこれが意図した状態。免除でない欠落・形式が
+        # 不正な値は上のチェックで既に error 済みなので、ここで重複報告しない）。
+        if distilled_malformed or not isinstance(distilled_value, str):
+            continue
+        distilled = distilled_value
         if not distilled or not sources:
             continue
 
@@ -638,6 +720,8 @@ def main(argv: "list[str] | None" = None) -> int:
         f"✓ knowledge 文書の整合を確認"
         f"（{len(targets)} 本 / 警告 {len(warnings)} 件 / 解消待ち {len(pending_conflicts)} 件）"
     )
+    if default_dir_missing:
+        print("knowledge/ が無いので対象なし")
     return 0
 
 

@@ -107,7 +107,8 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
 
 - bump は `distilled_from_sha` だけを書き換え、`updated` は触らない（上の「`updated` の規則」）
 - `Conflict` の文書は bump しない
-- **squash・rebase の後の追従**: squash や rebase で、sha が指していたコミットが HEAD の履歴から外れる（手元では古いコミットが残るので検査は通るが、新しく clone すると sha を解決できない）。`bump-distilled-sha.py --follow-rewritten <base>` は、その PR で変えた文書のうち、sha が HEAD から辿れず、旧 sha と HEAD で sources の中身が同じものだけを HEAD へ追従させる。旧 sha のあとに source が変わった文書は追従せずに報告する（蒸留し直す）。create-pr は squash の後に、review-pr は rebase の後の push の前にこれを実行して追従コミットを積む（ADR 0014）。手で squash・rebase したときも同じように実行する
+- **squash・rebase の後の追従**: squash や rebase で、sha が指していたコミットが HEAD の履歴から外れる（手元では通ることがある（その PR で source が変わっていないとき）が、新しく clone すると sha を解決できない）。`bump-distilled-sha.py --follow-rewritten <base>` は、その PR で変えた文書のうち、sha が HEAD から辿れず、旧 sha と HEAD で sources の中身が同じものだけを HEAD へ追従させる。旧 sha のあとに source が変わった文書は追従せずに報告する（蒸留し直す）。create-pr は squash の後に、review-pr は rebase の後の push の前にこれを実行して追従コミットを積む（ADR 0014）。push 済みのブランチでは rebase のたびに追従コミットが 1 つ増える。手で squash・rebase したときも同じように実行する
+- **PR は merge commit でマージする**: GitHub の squash merge や rebase merge でマージすると、追従させた sha（PR ブランチのコミット）が main から辿れなくなり、以後の CI の stale 検査が「distilled_from_sha を解決できない」で落ち続ける。knowledge 文書を持つリポジトリでは、squash merge と rebase merge を無効にしておく
 
 ### 検査スクリプト
 
@@ -126,21 +127,23 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
 - `--allow-empty-sources-with-decision-log`: `## 決定ログ` 節を持つ文書に限り、sources と `distilled_from_sha` が揃って空でもよい（stale 判定しない）。既定では sources は必須
 - `--warn-only`: 違反があっても exit 0
 
-**パース契約**: `bump-distilled-sha.py` は `check-knowledge.py` の STALE 行（`✗ <文書>: STALE ← <source> が distilled_from_sha(<値>) より後に更新されている（<7桁>）。…`）をパースする。SessionStart の hook と create-pr は、bump の出力の「STALE な文書は無い」と「（dry-run）<文書> → <sha>」をパースする。書式を変えるときは呼び出し側も直す。
+**パース契約**: `bump-distilled-sha.py` は `check-knowledge.py` の STALE 行（`✗ <文書>: STALE ← <source> が distilled_from_sha(<値>) より後に更新されている（<7桁>）。…`）をパースする。SessionStart の hook は bump の出力の「STALE な文書は無い」と「（dry-run）<文書> → <sha>」を、create-pr（Step 6.1）は `--follow-rewritten` の出力の「✓ <文書>: <旧 sha> → <新 sha>」をパースする。書式を変えるときは呼び出し側も直す。create-pr・review-pr は sync で常に最新になるが、導入先の `.claude/scripts/hve/` は最後に setup.sh を実行した時点の写しなので、書式や引数を変えたら導入先に setup.sh の再適用を案内する。
 
 ### 組み込み方
 
 配線は導入先が行う（setup.sh は配置だけ）。
 
-- **CI**: 全履歴を取得して実行する
+- **CI**: pull request で、全履歴を取得して実行する（main への push で実行すると base と head が同じになり、決定ログの検査は差分なしで通る。main への直 push は branching で禁じている）
 
   ```yaml
   - uses: actions/checkout@<sha>
     with:
       fetch-depth: 0
   - run: python3 .claude/scripts/hve/check-knowledge.py
-  - run: python3 .claude/scripts/hve/check-decision-log.py --base origin/main --head HEAD
+  - run: python3 .claude/scripts/hve/check-decision-log.py --base origin/${{ github.base_ref }} --head HEAD
   ```
+
+  `knowledge/` がまだ無いリポジトリでは、どちらの検査も対象 0 本で通る
 
 - **pre-push**: push するコミットを stdin から受けて検査する。例は hve-playbook の `.githooks/pre-push`。`git config core.hooksPath <dir>` で有効にする
 - **Claude Code の hook**: `.claude/settings.json` に絶対パスで書く
@@ -153,6 +156,8 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
     }
   }
   ```
+
+SessionStart の hook は全文書の履歴を遡るので、大きなリポジトリでは数十秒かかることがある。セッションの開始が遅くなるなら SessionStart には配線せず、CI と pre-push に任せる。
 
 AKM スキル（`.claude/skills/hve-akm/SKILL.md`）の Step 1・Step 3 はこれらのスクリプトを使う。
 

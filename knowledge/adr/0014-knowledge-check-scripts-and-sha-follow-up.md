@@ -35,8 +35,10 @@ knowledge の標準は、stale 検出と決定ログの不変性検査を「プ�
 - 設定は CLI 引数で渡し、既定値は本標準にする。設定ファイルの形式は作らない。paddock のために `--allow-empty-sources-with-decision-log`（`## 決定ログ` 節を持つ文書は sources と sha が揃って空でよい）と、`.github/workflows/` の `uses:` ピン更新だけの変更を内容の変更と見なさない処理を入れる
 - status が `Conflict` の文書は stale でも失敗にせず「解消待ち」として報告し、bump も飛ばす（ADR-0011）
 - shallow clone・merge-base が取れないときは、スキップせず exit 2 にする（判定できないことを「問題なし」として通さない）
-- 決定ログの検査は、独立ファイル方式のステータス節の外の変更を警告にする（誤字修正は許されるが機械では判定できない）。ADR の削除・改名と一覧 README の行の削除は error
+- 決定ログの検査は、独立ファイル方式のステータス節の外の、同じ行の中の差し替えを警告にする（誤字修正は許されるが機械では判定できない）。節の外での行の追加・削除、ADR の削除・改名、一覧 README の行の削除は error（誤字修正は行の数を変えないので、行の増減は決定の書き足し・削除とみなす）
 - squash・rebase の後の追従: コミットは自分の sha を含められないので、squash・rebase で sha の指すコミットが履歴から外れた文書は、もう 1 コミット積んで追従させるしかない。create-pr は squash の後に、review-pr（単独起動）は rebase の後の push の前に、`bump-distilled-sha.py --follow-rewritten` で追従コミットを積む。対象は、その PR で変えた文書のうち、sha が HEAD から辿れず、旧 sha と HEAD で sources の中身が同じもの。旧 sha のあとに source が変わった文書は追従しない（本当の stale を隠さないため）。sha が辿れるかで判定するのは、手元に古いコミットが残っていると stale の判定では外れたことが分からないため（新しく clone すると sha を解決できない）。これにより ADR-0008 の「未 push のブランチから作った PR は 1 コミット」に例外ができるので、ADR-0008 を Partially superseded にする
+- push 済みのブランチは rebase のたびに sha が外れるので、追従コミットがそのたびに 1 つ増える
+- この方式は、PR を merge commit でマージすることを前提にする。GitHub の squash merge・rebase merge でマージすると、追従させた sha（PR ブランチのコミット）が main から辿れず、以後の CI が落ち続ける（branching の規約は merge commit を定めている。hve-playbook のリポジトリ設定は別 issue で揃える）
 - paddock の影響警告 hook は PostToolUse で無効な出力（`{"decision": "warn"}`）を返していたので、`systemMessage` と `hookSpecificOutput.additionalContext` で出すように直して同梱する
 - hve-playbook 自身の `knowledge/` は `adr/` だけなので、`knowledge/adr/` と README は frontmatter 標準の対象外と明記する。dogfood は、tests/ での両検査の実行と、hve-playbook の pre-push（`.githooks/pre-push`）で行う
 

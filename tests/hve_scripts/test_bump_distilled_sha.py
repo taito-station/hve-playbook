@@ -322,6 +322,31 @@ def test_duplicate_distilled_lines_are_refused() -> None:
         shutil.rmtree(repo)
 
 
+def test_old_source_map_format_is_refused() -> None:
+    """旧標準（source ごとのマップ形式）の distilled_from_sha は書き換えず exit 1 で報告する
+    （F1）。この形式をそのまま bump すると、単一行の scalar に書き換えた直後に
+    インデント済みの子行が残り、壊れた YAML になる。"""
+    repo = new_repo()
+    try:
+        sha = baseline(repo)
+        path = repo / "knowledge/a.md"
+        text = path.read_text(encoding="utf-8")
+        old_map = f'distilled_from_sha:\n  {FIRST_ADR}: {sha}\n'
+        new_text = re.sub(r'distilled_from_sha: ".*"\n', old_map, text, count=1)
+        assert new_text != text, "旧形式への置き換えに失敗した（fixture の前提が崩れている）"
+        path.write_text(new_text, encoding="utf-8")
+        commit_all(repo, "旧形式（source ごとのマップ）へ変更")
+        before = path.read_text(encoding="utf-8")
+
+        code, out = run(repo, "knowledge/a.md")
+        assert code == 1, out
+        assert "旧形式（source ごとのマップ）は扱えない" in out, out
+        assert "ADR 0014" in out, out
+        assert path.read_text(encoding="utf-8") == before, "旧形式の文書を書き換えた"
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_missing_file_aborts_before_writing() -> None:
     """途中で落ちるとき、先行ファイルだけ書き換わった半端な状態を残さない。"""
     repo = new_repo()
@@ -642,6 +667,51 @@ def test_follow_rewritten_bumps_after_rebase() -> None:
         shutil.rmtree(repo)
 
 
+def test_follow_rewritten_handles_non_ascii_filenames() -> None:
+    """日本語ファイル名の文書も `git diff --name-only` の対象から漏れずに追従される
+    （F2）。既定の quotePath=true だと非 ASCII パスが 8 進数エスケープのクォート表記で
+    出力され、候補の抽出が黙って外れる。"""
+    repo = new_repo()
+    try:
+        base = baseline(repo)
+        write_doc(repo, "knowledge/用語集.md", sources=[FIRST_ADR], distilled_from_sha="HEAD")
+        write_doc(repo, "knowledge/ascii.md", sources=[FIRST_ADR], distilled_from_sha="HEAD")
+        commit_all(repo, "2 文書を追加")
+        pinned = full_head(repo)
+        write_doc(repo, "knowledge/用語集.md", sources=[FIRST_ADR], distilled_from_sha=pinned)
+        write_doc(repo, "knowledge/ascii.md", sources=[FIRST_ADR], distilled_from_sha=pinned)
+        commit_all(repo, "sha を pin")
+
+        p = repo / FIRST_ADR
+        p.write_text(p.read_text(encoding="utf-8") + "\n追記。\n", encoding="utf-8")
+        commit_all(repo, "source を更新")
+
+        for rel in ("knowledge/用語集.md", "knowledge/ascii.md"):
+            doc = repo / rel
+            doc.write_text(
+                doc.read_text(encoding="utf-8").replace("本文。", "本文を更新した。"),
+                encoding="utf-8",
+            )
+        commit_all(repo, "本文を更新")
+        for rel in ("knowledge/用語集.md", "knowledge/ascii.md"):
+            code, out = run(repo, rel)
+            assert code == 0, out
+        commit_all(repo, "sha 追従")
+
+        # squash: base 以降のコミットを 1 つにまとめる
+        run_git(repo, "reset", "--soft", base)
+        run_git(repo, "commit", "-q", "-m", "squash")
+        squashed = full_head(repo)
+
+        code, out = run(repo, "--follow-rewritten", base)
+        assert code == 0, out
+        assert f"→ {squashed}" in out, out
+        assert distilled_of(repo, "knowledge/用語集.md") == squashed, out
+        assert distilled_of(repo, "knowledge/ascii.md") == squashed, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_follow_rewritten_refuses_when_source_changed_after_old_sha() -> None:
     """旧 sha のあとに source が変わっている場合は追従しない（本当の stale を隠さない）。"""
     repo = new_repo()
@@ -692,6 +762,28 @@ def test_follow_rewritten_refuses_when_old_sha_is_unresolvable() -> None:
         assert code == 1, out
         assert "旧 sha が見つからないため追従できない" in out, out
         assert distilled_of(repo, "knowledge/a.md") == fake_sha
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_follow_rewritten_refuses_malformed_sha_format() -> None:
+    """distilled_from_sha の値が sha の形式（7〜40 桁の 16 進）に合わない場合は、
+    git に渡さず追従しない（F3）。"""
+    repo = new_repo()
+    try:
+        base = baseline(repo)
+        a = repo / "knowledge/a.md"
+        text = a.read_text(encoding="utf-8")
+        a.write_text(
+            re.sub(r'distilled_from_sha: ".*"', 'distilled_from_sha: "not-a-sha!"', text, count=1),
+            encoding="utf-8",
+        )
+        commit_all(repo, "distilled_from_sha を不正な値にする")
+
+        code, out = run(repo, "--follow-rewritten", base)
+        assert code == 1, out
+        assert "sha の形式が不正" in out, out
+        assert distilled_of(repo, "knowledge/a.md") == "not-a-sha!", "書き換えてはいけない"
     finally:
         shutil.rmtree(repo)
 
@@ -798,6 +890,70 @@ def test_follow_rewritten_rejects_combination_with_other_target_args() -> None:
         assert distilled_of(repo, "knowledge/a.md") == before
     finally:
         shutil.rmtree(repo)
+
+
+# --- パース契約（F15: create-pr Step 6.1 が拾う「✓ <文書>: <旧 sha> → <新 sha>」行） -----
+
+RE_BUMPED_LINE = re.compile(r"^✓ (.*): [0-9a-f]* → [0-9a-f]+$")
+
+
+def test_bumped_line_matches_create_pr_contract() -> None:
+    """`--follow-rewritten` で書き換えた行が、create-pr の
+    `sed -n 's/^✓ \\(.*\\): [0-9a-f]* → .*/\\1/p'` と同じ正規表現で文書パスを取り出せる。"""
+    repo = new_repo()
+    try:
+        base = baseline(repo)
+        a = repo / "knowledge/a.md"
+        a.write_text(
+            a.read_text(encoding="utf-8").replace("本文。", "本文を更新した。"), encoding="utf-8"
+        )
+        commit_all(repo, "本文を更新")
+        code, out = run(repo, "knowledge/a.md")
+        assert code == 0, out
+        old_sha = distilled_of(repo, "knowledge/a.md")
+        commit_all(repo, "sha 追従")
+
+        run_git(repo, "reset", "--soft", base)
+        run_git(repo, "commit", "-q", "-m", "squash")
+        squashed = full_head(repo)
+
+        code, out = run(repo, "--follow-rewritten", base)
+        assert code == 0, out
+
+        bumped_lines = [line for line in out.splitlines() if RE_BUMPED_LINE.match(line)]
+        assert bumped_lines, out
+        matched = RE_BUMPED_LINE.match(bumped_lines[0])
+        assert matched is not None
+        assert matched.group(1) == "knowledge/a.md", out
+
+        sed_proc = subprocess.run(
+            ["sed", "-n", r"s/^✓ \(.*\): [0-9a-f]* → .*/\1/p"],
+            input=bumped_lines[0] + "\n",
+            capture_output=True,
+            text=True,
+        )
+        assert sed_proc.stdout.strip() == "knowledge/a.md", sed_proc.stdout
+
+        assert old_sha != squashed
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_docstring_documents_bumped_line_contract() -> None:
+    """docstring のパース契約に create-pr Step 6.1 が使う行の書式を明記する（F15）。"""
+    assert _bump is not None
+    doc = _bump.__doc__ or ""
+    assert "✓ <文書>: <旧 sha> → <新 sha>" in doc, doc
+    assert "create-pr" in doc, doc
+
+
+def test_docstring_follow_rewritten_explanation_is_accurate() -> None:
+    """`--follow-rewritten` の説明が「ローカルでは常に通る」という不正確な記述を
+    含まない（F16）。PR 内で source まで変えて squash すると手元でもすぐ STALE になる。"""
+    assert _bump is not None
+    doc = _bump.__doc__ or ""
+    assert "ローカルにはまだ古いコミットが残っているので checker は stale と言わないことが" not in doc, doc
+    assert "source が PR 内で変わっていないとき" in doc, doc
 
 
 def main() -> int:

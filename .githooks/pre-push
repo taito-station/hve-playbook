@@ -12,8 +12,9 @@ ROOT="$(git rev-parse --show-toplevel)"
 SCRIPTS="$ROOT/hve-scripts"
 
 if ! command -v python3 >/dev/null 2>&1; then
-    echo "[pre-push] python3 が無いため knowledge の検査をスキップします" >&2
-    exit 0
+    # 検査を黙って飛ばすと改ざんを見逃すので止める（fail-closed）
+    echo "[pre-push] python3 が無いため knowledge の検査ができません。push を止めます" >&2
+    exit 1
 fi
 
 status=0
