@@ -97,9 +97,9 @@ merge-base 基準（3 ドット）の diff で、変更のあった決定ログ�
 
 ```bash
 # 独立ファイル方式
-git diff --no-renames --text --name-only origin/main...HEAD -- knowledge/adr/
+git -c core.quotePath=false diff --no-renames --text --name-only origin/main...HEAD -- knowledge/adr/
 # インライン方式
-git diff --no-renames --text --name-only origin/main...HEAD -- knowledge/
+git -c core.quotePath=false diff --no-renames --text --name-only origin/main...HEAD -- knowledge/
 
 # 出たファイルごとに hunk を開く
 git diff --text origin/main...HEAD -- "<file>"
@@ -108,8 +108,8 @@ git diff --text origin/main...HEAD -- "<file>"
 - 削除・変更された行（`-` 行）が「書き換えてよい範囲」に収まるかを人が判定する。インライン方式は `## 決定ログ` 節の中の `-` 行が違反
 - 既存エントリへの行の挿入（インライン方式の既存エントリへの追記、エントリ間への挿入、独立ファイル方式の旧 ADR のステータス節以外への追記）は `+` 行にしか出ないので、hunk の位置も確かめる
 - 2 ドット（`origin/main..HEAD`）は使わない。作業ブランチを切ったあとに main へ入った決定が、削除行として出る
-- `--no-renames` はファイル名の付け替え（採番の付け替え）を削除と追加として出すため、`--text` は `.gitattributes` でバイナリ扱いにされても中身を出すために付ける
-- pre-push hook や CI に組み込むときは、出力を表示して人が確かめる（出力の有無だけで fail にすると、正規の supersede でも落ちる）
+- `--no-renames` はファイル名の付け替え（採番の付け替え）を削除と追加として出すため、`--text` は `.gitattributes` でバイナリ扱いにされても中身を出すため、`core.quotePath=false` は日本語などのファイル名を引用符・エスケープなしで出し、そのまま次のコマンドに渡せるようにするために付ける
+- pre-push hook や CI に組み込むときは、出力を表示して人が確かめる（出力の有無だけで fail にすると、正規の supersede でも落ちる）。コマンド自体の失敗（merge-base が取れないなど、終了コード 0 以外）は fail にする
 
 ## fan-out ステップの制約
 
