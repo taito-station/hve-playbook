@@ -8,13 +8,13 @@ Accepted — 2026-10-04
 
 `skills/hve-akm/SKILL.md` の蒸留手順は「frontmatter の `updated` を当日日付に更新する」としていた。この書き方だと、下流の本文に効かない上流の変更（source の誤字修正など）で `distilled_from_sha` を追従させるときにも日付が進み、「いつ内容が変わったか」という信号が濁る。
 
-導入先の paddock は、次の規則で運用し、hve-akm の写しに注記を足して差を吸収していた（[taito-station/paddock#754](https://github.com/taito-station/paddock/issues/754) の決定、hve-playbook #28）。setup.sh を再適用するたびにこの注記は消える。
+導入先の paddock は、次の規則で運用し、hve-akm の写しに注記を足して差を吸収していた（[taito-station/paddock#754](https://github.com/taito-station/paddock/issues/754) の決定、[hve-playbook#28](https://github.com/taito-station/hve-playbook/issues/28)）。setup.sh を再適用するたびにこの注記は消える。
 
 - `updated` は下流の本文が実質的に変わったときだけ進める
 - `updated` はダブルクォートで囲む
 - 移設後の再ベースラインでは日付を据え置き、Conflict を宣言するときは `updated` だけ進める
 
-あわせて、クォート必須の理由として挙げられていた「mdq の索引化が date 型で失敗する」は、HypervelocityEngineering 8ab5a42（`json.dumps(..., default=str)` の導入）より前の mdq でしか起きない。setup.sh が入れる現行の mdq では再現しない。
+あわせて、クォート必須の理由として挙げられていた「mdq の索引化が date 型で失敗する」は、HypervelocityEngineering 8ab5a42（`json.dumps(..., default=str)` の導入）より前の mdq でしか起きない。8ab5a42 以降の mdq では再現しない（setup.sh はインストール済みの mdq を更新しないので、古い mdq が残っている環境では起きうる）。
 
 問い: `updated` の規則と例外規約を、標準にどこまで入れるか。
 
@@ -29,7 +29,7 @@ Accepted — 2026-10-04
 
 - 一般規則と Conflict 宣言の規約を標準に入れる
 - 一般規則・Conflict 宣言・移設後の再ベースラインの 3 つを標準に入れる
-- 一般規則とクォート必須だけを入れ、例外規約は入れない
+- 一般規則だけを入れ、例外規約は入れない
 
 ## 決定内容
 
@@ -75,9 +75,9 @@ paddock の例外 1c（移設由来の stale は sha を再ベースラインし
 - 再ベースラインの中身（sha だけ進めて日付は据え置く）は一般規則に含まれる。個別の例外として足すと規則が重複する
 - 「原因が移設だけの文書に限る」という限定は paddock 固有の移設の経緯に依存する
 
-### 一般規則とクォート必須だけを入れ、例外規約は入れない（却下）
+### 一般規則だけを入れ、例外規約は入れない（却下）
 
-`updated` の一般規則とクォート必須だけを入れ、Conflict 宣言時の扱いは各導入先に任せる。
+`updated` の一般規則（クォート必須を含む）だけを入れ、Conflict 宣言時の扱いは各導入先に任せる。
 
 #### メリット
 

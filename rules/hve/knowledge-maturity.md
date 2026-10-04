@@ -49,7 +49,7 @@ tags: [分類コード]
 | source の誤字修正など、下流の本文に効かない上流の変更 | 進める | 据え置く |
 | 本文の事実・判断が変わる差分マージ | 進める | 進める |
 | Tentative → Confirmed への昇格だけ | 据え置く | 進める |
-| Conflict の宣言（同じ回に差分マージしていたら、本文ごと取り消す。下記「status の 3 段階」参照） | 蒸留前の値のまま | 進める |
+| Conflict の宣言（下記「status の 3 段階」参照） | 蒸留前の値のまま | 進める |
 | knowledge 本文の、意味の変わらない表記揺れ・誤字の修正 | 据え置く | 据え置く |
 
 値は必ずダブルクォートで囲む（`updated: "2026-10-04"`）。クォートしないと YAML が date 型に解釈し、文字列を前提にした JSON 化や比較で型が揺れる。HVE の mdq も `default=str` の導入前（HypervelocityEngineering 8ab5a42 より前）は、frontmatter の JSON 化が `Object of type date is not JSON serializable` で失敗し、索引化できなかった。
@@ -64,7 +64,7 @@ tags: [分類コード]
 
 - `Conflict` は発見次第ユーザーに報告し、解消するまで該当部分を前提にしない
 - `Conflict` の文書は、本文と `distilled_from_sha` を蒸留前の状態に保つ。同じ回の蒸留で差分マージしていたら、本文と sha をどちらも蒸留前に戻し、status と `updated`（宣言した日）だけを変える。こうすると解消時に、蒸留前の sha から最新の source までの差分をそのまま取り込める
-- `Conflict` の文書は解消するまで蒸留しない。解消して差分マージしたときに sha を進める
+- `Conflict` の文書は解消するまで蒸留しない。ユーザーが矛盾を判断して status を戻したら、次回の蒸留で通常どおり差分マージし、sha を進める
 - `Tentative` → `Confirmed` への昇格は、QA 回答の確認またはユーザーのレビュー承認による
 
 ## SoT（Single Source of Truth）優先順位
