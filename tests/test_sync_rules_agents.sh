@@ -12,6 +12,7 @@
 #     （global 配下を project-level で重ねて読ませない。サブディレクトリの agent も読み込まれるため）
 #   - setup.sh は rules/global・agents/global・global skill を導入先にコピーしない
 #     （cq/mdq の導入分岐に入らないよう、python3 をスタブにして実行する）
+#   - workflows/hve-*.js が Read させる SKILL.md は、導入先でも自リポでもルートから解決できる
 
 set -u
 command -v python3 >/dev/null 2>&1 || { echo "[FAIL] 前提: python3 が必要"; exit 1; }
@@ -110,6 +111,19 @@ check "setup.sh: rules/<category> は配らない" [ ! -e "$T/.claude/rules/$CAT
 check "setup.sh: agents/global は配らない" [ ! -e "$T/.claude/agents/global" ]
 check "setup.sh: global の agent は配らない" [ ! -e "$T/.claude/agents/$AGENT" ]
 check "setup.sh: global skill は配らない" [ ! -e "$T/.claude/skills/learn" ]
+
+# 6) workflow が Read させる SKILL.md は、導入先でも hve-playbook 自身でもルートから解決できる
+read_paths() { grep -ohE 'Read [^ ]+/SKILL\.md' "$1"/hve-*.js | sed 's/^Read //' | sort -u; }
+all_exist() {
+    local root="$1" paths="$2" p
+    [ -n "$paths" ] || return 1
+    while IFS= read -r p; do
+        case "$p" in /*|*..*) return 1 ;; esac   # ルートの外を指すパスは不合格
+        [ -f "$root/$p" ] || return 1
+    done <<<"$paths"
+}
+check "setup.sh: workflow の Read 先が導入先に実在する" all_exist "$T" "$(read_paths "$T/.claude/workflows")"
+check "自リポ: workflow の Read 先が実在する" all_exist "$REPO_DIR" "$(read_paths "$REPO_DIR/workflows")"
 
 echo
 echo "結果: PASS=$pass FAIL=$fail"

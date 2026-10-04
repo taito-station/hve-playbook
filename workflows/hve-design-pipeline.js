@@ -42,7 +42,7 @@ const ardResult = await agent(
 - include_kpi_okr: ${ardParams.include_kpi_okr || false}
 
 スキルファイルを Read して手順に従ってください:
-1. Read skills/hve-ard/SKILL.md でワークフロー全体像を確認
+1. Read .claude/skills/hve-ard/SKILL.md でワークフロー全体像を確認
 2. 各ステップの templates/ を Read してプロンプトを確認
 3. DAG の依存関係に従って逐次実行（fan-out ステップは Agent tool で並列化）
 4. 全ステップ完了後、作成したファイル一覧を報告`,
@@ -79,7 +79,7 @@ const aasResult = await agent(
 - docs/architectural-requirements-app-*.md
 
 スキルファイルを Read して手順に従ってください:
-1. Read skills/hve-aas/SKILL.md でワークフロー全体像を確認
+1. Read .claude/skills/hve-aas/SKILL.md でワークフロー全体像を確認
 2. 各ステップの templates/ を Read してプロンプトを確認
 3. Step 1 → 2.1 → 2.2 → 3.1 → 3.2 → 4 → 5 → 6 → 7 → 8 の順で逐次実行
 4. 全ステップ完了後、作成したファイル一覧を報告`,
@@ -117,7 +117,7 @@ const aadResult = await agent(
 前提: AAS が完了済み。docs/catalog/ に各種カタログが存在します。
 
 スキルファイルを Read して手順に従ってください:
-1. Read skills/hve-aad-web/SKILL.md でワークフロー全体像を確認
+1. Read .claude/skills/hve-aad-web/SKILL.md でワークフロー全体像を確認
 2. 各ステップの templates/ を Read してプロンプトを確認
 3. DAG に従って実行（fan-out ステップは Agent tool で並列化）
 4. Step 3（一貫性レビュー）は全 Step 2.x 完了後に実行
