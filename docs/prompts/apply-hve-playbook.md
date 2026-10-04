@@ -121,6 +121,7 @@ bash <hve-playbook>/setup.sh <target>
   - `work/`（HVE の一時作業ファイル。手順 2 の退避先もここ）
   - `**/.claude/settings.local.json`
   - `docs/temp/`（create-pr / review-pr skill の一時ファイル。skill を使わない場合も足してよい）
+  - `.mdq/*` と `!.mdq/config.toml`、`.cq/*` と `!.cq/config.toml`（mdq / cq のローカル索引と利用記録。設定ファイルは追跡できるよう中身だけを除外する。`.mdq/` と書くと `!` の例外が効かない）
 
 ### 7. 検証する
 
