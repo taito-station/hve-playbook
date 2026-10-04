@@ -31,7 +31,7 @@ Step 2: 蒸留（差分マージ）
 
 Step 3: 横断整合性レビュー
   ├─ 軽微な矛盾 → その場修正
-  ├─ 重大な矛盾 → status: Conflict 宣言 → STOP
+  ├─ 重大な矛盾（既存の Conflict 文書を除く） → status: Conflict 宣言 → STOP
   └─ OK → Step 4
 
 Step 4: カバレッジ分析
@@ -58,7 +58,7 @@ knowledge/ 配下の各ファイルについて、frontmatter の `distilled_fro
 
 ### Step 2: 蒸留（差分マージ）
 
-stale な各ファイルについて、source の変更を knowledge 本文に反映する。
+stale な各ファイルについて、source の変更を knowledge 本文に反映する。status が `Conflict` の文書は蒸留せず、解消待ちとして報告する（宣言後に source が変わると Step 1 で stale と出続けるが、それで正しい）。
 
 1. source ファイルの変更差分を確認する:
    ```bash
@@ -69,7 +69,7 @@ stale な各ファイルについて、source の変更を knowledge 本文に�
    - source にない情報（既存の蒸留結果）は維持する
 3. 決定を伴う変更がある場合は、決定ログ（`knowledge/adr/`）に新エントリを追加する
 4. frontmatter の `distilled_from_sha` を新しい sha に更新する
-5. frontmatter の `updated` を当日日付に更新する
+5. frontmatter の `updated` は、本文または status が実質的に変わった場合だけ当日日付に更新する（`distilled_from_sha` だけの追従では触らない。判断は `rules/hve/knowledge-maturity.md` の「`updated` の規則」に従う）
 
 **蒸留対象が 3 本以上の場合**: サブエージェントに委譲する（1 エージェント 1 ファイル）
 
@@ -82,7 +82,7 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 - [ ] frontmatter の必須フィールド（title / status / kind / sources / distilled_from_sha / updated）が全ファイルに存在する
 - [ ] `distilled_from_sha` で参照している source ファイルが実在する
 - [ ] 決定ログの既存エントリが改変されていない（append-only 原則）
-- [ ] status が Conflict のまま放置されている文書がない
+- [ ] status が Conflict の文書を解消待ちとして列挙し、報告に含めている
 
 #### 目視チェック項目
 
@@ -95,7 +95,9 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 | 重大度 | 対応 |
 |---|---|
 | 軽微（表記揺れ、フォーマット不備） | その場で修正 |
-| 重大（事実の矛盾、SoT 違反） | 該当文書の status を `Conflict` に変更し、ユーザーに報告して STOP |
+| 重大（事実の矛盾、SoT 違反） | 該当文書の status を `Conflict` に変更し、ユーザーに報告して STOP。`distilled_from_sha` と `updated` の扱いは `rules/hve/knowledge-maturity.md` の「status の 3 段階」に従う（※）。すでに status が `Conflict` の文書は対象外（宣言し直さず、機械検査の解消待ち一覧に載せるだけ）。STOP するのは、この回に新しく Conflict を宣言したときだけ |
+
+※ Step 2 で差分マージしていたら、本文と sha をどちらも蒸留前に戻す。その差分のために手順 3 で足した、まだコミットしていない決定ログのエントリも取り消す
 
 ### Step 4: カバレッジ分析
 

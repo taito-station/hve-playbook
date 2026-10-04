@@ -16,3 +16,4 @@
 | [0008](0008-one-commit-per-pr-and-history-based-commit-format.md) | 未 push のブランチは PR 作成時に 1 コミットにまとめ、コミット形式は既存履歴に合わせる | Accepted | 2026-09-29 |
 | [0009](0009-scope-repo-claude-agents-to-hve.md) | このリポジトリの .claude/agents も HVE の agent だけを指す | Accepted | 2026-09-29 |
 | [0010](0010-drop-serena-for-builtin-lsp.md) | serena MCP と serena-enforcer を撤廃し、組み込みの LSP ツールと grep に寄せる | Accepted | 2026-10-03 |
+| [0011](0011-advance-updated-only-on-substantive-change.md) | knowledge の updated は本文または status が実質的に変わったときだけ進める | Accepted | 2026-10-04 |
