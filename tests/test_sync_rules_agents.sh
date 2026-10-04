@@ -1,5 +1,5 @@
 #!/bin/bash
-# sync-dotclaude.sh の rules / agents 同期と、setup.sh が global 配下を配らないことの検査
+# sync-dotclaude.sh の rules / agents 同期と、setup.sh が導入先に配るもの・触れないものの検査
 #
 # 実行: bash tests/test_sync_rules_agents.sh
 #
@@ -13,6 +13,8 @@
 #   - setup.sh は rules/global・agents/global・global skill を導入先にコピーしない
 #     （cq/mdq の導入分岐に入らないよう、python3 をスタブにして実行する）
 #   - workflows/hve-*.js が Read させる SKILL.md は、導入先でも自リポでもルートから解決できる
+#   - setup.sh は rules/hve/local-overrides.md を配り、完了メッセージで .claude/rules/hve-local/ を案内する
+#   - setup.sh を再実行しても .claude/rules/hve-local/ には触れない（既存の挙動を固定する回帰テスト）
 
 set -u
 command -v python3 >/dev/null 2>&1 || { echo "[FAIL] 前提: python3 が必要"; exit 1; }
@@ -124,6 +126,17 @@ all_exist() {
 }
 check "setup.sh: workflow の Read 先が導入先に実在する" all_exist "$T" "$(read_paths "$T/.claude/workflows")"
 check "自リポ: workflow の Read 先が実在する" all_exist "$REPO_DIR" "$(read_paths "$REPO_DIR/workflows")"
+
+# 7) プロジェクト固有の補足（hve-local）
+check "setup.sh: local-overrides.md を配る" [ -f "$T/.claude/rules/hve/local-overrides.md" ]
+check "setup.sh: 完了メッセージで hve-local を案内する" grep -q '\.claude/rules/hve-local/' "$TMP/setup.log"
+check "setup.sh: hve-local は作らない" [ ! -e "$T/.claude/rules/hve-local" ]
+mkdir -p "$T/.claude/rules/hve-local" && echo 'local note' >"$T/.claude/rules/hve-local/implement-flow.md"
+PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup2.log" 2>&1
+check "setup.sh 再実行 1 回目: exit 0" [ $? -eq 0 ]
+PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup3.log" 2>&1
+check "setup.sh 再実行 2 回目: exit 0" [ $? -eq 0 ]
+check "setup.sh 再実行: hve-local の中身が残る" [ "$(cat "$T/.claude/rules/hve-local/implement-flow.md" 2>/dev/null)" = "local note" ]
 
 echo
 echo "結果: PASS=$pass FAIL=$fail"
