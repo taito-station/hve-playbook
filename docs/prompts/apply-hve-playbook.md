@@ -144,5 +144,5 @@ bash <hve-playbook>/setup.sh <target>
 - 新規プロジェクトや要件定義から始める場合は、`/hve-ard` で ARD（要件定義）を始める。
   - 引数: 企業名、対象事業（任意）
 - 既存コードの改修が中心の場合は、`.claude/rules/hve/implement-flow.md` などの規律が自動で適用される。
-  - 今後の設計判断は `knowledge/adr/` に記録する。
+  - 今後の設計判断は `knowledge/adr/` に記録する（決定ログをインライン方式で運用しているプロジェクトは、`.claude/rules/hve-local/artifact-management.md` で宣言して各 knowledge の `## 決定ログ` 節に記録する）。
 - 詳しい使い方は `<hve-playbook>/docs/usage-prompts.md` を参照する。

@@ -36,36 +36,80 @@ description: 成果物管理規律 — ファイル配置・更新ポリシー�
 
 ## 決定ログの不変性
 
-決定ログ（`knowledge/adr/`）は **append-only** で運用する。
+決定ログは **append-only** で運用する。置き方は独立ファイル方式（既定）とインライン方式の 2 つ。
 
 ### 原則
 
-- 既存エントリを書き換えない（誤字修正を除く）
-- 決定を覆すときは新エントリを追加し、旧エントリを supersede した旨を記載する
+- 既存エントリを書き換えない。例外は方式ごとに「書き換えてよい範囲」で定める
+- 決定を覆すときは新エントリを追加し、新エントリに旧エントリを supersede した旨を書く（独立ファイル方式は旧 ADR のステータス節も更新する）
 - 削除は禁止
+- 更新漏れは implement-flow Step 7（Knowledge 同期）で防ぐ
 
 ### 配置
 
-独立ファイル方式を採用する。`knowledge/adr/` に 1 決定 1 ファイルで配置する。
+| 方式 | 置き場所 | 採り方 |
+|---|---|---|
+| 独立ファイル（既定） | `knowledge/adr/` に 1 決定 1 ファイル | 宣言は要らない |
+| インライン | 決定が効く `knowledge/` 配下の文書の末尾の `## 決定ログ` 節 | `.claude/rules/hve-local/artifact-management.md` に「artifact-management の「配置」を補足」の節を設けて宣言する（書式は local-overrides.md） |
 
-- `ls knowledge/adr/` で全決定を一覧できる
-- 必要な ADR だけ読めばよく、トークン効率が良い
-- 更新漏れは implement-flow Step 7（Knowledge 同期）で防ぐ
+- 独立ファイル方式は `ls knowledge/adr/` で全決定を一覧でき、必要な ADR だけ読めばよい
+- インライン方式は、決定とそれが効く文書を同じファイルで読める。すでにこの方式で運用している導入先が続けるための選択肢で、新しく始めるプロジェクトは独立ファイル方式を使う
+- 既存の別配置（documentation-standards の「配置先」参照）で ADR を運用しているリポジトリは、その配置先を独立ファイル方式の `knowledge/adr/` と読み替える（検査コマンドのパスも同じ）
+- 運用中の方式の切り替え（既存エントリの移行を含む）は本規則の範囲外。決定ログに記録して判断する
+- インライン方式を宣言したリポジトリに `knowledge/adr/` の ADR が残っている場合、それらには独立ファイル方式の「書き換えてよい範囲」と検査を適用する
+
+### 書き換えてよい範囲
+
+| 方式 | 書き換えてよいもの |
+|---|---|
+| 独立ファイル | 既存 ADR の `## ステータス` 節（ステータス値の更新（Proposed からの確定、supersede、非推奨）とその理由、有効な部分・失効した部分の記述）、一覧 `knowledge/adr/README.md` のステータス列、誤字修正 |
+| インライン | なし（誤字修正も不可）。supersede は新しいエントリで表し、旧エントリは書き換えない |
+
+誤字修正は、意味・判断・ID・日付・ステータスを変えない修正に限る。
 
 ### 書式
 
-documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
+独立ファイル方式は documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
+
+インライン方式は 1 エントリを見出し `### <ID>: 要約 (YYYY-MM-DD) — ステータス` と、その下の `####` の節で書き、`## 決定ログ` 節の末尾に追記する。節と MADR の章の対応:
+
+| インライン方式の節 | MADR の章 |
+|---|---|
+| 見出しのステータス、`#### ステータス`（任意） | ステータス |
+| `#### コンテキスト` | 背景と課題・意思決定の要因 |
+| `#### 決定` | 決定内容 |
+| `#### 理由` | 決定内容（採用理由） |
+| `#### 却下した代替案` | 検討した選択肢・選択肢の評価 |
+| `#### 影響` | 結果（Consequences） |
+
+- 新しいエントリはコンテキスト・決定・理由・影響を書き、代替案を検討したときは却下した代替案も書く（implement-flow Step 3 はこの節を読む）
+- 表にない節（関連・再現方法など）を足してよい
+- この規則より前に書かれたエントリには遡って適用しない（追記のみなので直せない）
+
+### ID とステータス語
+
+- ID: 独立ファイル方式は documentation-standards の採番（4 桁連番）に従う。インライン方式の既定は `ADR NNNN`（リポジトリ全体の 4 桁連番。次の番号は `git grep -h '^### ADR ' -- knowledge/` で既存の最大値を確かめて +1）で、導入先は hve-local で別の形式と採番（issue 番号など）を宣言してよい
+- ステータス語: 既定は documentation-standards のステータス値。導入先は方式を問わず、hve-local で独自の語を定めてよい。ステータス値に対応する語は、その対応も書く
 
 ### 機械検査
 
-git diff で既存エントリの改変を検出する:
+merge-base 基準（3 ドット）の diff で、変更のあった決定ログのファイルを並べ、1 ファイルずつ hunk を確かめる:
 
 ```bash
-# 決定ログの既存行が削除・変更されていないか確認（PR スコープ）
-git diff origin/main..HEAD -- knowledge/adr/ | grep '^-' | grep -v '^---'
+# 独立ファイル方式
+git -c core.quotePath=false diff --no-renames --text --name-only origin/main...HEAD -- knowledge/adr/
+# インライン方式
+git -c core.quotePath=false diff --no-renames --text --name-only origin/main...HEAD -- knowledge/
+
+# 出たファイルごとに hunk を開く
+git diff --text origin/main...HEAD -- "<file>"
 ```
 
-pre-push hook や CI で実行することを推奨する。
+- 削除・変更された行（`-` 行）が「書き換えてよい範囲」に収まるかを人が判定する。インライン方式は `## 決定ログ` 節の中の `-` 行が違反
+- 既存エントリへの行の挿入（インライン方式の既存エントリへの追記、エントリ間への挿入、独立ファイル方式の旧 ADR のステータス節以外への追記）は `+` 行にしか出ないので、hunk の位置も確かめる
+- 2 ドット（`origin/main..HEAD`）は使わない。作業ブランチを切ったあとに main へ入った決定が、削除行として出る
+- `--no-renames` はファイル名の付け替え（採番の付け替え）を削除と追加として出すため、`--text` は `.gitattributes` でバイナリ扱いにされても中身を出すため、`core.quotePath=false` は日本語などのファイル名を引用符・エスケープなしで出し、そのまま次のコマンドに渡せるようにするために付ける
+- pre-push hook や CI に組み込むときは、出力を表示して人が確かめる（出力の有無だけで fail にすると、正規の supersede でも落ちる）。コマンド自体の失敗（merge-base が取れないなど、終了コード 0 以外）は fail にする
 
 ## fan-out ステップの制約
 

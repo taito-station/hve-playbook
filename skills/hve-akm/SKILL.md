@@ -67,7 +67,7 @@ stale な各ファイルについて、source の変更を knowledge 本文に�
 2. 変更内容を knowledge 本文に差分マージする
    - **全書き換え禁止**。変更箇所のみ更新する
    - source にない情報（既存の蒸留結果）は維持する
-3. 決定を伴う変更がある場合は、決定ログ（`knowledge/adr/`）に新エントリを追加する
+3. 決定を伴う変更がある場合は、決定ログ（既定は `knowledge/adr/`。インライン方式を宣言したプロジェクトは各 knowledge の `## 決定ログ` 節）に新エントリを追加する
 4. frontmatter の `distilled_from_sha` を新しい sha に更新する
 5. frontmatter の `updated` は、本文または status が実質的に変わった場合だけ当日日付に更新する（`distilled_from_sha` だけの追従では触らない。判断は `rules/hve/knowledge-maturity.md` の「`updated` の規則」に従う）
 
@@ -81,7 +81,7 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 
 - [ ] frontmatter の必須フィールド（title / status / kind / sources / distilled_from_sha / updated）が全ファイルに存在する
 - [ ] `distilled_from_sha` で参照している source ファイルが実在する
-- [ ] 決定ログの既存エントリが改変されていない（append-only 原則）
+- [ ] 決定ログの既存エントリに、artifact-management の「書き換えてよい範囲」以外の改変がない（append-only 原則）
 - [ ] status が Conflict の文書を解消待ちとして列挙し、報告に含めている
 
 #### 目視チェック項目
