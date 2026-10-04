@@ -3,7 +3,7 @@
 Claude Code の開発基盤設定（user-level）と HVE 設計手法（project-level）を一元管理するリポジトリ。
 
 Based on [dahatake/HypervelocityEngineering](https://github.com/dahatake/HypervelocityEngineering) (MIT License).
-Includes [dotclaude-public](https://github.com/taito-station/dotclaude-public) by youhei-ushio (MIT License).
+Includes [youhei-ushio/dotclaude-public](https://github.com/youhei-ushio/dotclaude-public) by youhei-ushio (MIT License).
 
 ## 構成
 
