@@ -22,6 +22,7 @@
 - 配置は hve-playbook の `setup.sh` が行う。手作業でファイルをコピーしない（再実行で hve-playbook の版に揃えられるようにするため）。
 - `setup.sh` が変更するのは次のとおり。
   - `<target>/.claude/rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js` を**削除してから**置き直す。
+  - `<target>/.claude/rules/hve-local/`（プロジェクト固有の補足）には触れない。書式は `.claude/rules/hve/local-overrides.md`。
   - `<target>/.claude/CLAUDE.md` が無ければ、HVE 方法論をそのまま `.claude/CLAUDE.md` として作る。あれば `.claude/CLAUDE.md` は変えず、`.claude/CLAUDE.hve.md` を作る・上書きする。
   - `<target>/docs/` を作る（空のディレクトリ）。
   - cq/mdq が未導入なら、`HypervelocityEngineering` を使用中の Python 環境に `pip install -e` する。環境変数 `HVE_REPO_PATH` の場所か hve-playbook の隣のディレクトリに既存の clone があればそれを使い、無ければ `dahatake/HypervelocityEngineering` を hve-playbook の隣に `git clone` する。
@@ -72,8 +73,9 @@ bash <hve-playbook>/setup.sh <target>
   - `[INFO] CLAUDE.md を配置しました`: `.claude/CLAUDE.md` を新しく作った
   - `[WARN] ... CLAUDE.hve.md として配置しました`: `.claude/CLAUDE.hve.md` を新しく作った
   - `[INFO] CLAUDE.hve.md を最新版で更新しました`: `.claude/CLAUDE.hve.md` を上書きした
-- 再適用で、git 管理下の HVE 資産に独自の変更があった場合は、`git -C <target> diff` で上書きされた差分を示し、戻すかどうかをユーザーに確認する。
-- 手順 2 で退避したファイルがあれば、置き直された版と `diff -r` で比べ、独自の変更を戻すかどうかをユーザーに確認する。
+- 再適用で、git 管理下の HVE 資産に独自の変更があった場合は、`git -C <target> diff` で上書きされた差分を示す。写しには戻さず、`.claude/rules/hve-local/` に移すかどうかをユーザーに確認する（標準に取り込まれた内容なら移さず捨てる）。
+- 手順 2 で退避したファイルがあれば、置き直された版と `diff -r` で比べ、独自の変更を同じく hve-local に移すかどうかをユーザーに確認する。
+- `.claude/rules/hve-local/` があれば、標準の変更（`git -C <target> diff -- .claude/rules/hve .claude/skills`）と見比べ、hve-local の見出しが指す節が標準に実在し、「上書き」節が追従しているかを確かめる。
 - cq/mdq の導入に失敗しても `grep`/`find` にフォールバックして動く。失敗した場合は、その旨を報告に書く。
 
 ### 5. CLAUDE.md を整える
@@ -104,6 +106,7 @@ bash <hve-playbook>/setup.sh <target>
   !/.claude/rules/
   /.claude/rules/*
   !/.claude/rules/hve/
+  !/.claude/rules/hve-local/
   !/.claude/skills/
   /.claude/skills/*
   !/.claude/skills/hve-*/
@@ -123,7 +126,7 @@ bash <hve-playbook>/setup.sh <target>
 
 - 配置されたファイルを一覧で確認する（`find <target>/.claude -maxdepth 2 | sort`）。
 - `.claude/rules/hve/implement-flow.md` などの規則ファイルが揃っているか確認する。
-- `git -C <target> status --short -uall` で、HVE 資産（`CLAUDE.hve.md` を含む）・CLAUDE.md・`.gitignore` が変更または untracked として見えることを確認する。見えなければ ignore の例外が効いていない。 逆に、それ以外のファイル（下層の `.claude/` や独自の設定）が新しく見えるようになっていれば、例外が広すぎるので直す。
+- `git -C <target> status --short -uall` で、HVE 資産（`CLAUDE.hve.md` を含む）・`.claude/rules/hve-local/`（あれば）・CLAUDE.md・`.gitignore` が変更または untracked として見えることを確認する。見えなければ ignore の例外が効いていない。 逆に、それ以外のファイル（下層の `.claude/` や独自の設定）が新しく見えるようになっていれば、例外が広すぎるので直す。
 - コミットにはこれらだけを含める。無関係な変更はステージしない（破棄はしない。破棄が必要ならユーザーに確認する）。
 
 ### 8. コミットして PR にする

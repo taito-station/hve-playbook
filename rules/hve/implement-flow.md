@@ -150,6 +150,7 @@ Step 8: PR 作成
 - 設計判断を伴う変更は決定ログに同じ PR で追記する
   - HVE の決定ログは `knowledge/adr/`
 - Knowledge 更新で矛盾が生じた場合 → STOP（Conflict 宣言、人間判断）
+- `.claude/rules/hve-local/implement-flow.md` にプロジェクト固有の検証コマンド（stale 検査など）が列挙されていれば、ここで実行する。失敗したら直してから Step 8 へ進む（直せなければ STOP）
 
 | 結果 | 次のステップ |
 |---|---|

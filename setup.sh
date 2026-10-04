@@ -118,3 +118,4 @@ fi
 echo ""
 echo "[DONE] セットアップが完了しました。"
 echo "次のアクション: Claude Code セッション内で /hve-ard を実行し、要件定義を開始してください。"
+echo "プロジェクト固有の補足は .claude/rules/hve-local/ に書いてください（setup.sh は触れません。書式は .claude/rules/hve/local-overrides.md）。"
