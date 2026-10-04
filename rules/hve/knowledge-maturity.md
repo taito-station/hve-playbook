@@ -65,6 +65,7 @@ tags: [分類コード]
 - `Conflict` は発見次第ユーザーに報告し、解消するまで該当部分を前提にしない
 - `Conflict` の文書は、本文と `distilled_from_sha` を蒸留前の状態に保つ。同じ回の蒸留で差分マージしていたら、本文と sha をどちらも蒸留前に戻し、status と `updated`（宣言した日）だけを変える。こうすると解消時に、蒸留前の sha から最新の source までの差分をそのまま取り込める
 - `Conflict` の文書は解消するまで蒸留しない。ユーザーが矛盾を判断して status を戻したら、次回の蒸留で通常どおり差分マージし、sha を進める
+- すでに `Conflict` の文書は、整合性レビューで矛盾が見つかっても宣言し直さない（status・本文・`distilled_from_sha`・`updated` を変えない）。解消待ちとして報告するだけにする
 - `Tentative` → `Confirmed` への昇格は、QA 回答の確認またはユーザーのレビュー承認による
 
 ## SoT（Single Source of Truth）優先順位

@@ -31,7 +31,7 @@ Step 2: 蒸留（差分マージ）
 
 Step 3: 横断整合性レビュー
   ├─ 軽微な矛盾 → その場修正
-  ├─ 重大な矛盾 → status: Conflict 宣言 → STOP
+  ├─ 重大な矛盾（既存の Conflict 文書を除く） → status: Conflict 宣言 → STOP
   └─ OK → Step 4
 
 Step 4: カバレッジ分析
@@ -95,7 +95,7 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 | 重大度 | 対応 |
 |---|---|
 | 軽微（表記揺れ、フォーマット不備） | その場で修正 |
-| 重大（事実の矛盾、SoT 違反） | 該当文書の status を `Conflict` に変更し、ユーザーに報告して STOP。`distilled_from_sha` と `updated` の扱いは `rules/hve/knowledge-maturity.md` の「status の 3 段階」に従う（※） |
+| 重大（事実の矛盾、SoT 違反） | 該当文書の status を `Conflict` に変更し、ユーザーに報告して STOP。`distilled_from_sha` と `updated` の扱いは `rules/hve/knowledge-maturity.md` の「status の 3 段階」に従う（※）。すでに status が `Conflict` の文書は対象外（宣言し直さず、機械検査の解消待ち一覧に載せるだけ）。STOP するのは、この回に新しく Conflict を宣言したときだけ |
 
 ※ Step 2 で差分マージしていたら、本文と sha をどちらも蒸留前に戻す。その差分のために手順 3 で足した、まだコミットしていない決定ログのエントリも取り消す
 
