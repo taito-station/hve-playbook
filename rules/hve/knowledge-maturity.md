@@ -36,20 +36,21 @@ tags: [分類コード]
 | `kind` | Yes | `knowledge`（ドメイン知識）または `specification`（仕様） |
 | `sources` | Yes | 蒸留元ファイルのパス一覧 |
 | `distilled_from_sha` | Yes | source ごとの蒸留時点の git commit sha |
-| `updated` | Yes | 内容を実質的に更新した日（ISO 8601、ダブルクォート必須）。下記「`updated` の規則」参照 |
+| `updated` | Yes | 本文または status を実質的に更新した日（ISO 8601、ダブルクォート必須）。下記「`updated` の規則」参照 |
 | `doc_class` | No | 文書の役割分類（プロジェクトが定義する） |
 | `tags` | No | 検索用タグ |
 
 ### `updated` の規則
 
-`updated` は「いつ確定した知か」を示す。本文または status が実質的に変わったときだけ当日日付に進め、`distilled_from_sha` だけを追従させるときは触らない。下流の本文に効かない上流の変更まで日付を進めると、この信号が濁る。
+`updated` は、本文または status を実質的に更新した日を示す。本文または status が実質的に変わったときだけ当日日付に進め、`distilled_from_sha` だけを追従させるときは触らない。下流の本文に効かない上流の変更まで日付を進めると、「いつ内容が変わったか」という信号が濁る。
 
 | 変更 | `distilled_from_sha` | `updated` |
 |---|---|---|
 | source の誤字修正など、下流の本文に効かない上流の変更 | 進める | 据え置く |
 | 本文の事実・判断が変わる差分マージ | 進める | 進める |
-| Conflict の宣言だけ（下記「status の 3 段階」参照） | 据え置く | 進める |
-| 意味の変わらない表記揺れ・誤字の修正 | 据え置く | 据え置く |
+| Tentative → Confirmed への昇格だけ | 据え置く | 進める |
+| Conflict の宣言（同じ回に差分マージしていたら、本文ごと取り消す。下記「status の 3 段階」参照） | 蒸留前の値のまま | 進める |
+| knowledge 本文の、意味の変わらない表記揺れ・誤字の修正 | 据え置く | 据え置く |
 
 値は必ずダブルクォートで囲む（`updated: "2026-10-04"`）。クォートしないと YAML が date 型に解釈し、文字列を前提にした JSON 化や比較で型が揺れる。HVE の mdq も `default=str` の導入前（HypervelocityEngineering 8ab5a42 より前）は、frontmatter の JSON 化が `Object of type date is not JSON serializable` で失敗し、索引化できなかった。
 
@@ -62,7 +63,8 @@ tags: [分類コード]
 | `Conflict` | 矛盾あり。放置せず解消が必要 | source 間の矛盾、または蒸留時に検出した不整合 |
 
 - `Conflict` は発見次第ユーザーに報告し、解消するまで該当部分を前提にしない
-- `Conflict` の文書では `distilled_from_sha` を進めない（同じ回の蒸留で進めていたら元の値に戻す）。`updated` は宣言した日に進める。Conflict を解消して差分マージしたときに sha を進める
+- `Conflict` の文書は、本文と `distilled_from_sha` を蒸留前の状態に保つ。同じ回の蒸留で差分マージしていたら、本文と sha をどちらも蒸留前に戻し、status と `updated`（宣言した日）だけを変える。こうすると解消時に、蒸留前の sha から最新の source までの差分をそのまま取り込める
+- `Conflict` の文書は解消するまで蒸留しない。解消して差分マージしたときに sha を進める
 - `Tentative` → `Confirmed` への昇格は、QA 回答の確認またはユーザーのレビュー承認による
 
 ## SoT（Single Source of Truth）優先順位
