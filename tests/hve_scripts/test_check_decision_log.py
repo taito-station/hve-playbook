@@ -690,6 +690,130 @@ def test_full_path_after_double_dash_follows_rename():
         shutil.rmtree(repo)
 
 
+def test_dir_rename_into_own_subdirectory_follows_full_path():
+    """3 巡目レビュー: `docs/v1` → `docs/v1/legacy` のようにサブディレクトリへ移動する
+    改名でも、full path のペアが `docs/v1` → `docs/v1/legacy` として正しく作られ、
+    full path のリンクが追従する（旧実装は末尾成分ペアを `v1` → `legacy` として作って
+    しまい、無関係な地の文への誤爆の種になっていた）。"""
+    repo = new_repo()
+    try:
+        (repo / "docs/v1").mkdir(parents=True)
+        (repo / "docs/v1/a.md").write_text("# a\n", encoding="utf-8")
+        entry = (
+            "### 資料リンクのテスト\n\n"
+            "- 決定: [資料](../../docs/v1/a.md) を参照\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/b.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        (repo / "docs/v1/legacy").mkdir(parents=True)
+        run_git(repo, "mv", "docs/v1/a.md", "docs/v1/legacy/a.md")
+        text = read_doc(repo, "knowledge/b.md")
+        overwrite(repo, "knowledge/b.md", text.replace("docs/v1/a.md", "docs/v1/legacy/a.md"))
+        commit_all(repo, "docs/v1/a.md を docs/v1/legacy/ へ移動する")
+
+        code, out = check(repo)
+        assert code == 0, f"サブディレクトリへの移動に伴う full path の追従が通らない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_nested_dir_rename_follows_full_path_from_leaf_file():
+    """3 巡目レビュー: 改名対象の `src/old` 配下に、実際にリネームされるファイル
+    （`src/old/sub/z.md`）が 2 階層下にしか無い場合でも、`src/old` → `src/new` の
+    full path ペアが作られ、`src/old` 直下への（実在しなくてもよい）リンク参照も
+    追従する（旧実装はリネームされたファイルの直上ディレクトリ（`sub`）からしか
+    ペアを作らず、`src/old/sub` → `src/new/sub` にしかならないため、`src/old` 直下
+    への参照には効かず error になっていた）。"""
+    repo = new_repo()
+    try:
+        (repo / "src/old/sub").mkdir(parents=True)
+        (repo / "src/old/sub/z.md").write_text("# z\n", encoding="utf-8")
+        entry = (
+            "### 資料リンクのテスト\n\n"
+            "- 決定: [資料](../../src/old/readme.md) を参照\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/b.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        run_git(repo, "mv", "src/old", "src/new")
+        text = read_doc(repo, "knowledge/b.md")
+        overwrite(repo, "knowledge/b.md", text.replace("src/old/readme.md", "src/new/readme.md"))
+        commit_all(repo, "src/old → src/new のリネームに伴いリンクを追従させる")
+
+        code, out = check(repo)
+        assert code == 0, f"ファイルの 2 階層上のディレクトリ改名への追従が通らない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_file_moved_into_new_subdirectory_of_parent_follows_full_path():
+    """3 巡目レビュー: `knowledge/x.md` → `knowledge/archive/x.md` のように、親
+    ディレクトリの下へ新設したサブディレクトリへ移動する改名でも、`knowledge` →
+    `knowledge/archive` の full path ペアが作られてリンクが追従する。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/x.md", "# x\n")
+        entry = (
+            "### 資料リンクのテスト\n\n"
+            "- 決定: [資料](knowledge/x.md) を参照\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/b.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        (repo / "knowledge/archive").mkdir(parents=True)
+        run_git(repo, "mv", "knowledge/x.md", "knowledge/archive/x.md")
+        text = read_doc(repo, "knowledge/b.md")
+        overwrite(repo, "knowledge/b.md", text.replace("knowledge/x.md", "knowledge/archive/x.md"))
+        commit_all(repo, "knowledge/x.md を knowledge/archive/ へ移動する")
+
+        code, out = check(repo)
+        assert code == 0, f"親ディレクトリ配下への新設サブディレクトリ移動への追従が通らない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_dir_rename_into_subdirectory_does_not_allow_leaf_only_link_rewrite():
+    """3 巡目レビュー: `docs/v1` → `docs/v1/legacy` の移動からは末尾成分だけのペア
+    （`v1` → `legacy`）を作らない。相対リンクの末尾成分だけを書き換えた
+    `](../v1/b.md)` → `](../legacy/b.md)` は、実際には存在しない改名の追従を主張して
+    いるだけなので error にする（旧実装はファイル直上のディレクトリ名から末尾成分
+    ペアを作ってしまい、この誤った書き換えを素通りさせていた）。full path への参照は
+    混ぜず、末尾成分だけの参照を単独で検証する（full path ペアとの置換順序に由来する
+    副作用で見かけ上 error になる偽陽性を避けるため）。"""
+    repo = new_repo()
+    try:
+        (repo / "docs/v1").mkdir(parents=True)
+        (repo / "docs/v1/a.md").write_text("# a\n", encoding="utf-8")
+        entry = (
+            "### 資料リンクのテスト\n\n"
+            "- 決定: [関連資料](../v1/b.md) を参照\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/c.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        (repo / "docs/v1/legacy").mkdir(parents=True)
+        run_git(repo, "mv", "docs/v1/a.md", "docs/v1/legacy/a.md")
+        text = read_doc(repo, "knowledge/c.md")
+        # 実際に改名されたのは a.md で b.md は無関係。末尾成分だけを誤って書き換える。
+        overwrite(repo, "knowledge/c.md", text.replace("../v1/b.md", "../legacy/b.md"))
+        commit_all(repo, "b.md へのリンクだけ誤って書き換える")
+
+        code, out = check(repo)
+        assert code == 1, f"存在しない改名を主張する末尾成分だけの書き換えを通してしまっている:\n{out}"
+        assert "既存エントリが変更されている" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_inline_file_deletion_is_error():
     repo = new_repo()
     try:

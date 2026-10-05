@@ -28,12 +28,20 @@
   （節の境界が base の時点からすでに一意に決まらない）なら警告にとどめる。base では
   重複していなかったのに現在重複している（base に無い新規文書での重複を含む）場合は、
   新たに生じた重複として error にする。ディレクトリの改名に伴う、節内のパス参照の
-  置換は許容する。置換ペアは改名の前後のディレクトリについて、`/` を含む full path の
-  ペア（例: `knowledge/old` → `knowledge/new`）と、末尾成分だけのペア（例:
-  `old` → `new`）の両方を作る。末尾成分だけのペアは、相対リンクの途中に出てくる
-  ディレクトリ名（例: `](../old/a.md)`）を追従させるために使うが、直後に `/` が続く
-  一致だけに絞って適用し、地の文に現れる無関係な同名の語（例: 「方式 v1 を採用する」の
-  `v1`）への誤爆を避ける。full path のペアはパス区切り等で挟まれた一致だけに当てる。
+  置換は許容する。置換ペアは、改名された旧・新パスを `Path.parts` に分解し、末尾から
+  共通する要素を取り除いた残り（`o`, `n`）から作る。残りを `/` で結合した full path の
+  ペア（例: `src/old/sub/z.md` → `src/new/sub/z.md` なら `src/old` → `src/new`）を
+  必ず作り、`o[:-1] == n[:-1] and o[-1] != n[-1]`（同じ親の下でのファイル名だけの改名）
+  のときだけ、末尾成分だけのペア（例: `old` → `new`）も追加で作る（旧・新がどちらも
+  1 要素なら full path のペアと同じなので作らない）。末尾成分だけのペアは、相対リンクの
+  途中に出てくるディレクトリ名（例: `](../old/a.md)`）を追従させるために使うが、直後に
+  `/` が続く一致だけに絞って適用し、地の文に現れる無関係な同名の語（例: 「方式 v1 を
+  採用する」の `v1`）への誤爆を避ける。サブディレクトリへの移動（例: `docs/v1` →
+  `docs/v1/legacy`）では親が異なるため末尾成分のペアを作らず、`](../v1/b.md)` のように
+  末尾成分だけを書き換えた相対リンクは full path のペアとも一致せず error になる。
+  全ペアは `(-len(old), old, new)` の順で並べ、1 本の正規表現にまとめて 1 回だけ当てる
+  （ペアを順に当てると、置換後の文字列に別のペアが再びかかってしまうため）。full path
+  のペアはパス区切り等で挟まれた一致だけに当てる。
 
 比較は `git merge-base <head> <base-ref>`（既定 `<base-ref>` = `origin/main`、無ければ
 `main`）を基準に行う。`--head <commit>` を渡すとそのコミットの内容と比較し、渡さない
@@ -304,14 +312,19 @@ def file_rename_map(root, base_sha, head, scope_dir):
 def detect_path_renames(root, base_sha, head):
     """base..head（or 作業ツリー）間のファイルリネームからディレクトリリネームを検出する。
 
-    返り値は (旧, 新) のパスのリスト（長い順）。base の行に適用して現在の行と一致
-    すれば「パスリネームのみの変更」と判定できる。置換ペアは改名の前後のディレクトリ
-    について、`/` を含む full path のペア（例: `knowledge/old` → `knowledge/new`）と、
-    末尾成分だけのペア（例: `old` → `new`）の両方を作る。末尾成分だけのペアは、相対
-    リンクの途中に出てくるディレクトリ名（例: `](../old/a.md)`）を追従させるために
-    必要だが、`apply_renames()` 側で「直後に `/` が続く一致だけ」に絞って適用し、
-    地の文に現れる無関係な同名の語（例: 「方式 v1 を採用する」の `v1`）への誤爆を
-    避ける。full path のペアはパス区切り等で挟まれた一致だけに当てる。
+    返り値は (旧, 新) のパスのリスト（`(-len(旧), 旧, 新)` の順）。base の行に適用して
+    現在の行と一致すれば「パスリネームのみの変更」と判定できる。改名された旧・新パスを
+    `Path.parts` に分解し、末尾から共通する要素を取り除いた残り（`o`, `n`）から置換
+    ペアを作る。残りを `/` で結合した full path のペア（例: `src/old/sub/z.md` →
+    `src/new/sub/z.md` なら `src/old` → `src/new`）を必ず作り、
+    `o[:-1] == n[:-1] and o[-1] != n[-1]`（同じ親の下でのファイル名だけの改名）の
+    ときだけ、末尾成分だけのペア（例: `old` → `new`）も追加で作る。旧・新がどちらも
+    1 要素のときは full path のペアと同じになるため作らない。サブディレクトリへの移動
+    （例: `docs/v1` → `docs/v1/legacy`）は親が異なるため末尾成分のペアを作らない
+    （`](../v1/b.md)` のような末尾成分だけを書き換えた相対リンクへの誤爆を避ける）。
+    末尾成分だけのペアは `apply_renames()` 側で「直後に `/` が続く一致だけ」に絞って
+    適用し、地の文に現れる無関係な同名の語（例: 「方式 v1 を採用する」の `v1`）への
+    誤爆を避ける。full path のペアはパス区切り等で挟まれた一致だけに当てる。
     リポジトリ全体を対象にする（リンク先が --dir の外にあることがあるため）。
     """
     lines = run_diff_name_status(root, base_sha, head, paths=None, rename=True, diff_filter="R")
@@ -321,16 +334,18 @@ def detect_path_renames(root, base_sha, head):
         parts = line.split("\t")
         if len(parts) < 3:
             continue
-        old_dir = str(Path(parts[1]).parent)
-        new_dir = str(Path(parts[2]).parent)
-        if old_dir != new_dir:
-            dir_renames.add((old_dir, new_dir))
-            old_leaf, new_leaf = Path(old_dir).name, Path(new_dir).name
-            if old_leaf and new_leaf and old_leaf != new_leaf:
-                dir_renames.add((old_leaf, new_leaf))
+        o = list(Path(parts[1]).parts)
+        n = list(Path(parts[2]).parts)
+        while o and n and o[-1] == n[-1]:
+            o.pop()
+            n.pop()
+        if not o or not n:
+            continue
+        dir_renames.add(("/".join(o), "/".join(n)))
+        if o[:-1] == n[:-1] and o[-1] != n[-1] and (len(o) > 1 or len(n) > 1):
+            dir_renames.add((o[-1], n[-1]))
 
-    subs = sorted(dir_renames, key=lambda p: len(p[0]), reverse=True)
-    return subs
+    return sorted(dir_renames, key=lambda p: (-len(p[0]), p[0], p[1]))
 
 
 # パス境界とみなす文字（この文字で挟まれていない一致は置換しない）。英数字・`_`・`-`・`.`
@@ -352,11 +367,27 @@ def _path_boundary_pattern(token):
 
 
 def apply_renames(line, renames):
-    """`renames`（旧→新の full path ペア）を、パス境界に挟まれた一致だけに当てる。"""
-    result = line
-    for old, new in renames:
-        result = _path_boundary_pattern(old).sub(lambda m, new=new: new, result)
-    return result
+    """`renames`（旧→新のペア）を、パス境界に挟まれた一致だけに、1 本の正規表現に
+    まとめて 1 回だけ当てる。ペアを順に当てると、置換後の文字列に別のペアが再び
+    かかってしまうため（例: `docs/v1/{a,b}.md` → `docs/v1/legacy/` の移動で、
+    `docs/v1` → `docs/v1/legacy` の適用結果に同じペアが再度一致して
+    `docs/legacy/legacy/a.md` になる）、全ペアを 1 本の regex の alternation に
+    まとめて 1 回の `sub()` で処理する。`(-len(旧), 旧, 新)` の順で並べ、長い
+    トークンを alternation の先頭に置くことで、full path のペアが末尾成分だけの
+    ペアより先に試される。
+    """
+    if not renames:
+        return line
+    ordered = sorted(renames, key=lambda p: (-len(p[0]), p[0], p[1]))
+    mapping = {}
+    alternatives = []
+    for old, new in ordered:
+        if old in mapping:
+            continue
+        mapping[old] = new
+        alternatives.append(_path_boundary_pattern(old).pattern)
+    combined = re.compile("|".join(f"(?:{a})" for a in alternatives))
+    return combined.sub(lambda m: mapping[m.group(0)], line)
 
 
 # --- Markdown 節の抽出 ---------------------------------------------------------
