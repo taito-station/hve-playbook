@@ -21,3 +21,4 @@
 | [0013](0013-decision-log-file-or-inline-modes.md) | 決定ログは独立ファイル方式を既定とし、インライン方式を宣言で選べるようにする | Accepted | 2026-10-04 |
 | [0014](0014-knowledge-check-scripts-and-sha-follow-up.md) | knowledge の検査スクリプトを同梱し、stale は文書ごとの単一 sha の祖先判定にする | Accepted | 2026-10-04 |
 | [0015](0015-license-plain-mit-with-provenance-in-readme.md) | LICENSE は著作権行と MIT 本文だけにし、由来の説明は README に置く | Accepted | 2026-10-05 |
+| [0016](0016-hve-implement-skill-and-two-phase-call-from-resolve-issue.md) | implement-flow の実行手順を hve-implement skill として配り、resolve-issue からは 2 段で呼ぶ | Accepted | 2026-10-05 |

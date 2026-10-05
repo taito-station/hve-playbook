@@ -217,6 +217,16 @@ Step 8: PR 作成
 
 各ステップに STOP 条件（矛盾検出・テスト失敗等）があり、条件に該当した場合は自動停止して人間に報告する。詳細は `rules/hve/implement-flow.md` を参照。
 
+フローを順に実行するには `/hve-implement` を使う。Step 1〜4 を Plan モードで進め、Step 4 の後に計画の承認を得てから実装に入る:
+
+```
+/hve-implement
+
+対象: Issue #123（または実装したい内容）
+```
+
+resolve-issue skill は、導入先に hve-implement があれば bug / feature パスで自動的に呼ぶ（計画の前に Step 2〜4、実装で Step 5〜7）。
+
 ### Knowledge 管理（AKM）
 
 implement-flow の Step 2（Knowledge 検索）と Step 7（Knowledge 同期）で構成される知識管理の仕組み。

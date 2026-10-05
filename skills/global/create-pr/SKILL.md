@@ -23,7 +23,7 @@ Step 5 で委譲する `review-pr` skill のレビュー構成 (`--depth` 指定
 
 短縮禁止の **正本・理由・実例・具体的に禁止される行動** は `skills/global/review-pr/SKILL.md` の「短縮禁止」セクション参照。create-pr 側は委譲時に短縮指示を渡さず、review-pr の判定に任せる。
 
-例外: `--depth` フラグによる ITER_MAX・観点の変更は「独断での短縮」に該当しない。これは workflow 設計レベルの決定（Issue の種別に基づくパス分岐）であり、実行時の ad-hoc 判断ではないため。`--depth` フラグは resolve-issue skill が Issue の種別から決定し、create-pr 経由で review-pr に転送する。
+例外: `--depth` フラグによる ITER_MAX・観点の変更は「独断での短縮」に該当しない。これは workflow 設計レベルの決定（Issue の種別・ブランチの type に基づくパス分岐）であり、実行時の ad-hoc 判断ではないため。`--depth` フラグは resolve-issue skill が Issue の種別から、hve-implement skill（単独モード）がブランチの type から決定し、create-pr 経由で review-pr に転送する。
 
 ---
 
@@ -33,7 +33,8 @@ Step 5 で委譲する `review-pr` skill のレビュー構成 (`--depth` 指定
 
 本 skill の **`args` パラメータ (Skill ツール)** を解析する。受け取るのは
 `--depth lightweight` / `--depth full` のみで、resolve-issue skill が Issue の
-種別から決めて渡す (`/create-pr --depth lightweight` 等)。create-pr 単独起動では
+種別から、hve-implement skill (単独モード) がブランチの type から決めて渡す
+(`/create-pr --depth lightweight` 等)。create-pr 単独起動では
 指定なし = legacy (全観点、最大 5 巡):
 
 ```text
@@ -391,7 +392,7 @@ Skill ツール経由で呼び出す:
 - `--depth lightweight` — バグ修正パス: Correctness + Security のみ、1 巡
 - `--depth full` — 機能追加パス: Correctness + Security + Impact、最大 3 巡
 
-create-pr 単独起動時（resolve-issue skill 経由でない場合）は `DEPTH_FLAG` なし = 現行動作（全観点、最大 5 巡）。
+create-pr 単独起動時（resolve-issue / hve-implement skill 経由でない場合）は `DEPTH_FLAG` なし = 現行動作（全観点、最大 5 巡）。
 
 **depth 独自付与の禁止**: create-pr が PR の内容・規模・難易度・変更ファイル種別を
 判断して独自に `--depth` を付与することは**禁止**する (Step 0 参照)。

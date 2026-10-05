@@ -6,6 +6,7 @@ description: 実装フロー規約 — Plan・Knowledge 検索・テスト設計
 
 実装タスク（feat / fix / refactor / 改修）に適用するゲートベースのフロー。
 コードを書く前に Plan・Knowledge 検索・棄却チェック・ギャップ分析・テスト設計を義務化し、実装後に Knowledge 同期を行う。
+このフローを順に実行する手順は hve-implement skill（`/hve-implement`。resolve-issue からも呼ばれる）にある。
 
 ## 適用条件
 
