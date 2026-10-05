@@ -42,19 +42,19 @@ Step 4: カバレッジ分析
 
 ### Step 1: Stale 検出
 
-knowledge/ 配下の各ファイルについて、frontmatter の `distilled_from_sha` と source の現在の git sha を比較する。
+検査スクリプトで knowledge/ 配下の文書を検査する（判定ロジックは `rules/hve/knowledge-maturity.md` の「Stale 検出の仕組み」）:
 
-1. knowledge/ 配下の全ファイルの frontmatter を読む
-2. 各 `distilled_from_sha` エントリについて、source の現在の sha を取得:
-   ```bash
-   git log -1 --format=%H -- <source_file_path>
-   ```
-3. sha が一致しないファイルを stale として報告する
+```bash
+python3 .claude/scripts/hve/check-knowledge.py
+```
 
-**出力**: stale なファイル一覧（ファイルパス、stale な source、sha の差分）
+導入先が hve-local（`.claude/rules/hve-local/hve-akm.md` など）で引数（`--required`・`--allow-empty-sources-with-decision-log` など）を定めていれば、それを付ける。
+
+**出力**: `STALE` 行（文書・stale な source・`distilled_from_sha`）、その他の違反（必須項目の欠落・sources の不在など）、解消待ち（status が `Conflict`）の件数
 
 - stale なファイルが 0 件の場合: 「stale なし」と報告し、Step 3 に進む（Step 2 スキップ）
 - stale なファイルがある場合: Step 2 に進む
+- exit 2（判定不能。shallow clone など）の場合: 原因を報告して STOP
 
 ### Step 2: 蒸留（差分マージ）
 
@@ -62,13 +62,13 @@ stale な各ファイルについて、source の変更を knowledge 本文に�
 
 1. source ファイルの変更差分を確認する:
    ```bash
-   git diff <old_sha>..<new_sha> -- <source_file_path>
+   git diff <distilled_from_sha>..HEAD -- <source_file_path>
    ```
 2. 変更内容を knowledge 本文に差分マージする
    - **全書き換え禁止**。変更箇所のみ更新する
    - source にない情報（既存の蒸留結果）は維持する
 3. 決定を伴う変更がある場合は、決定ログ（既定は `knowledge/adr/`。インライン方式を宣言したプロジェクトは各 knowledge の `## 決定ログ` 節）に新エントリを追加する
-4. frontmatter の `distilled_from_sha` を新しい sha に更新する
+4. 本文の変更をコミットしたあと、`python3 .claude/scripts/hve/bump-distilled-sha.py <文書>` で `distilled_from_sha` をそのコミットへ進め、追従のコミットを積む（コミットは自分の sha を含められないので 2 コミットになる。squash・rebase の後の扱いは knowledge-maturity の「sha の追従」）
 5. frontmatter の `updated` は、本文または status が実質的に変わった場合だけ当日日付に更新する（`distilled_from_sha` だけの追従では触らない。判断は `rules/hve/knowledge-maturity.md` の「`updated` の規則」に従う）
 
 **蒸留対象が 3 本以上の場合**: サブエージェントに委譲する（1 エージェント 1 ファイル）
@@ -79,10 +79,9 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 
 #### 機械検査チェックリスト
 
-- [ ] frontmatter の必須フィールド（title / status / kind / sources / distilled_from_sha / updated）が全ファイルに存在する
-- [ ] `distilled_from_sha` で参照している source ファイルが実在する
-- [ ] 決定ログの既存エントリに、artifact-management の「書き換えてよい範囲」以外の改変がない（append-only 原則）
-- [ ] status が Conflict の文書を解消待ちとして列挙し、報告に含めている
+- [ ] `python3 .claude/scripts/hve/check-knowledge.py` が exit 0（frontmatter の必須フィールド、sources の実在、stale）
+- [ ] `python3 .claude/scripts/hve/check-decision-log.py` が exit 0（決定ログの既存エントリに、artifact-management の「書き換えてよい範囲」以外の改変がない。append-only 原則）。警告が出たら、誤字修正かどうかを確かめる
+- [ ] status が Conflict の文書を解消待ちとして列挙し、報告に含めている（`check-knowledge.py` の解消待ちの一覧）
 
 #### 目視チェック項目
 

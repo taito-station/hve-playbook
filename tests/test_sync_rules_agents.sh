@@ -138,6 +138,21 @@ PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup3.log" 2>&
 check "setup.sh 再実行 2 回目: exit 0" [ $? -eq 0 ]
 check "setup.sh 再実行: hve-local の中身が残る" [ "$(cat "$T/.claude/rules/hve-local/implement-flow.md" 2>/dev/null)" = "local note" ]
 
+# 8) knowledge 検査スクリプト（hve-scripts/ → .claude/scripts/hve/）
+S="$T/.claude/scripts/hve"
+runs_help() { "$REAL_PY" "$1" --help >/dev/null 2>&1; }
+check "setup.sh: check-knowledge.py を配る" runs_help "$S/check-knowledge.py"
+check "setup.sh: check-decision-log.py を配る" runs_help "$S/check-decision-log.py"
+check "setup.sh: bump-distilled-sha.py を配る" runs_help "$S/bump-distilled-sha.py"
+has_hooks() { [ -f "$S/hooks/session-stale-check.sh" ] && [ -f "$S/hooks/check-knowledge-impact.py" ]; }
+check "setup.sh: hook を配る" has_hooks
+check "setup.sh: 完了メッセージで .claude/scripts/hve/ を案内する" grep -q '\.claude/scripts/hve/' "$TMP/setup3.log"
+echo stale >"$S/removed-upstream.py"
+echo own >"$T/.claude/scripts/own.py"
+PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup4.log" 2>&1
+check "setup.sh 再実行: scripts/hve は置き直す（配布元に無いファイルは残らない）" [ ! -e "$S/removed-upstream.py" ]
+check "setup.sh 再実行: scripts/hve の外の自作スクリプトには触れない" [ "$(cat "$T/.claude/scripts/own.py" 2>/dev/null)" = "own" ]
+
 echo
 echo "結果: PASS=$pass FAIL=$fail"
 [ "$fail" -eq 0 ]

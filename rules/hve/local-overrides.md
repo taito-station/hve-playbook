@@ -4,7 +4,7 @@ description: プロジェクト固有の補足 — setup.sh の再適用で消�
 
 # プロジェクト固有の補足（hve-local）
 
-`setup.sh` は `.claude/rules/hve/`・`.claude/skills/hve-*/`・`.claude/agents/hve-*.md`・`.claude/workflows/hve-*.js` を削除してから置き直す。これらの写しに書き足した注記は、再適用のたびに消える。プロジェクト固有の補足・上書きは、写しではなく `.claude/rules/hve-local/` に書く。setup.sh はこのディレクトリに触れない。
+`setup.sh` は `.claude/rules/hve/`・`.claude/skills/hve-*/`・`.claude/agents/hve-*.md`・`.claude/workflows/hve-*.js`・`.claude/scripts/hve/` を削除してから置き直す。これらの写しに書き足した注記は、再適用のたびに消える。プロジェクト固有の補足・上書きは、写しではなく `.claude/rules/hve-local/` に書く。setup.sh はこのディレクトリに触れない。
 
 ## 置き場所
 
@@ -13,7 +13,7 @@ description: プロジェクト固有の補足 — setup.sh の再適用で消�
 | `rules/hve/<name>.md` | `.claude/rules/hve-local/<name>.md`（例: `hve-local/implement-flow.md`） |
 | `skills/hve-*/SKILL.md`（`<skill 名>` は `hve-akm` など） | `.claude/rules/hve-local/<skill 名>.md`（例: `hve-local/hve-akm.md`） |
 
-- 写し（`.claude/rules/hve/`・`.claude/skills/hve-*/`・`.claude/agents/hve-*.md`・`.claude/workflows/hve-*.js`）は編集しない。hve-playbook 本体では rules/hve・skills/hve-* が原本なので、直接編集する
+- 写し（`.claude/rules/hve/`・`.claude/skills/hve-*/`・`.claude/agents/hve-*.md`・`.claude/workflows/hve-*.js`・`.claude/scripts/hve/`）は編集しない。hve-playbook 本体では rules/hve・skills/hve-*・hve-scripts が原本なので、直接編集する。検査スクリプトの設定は引数で渡し、渡し方（CI・pre-push・hook の呼び出し）は hve-local に書く
 - hve-local のファイルに `paths:` frontmatter を付けない。付けると対象ファイルを読んだときだけ読み込まれ、補足が効かない場面が出る
 
 ## 書式と優先順位

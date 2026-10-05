@@ -79,7 +79,7 @@ git switch -c feat/<next-task>
 
 ## PR とコミットの粒度
 
-**1 PR = 1 機能単位（または 1 修正単位）** を原則とする。まだ push していないブランチは、create-pr skill が PR を作る前に 1 コミットにまとめる（`git reset --soft <base>` + `git commit`）ので、未 push のブランチから作った PR は 1 コミットになる。レビューと bisect のしやすさを担保するため。
+**1 PR = 1 機能単位（または 1 修正単位）** を原則とする。まだ push していないブランチは、create-pr skill が PR を作る前に 1 コミットにまとめる（`git reset --soft <base>` + `git commit`）ので、未 push のブランチから作った PR は 1 コミットになる。レビューと bisect のしやすさを担保するため。例外として、HVE の knowledge の検査スクリプトがあるリポジトリで、squash によって knowledge 文書の `distilled_from_sha` が指すコミットが履歴から外れたときは、create-pr が sha の追従コミットを 1 つ積むので 2 コミットになる（ADR 0014）。このようなリポジトリでは、PR を merge commit でマージする（squash・rebase merge では追従した sha が main から辿れなくなる）。
 
 ### 推奨される分け方
 

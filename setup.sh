@@ -71,6 +71,13 @@ if [ ${#workflows[@]} -gt 0 ]; then
     echo "[INFO] workflows/hve-*.js を配置しました"
 fi
 
+# hve-scripts/ → scripts/hve/（knowledge の検査スクリプト）
+mkdir -p "$TARGET_CLAUDE/scripts"
+rm -rf "$TARGET_CLAUDE/scripts/hve"
+cp -r "$SCRIPT_DIR/hve-scripts" "$TARGET_CLAUDE/scripts/hve"
+find "$TARGET_CLAUDE/scripts/hve" -name '__pycache__' -type d -prune -exec rm -rf {} +
+echo "[INFO] scripts/hve/ を配置しました"
+
 # CLAUDE.hve.md（HVE 方法論の説明）
 if [ ! -f "$TARGET_CLAUDE/CLAUDE.md" ]; then
     cp "$SCRIPT_DIR/CLAUDE.hve.md" "$TARGET_CLAUDE/CLAUDE.md"
@@ -119,3 +126,4 @@ echo ""
 echo "[DONE] セットアップが完了しました。"
 echo "次のアクション: Claude Code セッション内で /hve-ard を実行し、要件定義を開始してください。"
 echo "プロジェクト固有の補足は .claude/rules/hve-local/ に書いてください（setup.sh は触れません。書式は .claude/rules/hve/local-overrides.md）。"
+echo "knowledge の検査スクリプトは .claude/scripts/hve/ に置きました。CI・pre-push・Claude Code の hook への組み込み方は .claude/rules/hve/knowledge-maturity.md を参照してください。"

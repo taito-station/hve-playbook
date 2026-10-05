@@ -12,7 +12,7 @@ Includes [youhei-ushio/dotclaude-public](https://github.com/youhei-ushio/dotclau
 | 役割 | デプロイ方法 | デプロイ先 | 内容 |
 |---|---|---|---|
 | **user-level 基盤** | `sync-dotclaude.sh` (symlink) | `~/.claude/` | hooks, global skills, scripts, rules/global, agents/global, settings |
-| **project-level HVE** | `setup.sh` (copy) | target/.claude/ | rules/hve, HVE skills/agents/workflows |
+| **project-level HVE** | `setup.sh` (copy) | target/.claude/ | rules/hve, HVE skills/agents/workflows, knowledge の検査スクリプト（hve-scripts → scripts/hve） |
 
 ## セットアップ
 
@@ -80,6 +80,10 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 | スクリプト | 内容 |
 |---|---|
 | `scripts/session-cost.py` | セッション JSONL からトークン使用量と費用を集計 |
+
+`hve-scripts/` は導入先に配る knowledge の検査スクリプト（stale 検出・決定ログの不変性・sha の追従・hook）。setup.sh が導入先の `.claude/scripts/hve/` に置く。使い方は `rules/hve/knowledge-maturity.md` の「Stale 検出の仕組み」（[ADR-0014](knowledge/adr/0014-knowledge-check-scripts-and-sha-follow-up.md)）。
+
+このリポジトリ自身にも pre-push で適用している。clone したら一度だけ `git -C hve-playbook config core.hooksPath .githooks` を実行して有効にする。
 
 ## 推奨ツール
 
