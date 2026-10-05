@@ -26,9 +26,10 @@ work/
 # create-pr / review-pr 一時ファイル
 docs/temp/
 
-# mdq / cq のローカル索引（再生成できる。利用記録 usage.jsonl を含む）
+# mdq / cq のローカル索引と利用記録（再生成できる。usage.jsonl には検索クエリが残る）
+# mdq / cq は実行したディレクトリに作るので、全階層に当てる（`**/`）
 # 設定ファイルは追跡できるよう、ディレクトリではなく中身を除外する（`.mdq/` と書くと `!` の例外が効かない）
-.mdq/*
-!.mdq/config.toml
-.cq/*
-!.cq/config.toml
+**/.mdq/*
+!**/.mdq/config.toml
+**/.cq/*
+!**/.cq/config.toml
