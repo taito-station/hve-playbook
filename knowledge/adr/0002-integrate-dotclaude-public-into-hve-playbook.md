@@ -4,8 +4,8 @@
 
 Partially superseded by 0015-license-plain-mit-with-provenance-in-readme — 2026-10-05
 
-- 有効な部分: hve-playbook への統合と 2 段デプロイモデル、CLAUDE.md と CLAUDE.hve.md への分割、LICENSE に dotclaude-public の著作権表示（著作権行）を置くこと
-- 失効した部分: LICENSE で出典（由来のリポ）を辿れるようにするという部分（決定内容の「LLM が出典を辿れるようにする」と、結果の「出典は LICENSE とコミット履歴で追跡可能」）。由来のリポ名・URL は README.md に置く（ADR-0015）
+- 有効な部分: hve-playbook への統合と 2 段デプロイモデル、CLAUDE.md と CLAUDE.hve.md への分割、LICENSE に dotclaude-public の著作権表示（著作権行）を置くこと、出典（由来のリポ）を辿れるようにするという目的
+- 失効した部分: 出典（由来のリポ）の置き場所を LICENSE とする部分（決定内容の「LICENSE に…追記し、LLM が出典を辿れるようにする」のうち LICENSE で辿る点と、結果の「出典は LICENSE とコミット履歴で追跡可能」）。出典の置き場所は README.md にする（ADR-0015）
 
 ## 背景と課題
 

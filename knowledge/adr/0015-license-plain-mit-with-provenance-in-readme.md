@@ -31,13 +31,14 @@ ADR-0002 は「LICENSE に dotclaude-public の著作権表示を追記し、LLM
 
 LICENSE は `MIT License`、3 者の著作権行（`Copyright (c) 2026 taito-station` / `Copyright (c) 2026 Daiyu Hatakeyama` / `Copyright (c) 2026 youhei-ushio`）、MIT 本文だけにする。由来の説明（リポ名・URL・ライセンス）は README.md の冒頭（`Based on …` / `Includes …`）に置く。リポ名・URL・ライセンスは README にすでにあり、著作者の実名は LICENSE の著作権行に残るので、移す作業は LICENSE から段落を消すだけで済む。
 
-本 ADR は ADR-0002 を部分的に置き換える。ADR-0002 の決定のうち「LICENSE に dotclaude-public の著作権表示を追記する」は、著作権行として残るので有効のまま。「LLM が出典を辿れるようにする」と結果の「出典は LICENSE とコミット履歴で追跡可能」は失効し、「著作権表示は LICENSE、由来（リポ名・URL）は README.md、経緯はコミット履歴」に置き換える。ADR-0002 のステータス節と一覧に、有効な部分と失効した部分を書いた。
+本 ADR は ADR-0002 を部分的に置き換える。ADR-0002 の決定のうち「LICENSE に dotclaude-public の著作権表示を追記する」は、著作権行として残るので有効のまま。出典（由来のリポ）を辿れるようにするという目的も有効のまま。失効するのは出典の置き場所を LICENSE とする部分（決定内容の「LLM が出典を辿れるようにする」のうち LICENSE で辿る点と、結果の「出典は LICENSE とコミット履歴で追跡可能」）で、「著作権表示は LICENSE、由来（リポ名・URL）は README.md、経緯はコミット履歴」に置き換える。ADR-0002 のステータス節に有効な部分と失効した部分を書き、一覧のステータス列を更新した。
 
 ### 結果（Consequences）
 
 - 良い結果: licensee 10.1.0 で `License: MIT`（`Licensee::Matchers::Exact`、Confidence 100%）と判定され、3 者すべてが Attribution に出る
-- 良い結果: 上流 2 者の著作権表示は LICENSE に残り、MIT の再配布条件を満たす
+- 良い結果: 上流 2 者の著作権表示は LICENSE に残り、本リポジトリの LICENSE としては MIT の再配布条件を満たす（setup.sh が導入先にコピーする HVE 由来の資産には LICENSE を同梱しない。この扱いは本 ADR の範囲外）
 - 悪い結果: LICENSE だけを見ても、どのリポから何を取り込んだかはわからない（README を見る必要がある）
+- 悪い結果: 旧 LICENSE にあった「HypervelocityEngineering by Daiyu Hatakeyama」という著作者の実名とリポの対応は、README（GitHub ハンドル `dahatake` のみ）にも LICENSE（実名のみ）にも残らない。本 ADR の「意思決定の要因」と、README の URL のオーナーから辿れるので許容する
 - 悪い結果: GitHub 側の判定が更新されるタイミングは TBD（推論: 既定ブランチへの反映後に GitHub 側で再判定される）。マージ後に確認する
 
 ## 選択肢の評価（Pros and Cons）
