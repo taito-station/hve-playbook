@@ -121,12 +121,14 @@ bash <hve-playbook>/setup.sh <target>
   - `work/`（HVE の一時作業ファイル。手順 2 の退避先もここ）
   - `**/.claude/settings.local.json`
   - `docs/temp/`（create-pr / review-pr skill の一時ファイル。skill を使わない場合も足してよい）
+  - `**/.mdq/*` と `!**/.mdq/config.toml`、`**/.cq/*` と `!**/.cq/config.toml`（mdq / cq のローカル索引と利用記録。実行したディレクトリに作られるので全階層に当てる。設定ファイルは追跡できるよう中身だけを除外する）。既に `.mdq/`・`.cq/`（ディレクトリ指定）があれば、追記ではなくこの行に置き換える（ディレクトリごと除外すると `!` の例外が効かない）
 
 ### 7. 検証する
 
 - 配置されたファイルを一覧で確認する（`find <target>/.claude -maxdepth 2 | sort`）。
 - `.claude/rules/hve/implement-flow.md` などの規則ファイルが揃っているか確認する。
 - `git -C <target> status --short -uall` で、HVE 資産（`CLAUDE.hve.md` を含む）・`.claude/rules/hve-local/`（あれば）・CLAUDE.md・`.gitignore` が変更または untracked として見えることを確認する。見えなければ ignore の例外が効いていない。 逆に、それ以外のファイル（下層の `.claude/` や独自の設定）が新しく見えるようになっていれば、例外が広すぎるので直す。
+- `git -C <target> check-ignore -v --no-index .mdq/usage.jsonl` が `.gitignore` の行を返し、`git -C <target> check-ignore --no-index .mdq/config.toml` が何も返さない（exit 1）ことを確認する。返らなければ、索引の除外か `config.toml` の例外が効いていない。
 - コミットにはこれらだけを含める。無関係な変更はステージしない（破棄はしない。破棄が必要ならユーザーに確認する）。
 
 ### 8. コミットして PR にする
