@@ -222,8 +222,10 @@ Step 8: PR 作成
 ```
 /hve-implement
 
-対象: Issue #123（または実装したい内容）
+対象: 実装したい内容（例: CSV 出力に日付の列を足す）
 ```
+
+Issue を対応するときは resolve-issue skill を使う（パス判定・Plan の敵対的レビュー・PO 承認・Issue への記録を含む）。
 
 resolve-issue skill は、導入先に hve-implement があれば bug / feature パスで自動的に呼ぶ（計画の前に Step 2〜4、実装で Step 5〜7）。
 

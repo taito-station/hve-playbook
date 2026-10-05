@@ -106,7 +106,7 @@ if ERRORS is not empty:
 
 3. **原因特定 + 修正方針**:
    - LSP ツール（`findReferences` / `goToDefinition`）でコードを調査し、原因を特定（その言語の LSP plugin が無いなら、`grep` で対象を絞ってから `Read` する）
-   - **`.claude/skills/hve-implement/SKILL.md` がある場合（ドキュメントのみの変更を除く）**: 修正方針を記録する前に
+   - **`.claude/skills/hve-implement/SKILL.md` がある場合（implement-flow の対象外＝ドキュメントのみ・設定変更のみ・依存更新のみの変更を除く）**: 修正方針を記録する前に
      `/hve-implement --phase pre <issue番号>` を Skill ツールで呼び、Knowledge 検索・棄却済み案チェック・
      質問票（implement-flow の Step 2〜4）を済ませる。結果は修正方針のコメントに含める。STOP したら
      修正方針を記録せずに PO へ報告する
@@ -125,9 +125,9 @@ if ERRORS is not empty:
 
 #### [feature] フルパス — 前処理
 
-**`.claude/skills/hve-implement/SKILL.md` がある場合（ドキュメントのみの変更を除く）**: 項目 1 の代わりに `/hve-implement --phase pre <issue番号>` を
+**`.claude/skills/hve-implement/SKILL.md` がある場合（implement-flow の対象外＝ドキュメントのみ・設定変更のみ・依存更新のみの変更を除く）**: 項目 1 の代わりに `/hve-implement --phase pre <issue番号>` を
 Skill ツールで呼び、Knowledge 検索・棄却済み案チェック・質問票（implement-flow の Step 2〜4）を済ませる。
-質問票の回答探索は項目 1 の順序に従う（hve-implement が参照する）。結果は項目 2 の Plan の「前提」「設計方針」に書く。
+質問票の回答探索は項目 1 の探索順とガードレールに従う（hve-implement が参照する）。ただし回答は `knowledge/<domain>/` ではなく `qa/` に保存する（HVE の check-knowledge.py は項目 1 の書式を knowledge 文書として扱えない）。結果は項目 2 の Plan の「前提」「設計方針」に書く。
 STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 ではなく hve-implement の Step 7 で書く。
 
 1. **不確定点チェック + 業務ナレッジ駆動の回答探索**:
@@ -326,7 +326,7 @@ STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 では�
    })
    ```
 
-   - **承認** → 次の手順（ADR 作成）へ進む
+   - **承認** → 次の手順（ADR 作成）へ進む（hve-implement がある場合は ADR を Step 7 で書くので Step 3 へ）
    - **差し戻し** → PO が「Other」欄にフィードバックを記入するか、
      別途 `AskUserQuestion` でフィードバック詳細を収集する。
      フィードバックに基づき Plan を修正し、Issue コメントを更新する。
@@ -394,10 +394,10 @@ STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 では�
    - ブランチ名の概要部分は Issue タイトルから英語のケバブケースで生成
 
 2. Issue の要件に基づいて実装を行う
-   - **[bug / feature] `.claude/skills/hve-implement/SKILL.md` がある場合（ドキュメントのみの変更を除く）**: `/hve-implement --phase post <issue番号>`
+   - **[bug / feature] `.claude/skills/hve-implement/SKILL.md` がある場合（implement-flow の対象外＝ドキュメントのみ・設定変更のみ・依存更新のみの変更を除く）**: `/hve-implement --phase post <issue番号>`
      を Skill ツールで呼び、テスト設計・実装・Knowledge 同期（implement-flow の Step 5〜7）を行う。項目 3 の
      テスト観点と失敗時の打ち切りは引き続き適用する（hve-implement が STOP したら、項目 3 の revert と
-     エスカレーションに従う）。受入基準が不明確で STOP したら、Step 2 の Plan の修正と PO の再承認に戻る
+     エスカレーションに従う）。受入基準が不明確で STOP したら、feature は Step 2 の Plan の修正と PO の再承認に、bug は Step 2 の修正方針の見直しに戻る
 
 3. ユニットテストを追加・更新
    - **テスト観点は3軸に集中**:

@@ -31,16 +31,16 @@ Accepted — 2026-10-05
 選択した選択肢: **hve-implement を単独でも使え、resolve-issue からは 2 段で呼ぶ**。
 
 - `skills/hve-implement/SKILL.md` を配る（setup.sh の `skills/hve-*` の一括コピーに乗る）。規約の正本は implement-flow.md のままで、skill は実行手順だけを持つ
-- 単独モードは Step 0〜8 を実行する。Step 1〜4 を Plan モードで進め、Step 4 の後に計画の承認を得てから Step 5 へ進む。`--depth` はブランチの type で決める（`fix` → lightweight、それ以外 → full）
-- resolve-issue は `.claude/skills/hve-implement/SKILL.md` があるときだけ、bug / feature パスで `--phase pre`（Step 2〜4）を計画・修正方針の前に、`--phase post`（Step 5〜7）を Step 3 の実装で呼ぶ。Step 0・1・8 は resolve-issue が持つ。ops パスとドキュメントのみの変更は対象外
-- 重なる手順は hve-implement 側に寄せる: 質問票は Step 4（回答の探索順は resolve-issue の手順）、ADR は Step 7、テストの 3 回失敗は Step 6 の STOP のあと resolve-issue の revert とエスカレーション
+- 単独モードは Issue の無い実装指示の入口で、Step 0〜8 を実行する（Issue は resolve-issue で対応する）。Step 1〜4 を Plan モードで進め、Step 4 の後に計画の承認を得てから Step 5 へ進む。`--depth` は Step 1 でタスクを分類して決める（バグ修正 → lightweight、それ以外 → full）。分類は計画に書いて承認を得る
+- resolve-issue は `.claude/skills/hve-implement/SKILL.md` があるときだけ（implement-flow の対象外の変更を除く）、bug / feature パスで `--phase pre`（Step 2〜4）を計画・修正方針の前に、`--phase post`（Step 5〜7）を Step 3 の実装で呼ぶ。Step 0・1・8 は resolve-issue が持つ。ops パスと implement-flow の対象外の変更は対象外
+- 重なる手順は hve-implement 側に寄せる: 質問票は Step 4（bug は AskUserQuestion、feature は resolve-issue の探索順とガードレールに従い、回答は `knowledge/<domain>/` ではなく HVE の `qa/` に保存する）、ADR は Step 7、テストの 3 回失敗は Step 6 の STOP のあと resolve-issue の revert とエスカレーション。全テストの実行時期とブラウザテストは resolve-issue に従う
 - 固有の差分は `.claude/rules/hve-local/hve-implement.md` と `.claude/rules/hve-local/implement-flow.md` に書く。Step 7 は hve-local に検証コマンドがあればそれだけを実行し、無ければ同梱の検査スクリプト（`.claude/scripts/hve/`、hve-playbook 自身は `hve-scripts/`）を実行する
 - create-pr / review-pr は、hve-implement の単独モードを `--depth` の決定者として認める
 
 ### 結果（Consequences）
 
 - 良い結果: Step 2〜4 の STOP が承認前に出るので、承認済みの計画を作り直さずに済む。他の導入先も同じ手順で implement-flow を実行できる
-- 悪い結果: resolve-issue の手順に分岐が増える。導入先に自前の実装 skill がある間は、自然言語のトリガーが衝突しうる（paddock は [paddock#756](https://github.com/taito-station/paddock/issues/756) で置き換える）
+- 悪い結果: resolve-issue の手順に分岐が増える。resolve-issue（sync で常に最新）と hve-implement（導入先の写しで、setup.sh を実行した時点のまま）が `--phase` と互いの手順を参照するので、版がずれうる。どちらかの手順を変えたら、導入先に setup.sh の再適用を案内する。導入先に自前の実装 skill がある間は、自然言語のトリガーが衝突しうる（paddock は [paddock#756](https://github.com/taito-station/paddock/issues/756) で置き換える）
 
 ## 選択肢の評価（Pros and Cons）
 
