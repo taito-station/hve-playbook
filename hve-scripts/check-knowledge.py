@@ -18,13 +18,19 @@
      可変参照、大文字 16 進、短すぎる値）は error。ただし
      `--allow-empty-sources-with-decision-log` で空が許される文書は除く        [error]
   3. sources に列挙したパスがリポジトリ相対の正規形で、実在し、大文字小文字まで
-     実ファイルと一致し、シンボリックリンクの解決先がリポジトリの外を指して
-     いないか                                                                 [error]
+     実ファイルと一致し、シンボリックリンクでないか（リポジトリの中を指している
+     ものも含めて使えない。stale 判定（5）がリンク先の変更を追えないため）      [error]
   4. sources が空か（既定は error。`--allow-empty-sources-with-decision-log` を
      付けたときだけ、本文に `## 決定ログ` 見出し（行頭・コードフェンス外）を持つ
      文書は sources・distilled_from_sha が空・欠落でもよい）                  [error]
   5. stale: 各 source の最後の「内容変更」コミットが、文書の `distilled_from_sha`
-     を解決した commit の祖先かどうか（`git merge-base --is-ancestor`）       [error]
+     を解決した commit の祖先かどうか（`git merge-base --is-ancestor`）。
+     `distilled_from_sha` の形式が不正なとき（(2) で error 済み）は、この判定自体を
+     行わない（「形式不正」と「解決できない」を二重報告しない）。`rev-parse` で
+     解決した結果のフル sha が書かれた値で始まらない場合（同名の tag・branch 等の
+     ref に解決された）も error にする。`merge-base --is-ancestor` の終了コードが
+     1（祖先でない＝STALE）でも 0（祖先）でもないときは、判定不能の別の error に
+     する（STALE 行の書式で報告すると後続スクリプトが誤って解釈するため）       [error]
 
 「内容変更ではない」として遡る（stale 判定の遡上をスキップする）のは次の 3 種類:
   - R100（内容差分ゼロのリネーム）
@@ -269,16 +275,35 @@ def path_status(sha: str, path: str) -> "tuple[str | None, str | None]":
 
     マージに対する `git show` の既定（combined diff）に依存する。詳細な理由は
     paddock の `scripts/check-doc-classes.py` の同名関数の docstring を参照。
+
+    `-z` で読み NUL 区切りでフィールドを分解する。`-z` なしだとファイル名に含まれる
+    二重引用符やバックスラッシュが C クォートされ（`core.quotePath=false` は非
+    ASCII だけを対象にするので効かない）、`path` との終点一致が外れて stale 判定が
+    無言で warning に落ちる。
     """
-    proc = git("show", "--format=", "--name-status", "-M100%", sha)
+    proc = git_raw("show", "--format=", "--name-status", "-M100%", "-z", sha)
     if proc.returncode != 0:
-        raise GitFailed(f"git show --name-status が失敗した（{proc.stderr.strip()[:200]}）")
-    for line in proc.stdout.splitlines():
-        parts = line.split("\t")
-        if len(parts) >= 2 and parts[-1] == path:
-            status = parts[0]
-            src = parts[1] if status.startswith("R") and len(parts) >= 3 else None
-            return status, src
+        raise GitFailed(
+            f"git show --name-status が失敗した（{decode_preserving(proc.stderr).strip()[:200]}）"
+        )
+    fields = [decode_preserving(b) for b in proc.stdout.split(b"\0") if b]
+    i = 0
+    while i < len(fields):
+        status = fields[i]
+        if status.startswith("R"):
+            if i + 2 >= len(fields):
+                break
+            old, new = fields[i + 1], fields[i + 2]
+            if new == path:
+                return status, old
+            i += 3
+            continue
+        if i + 1 >= len(fields):
+            break
+        current = fields[i + 1]
+        if current == path:
+            return status, None
+        i += 2
     return None, None
 
 
@@ -393,19 +418,6 @@ def case_exact(path: Path, root: Path) -> bool:
     return True
 
 
-def resolves_outside_repo(resolved: Path, root: Path) -> bool:
-    """`resolved`（symlink 解決後の絶対パス）がリポジトリ `root` の外を指すか。
-
-    `repo_relative_path_error` は書かれた文字列を字面で見るだけなので、相対パスの
-    まま書かれた symlink がリポジトリ外の実ファイルを指すケースは通り抜ける。
-    """
-    try:
-        resolved.relative_to(root)
-        return False
-    except ValueError:
-        return True
-
-
 def repo_relative_path_error(raw: str) -> "str | None":
     """`sources` に書けるパスでない理由を返す（正常なら None）。"""
     if raw.startswith("/") or ".." in Path(raw).parts:
@@ -417,7 +429,7 @@ def repo_relative_path_error(raw: str) -> "str | None":
 
 # --- 決定ログ見出しの検出 -----------------------------------------------------
 RE_FENCE = re.compile(r"^(`{3,}|~{3,})")
-RE_DECISION_LOG_HEADING = re.compile(r"^## 決定ログ\s*$")
+RE_DECISION_LOG_HEADING = re.compile(r"^##[ \t]+決定ログ[ \t]*$")
 
 
 def has_decision_log_heading(body: str) -> bool:
@@ -559,6 +571,13 @@ def main(argv: "list[str] | None" = None) -> int:
         distilled_malformed = distilled_is_old_map or (
             isinstance(distilled_value, list) and len(distilled_value) > 0
         )
+        # 形式が不正（旧マップ/list 形式、または sha 以外の値）全般。(5) の stale
+        # 判定はこれが真なら行わない（「形式不正」と「解決できない」を二重報告しない）。
+        distilled_format_invalid = distilled_malformed or (
+            isinstance(distilled_value, str)
+            and distilled_value.strip() != ""
+            and not RE_SHA.match(distilled_value.strip())
+        )
 
         # (1) 必須項目
         for key in required_keys:
@@ -598,16 +617,19 @@ def main(argv: "list[str] | None" = None) -> int:
         if "sources" in fm and not sources and not allow_empty:
             errors.append(f"{rel}: sources が空（由来を辿れない）")
 
-        # (3) sources の実在・正規形・大文字小文字・symlink の解決先（空・欠落の
-        # どちらでも、列挙された要素だけは常に検査する）
+        # (3) sources の実在・正規形・大文字小文字・symlink（空・欠落のどちらでも、
+        # 列挙された要素だけは常に検査する）。symlink はリポジトリの中を指して
+        # いても使えない（stale 判定の履歴走査がリンク先の変更を追えないため）。
         for src in sources:
             path_error = repo_relative_path_error(src)
             if path_error:
                 errors.append(f"{rel}: sources は{path_error} → {src}")
+            elif (root / src).is_symlink():
+                errors.append(
+                    f"{rel}: sources にシンボリックリンクは使えない。実体のパスを書く → {src}"
+                )
             elif not (root / src).is_file():
                 errors.append(f"{rel}: sources のパスが実在しない → {src}")
-            elif resolves_outside_repo((root / src).resolve(), root.resolve()):
-                errors.append(f"{rel}: sources がリポジトリの外を指している → {src}")
             elif not case_exact((root / src).resolve(), root.resolve()):
                 errors.append(f"{rel}: sources の大文字小文字が実ファイルと違う → {src}")
 
@@ -628,7 +650,7 @@ def main(argv: "list[str] | None" = None) -> int:
         # (5) stale。sources・distilled_from_sha のどちらかが無ければ判定しない
         # （allow_empty による免除時はこれが意図した状態。免除でない欠落・形式が
         # 不正な値は上のチェックで既に error 済みなので、ここで重複報告しない）。
-        if distilled_malformed or not isinstance(distilled_value, str):
+        if distilled_format_invalid or not isinstance(distilled_value, str):
             continue
         distilled = distilled_value
         if not distilled or not sources:
@@ -646,6 +668,15 @@ def main(argv: "list[str] | None" = None) -> int:
                 errors.append(f"{rel}: distilled_from_sha '{distilled}' を解決できない")
             continue
         distilled_full = resolved.stdout.strip()
+        if not distilled_full.startswith(distilled):
+            # rev-parse は ref 名も受け付けるので、書いた値と同名の tag・branch が
+            # あると無関係な commit に解決される（本物の sha ならフル sha が必ず
+            # 書いた値で始まる）。
+            errors.append(
+                f"{rel}: distilled_from_sha が同名の ref（tag・branch）に解決された"
+                f" → {distilled}"
+            )
+            continue
 
         for src in sources:
             if not (root / src).is_file():
@@ -674,10 +705,19 @@ def main(argv: "list[str] | None" = None) -> int:
                         "（未コミット / 履歴の尽き）"
                     )
                 continue
-            if git("merge-base", "--is-ancestor", changed, distilled_full).returncode != 0:
+            mb = git("merge-base", "--is-ancestor", changed, distilled_full)
+            if mb.returncode == 1:
                 errors.append(
                     f"{rel}: STALE ← {src} が distilled_from_sha({distilled}) より後に更新されている"
                     f"（{changed[:7]}）。差分マージして sha/日付を更新する"
+                )
+            elif mb.returncode != 0:
+                # 0（祖先）・1（祖先でない）以外は祖先判定そのものが失敗している。
+                # STALE 行の書式で報告すると bump-distilled-sha.py 等が誤ってパース
+                # するので、別の書式の error にする（判定不能）。
+                errors.append(
+                    f"{rel}: {src} の祖先判定ができない"
+                    f"（git merge-base が異常終了した: {mb.stderr.strip()[:200]}）"
                 )
 
     # --- 報告 ---

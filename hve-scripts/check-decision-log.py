@@ -6,11 +6,15 @@
 
 - **独立ファイル方式（既定）**: `--adr-dir`（既定 `knowledge/adr`）が base コミット時点
   で存在するリポジトリに適用する。base にあった ADR ファイル（README.md を除く）は
-  削除・改名を禁止する。`## ステータス` 節を除いた本文は、行数が同じで同じ位置の行の
-  中だけが変わっている（誤字修正や決定の書き換えが 1 行の中に収まっている）場合のみ
-  警告にする。行の追加・削除（行数が変わる、または行の対応が取れない変更）は、機械で
-  誤字修正と判定できないため error にする。`## ステータス` 見出し自体の数が base と
-  現在で変わっていれば警告する。一覧 `README.md` は base にあった行の削除を禁止し、
+  削除・改名を禁止する。`## ステータス` 節を除いた本文は、base と現在を
+  `difflib.SequenceMatcher` の opcode で比較する。`equal` 以外の区間のうち、行数が
+  変わらない `replace`（誤字修正や決定の書き換えが同じ位置の行の中だけに収まっている）
+  だけを警告にする。`insert`・`delete`、または行数が変わる `replace`（機械で誤字修正と
+  判定できない変更）は error にする。警告・error とも、変わった行はすべて base と現在の
+  対で表示する。`## ステータス` 節自体は、見出しの数が base と現在で変わっていれば警告
+  する。節の中身（ステータス値の行＝節内最初の非空行を除いた部分）が変わっている場合も
+  警告する（supersede の経緯の追記等、正規の運用でも行数が変わり得るため、ここは常に
+  警告にとどめ error にしない）。一覧 `README.md` は base にあった行の削除を禁止し、
   ステータス列以外の変更を警告、ステータス列の変更は許可する。README のステータス列と
   ADR 本体のステータス節の値の食い違いは、base に無い新規 ADR を含む現在の全行について
   検査し、食い違えば警告する。`--adr-dir` 配下にサブディレクトリや `.md` 以外のファイル
@@ -20,27 +24,42 @@
   `## 決定ログ` 見出し（コードフェンスの外）を持つ `.md` を対象にする。base 時点の
   節の内容が、現在の節の先頭に一致する（prefix）ことだけを求める。末尾への追記だけが
   許され、既存行の変更・削除・途中への挿入・節や文書そのものの削除は error になる。
-  1 つの文書に `## 決定ログ` 見出しが 2 つ以上ある（base・現在のいずれか）のも error
-  にする（節の境界が一意に決まらないため）。ディレクトリの改名に伴う、節内のパス参照の
-  置換は許容する。置換ペアは改名の前後のディレクトリの full path だけで、末尾成分だけの
-  ペア（例: `src/v1` → `src/v2` の改名から `v1` → `v2` を作る）は作らない。置換も
-  パス区切り等で挟まれた一致だけに当てる（無関係な文字列への誤爆を避けるため）。
+  1 つの文書に `## 決定ログ` 見出しが 2 つ以上あるとき、base の時点で既に重複していた
+  （節の境界が base の時点からすでに一意に決まらない）なら警告にとどめる。base では
+  重複していなかったのに現在重複している（base に無い新規文書での重複を含む）場合は、
+  新たに生じた重複として error にする。ディレクトリの改名に伴う、節内のパス参照の
+  置換は許容する。置換ペアは改名の前後のディレクトリについて、`/` を含む full path の
+  ペア（例: `knowledge/old` → `knowledge/new`）と、末尾成分だけのペア（例:
+  `old` → `new`）の両方を作る。末尾成分だけのペアは、相対リンクの途中に出てくる
+  ディレクトリ名（例: `](../old/a.md)`）を追従させるために使うが、直後に `/` が続く
+  一致だけに絞って適用し、地の文に現れる無関係な同名の語（例: 「方式 v1 を採用する」の
+  `v1`）への誤爆を避ける。full path のペアはパス区切り等で挟まれた一致だけに当てる。
 
 比較は `git merge-base <head> <base-ref>`（既定 `<base-ref>` = `origin/main`、無ければ
 `main`）を基準に行う。`--head <commit>` を渡すとそのコミットの内容と比較し、渡さない
-ときは作業ツリー（未コミットの変更を含む）と比較する。merge-base が解決できない
-（ref が無い・shallow clone で履歴が足りない等）ときは、違反の有無を判定できないので
-exit 2 にする（違反なしとして通さない）。
+ときは作業ツリー（未コミットの変更を含む）と比較する。作業ツリーと比較するとき、
+`--adr-dir` 配下の一覧やインライン方式の新規文書検出は、追跡済みファイルと
+`.gitignore` の対象外の未追跡ファイルだけを対象にする（`git ls-files --cached --others
+--exclude-standard`）。`.gitignore` 対象の未追跡ファイル（`.DS_Store` 等）はノイズとして
+無視する。merge-base が解決できない（ref が無い・shallow clone で履歴が足りない等）とき
+は、違反の有無を判定できないので exit 2 にする（違反なしとして通さない）。
 
 git の出力は `-c core.quotePath=false -c diff.noprefix=false -c diff.mnemonicPrefix=false`
 で固定し、diff を使う箇所は `--no-ext-diff --no-textconv --no-color --text` を付ける。
 内容の比較は `git diff` の文字列出力ではなく `git show <commit>:<path>`（または作業
 ツリーのバイト列）を読んで行うため、`diff.external` / textconv の設定に影響されない。
-パスの存在確認は `git cat-file -e <commit>:<path>` の終了コードだけで判定し、「パスが
-無い」と「git 自体の失敗（壊れたオブジェクト等）」を混同しない。後者は判定不能として
-`git_failed()` 経由で exit 2 にする（違反なしとして通さない）。
+パスの存在確認は `git ls-tree <commit> -- <path>` の終了コードと出力の有無だけで判定
+し、「パスが無い」と「git 自体の失敗（壊れた commit 参照等）」を混同しない。
+`git cat-file -e` は使わない。対象の blob オブジェクトがツリー上には残っていても物理的
+に欠落・破損している場合でも「存在しない」と誤判定してしまうため（`ls-tree` ならツリー
+の一覧だけで判定でき、blob の内容を読む必要がない）。内容を読む段（`git show`）が失敗
+した場合は、パスの存在確認を別途行い、パスがあるのに読めない（壊れたオブジェクト等）
+ときは判定不能として `git_failed()` 経由で exit 2 にする（違反なしとして通さない）。
 リネーム検出（`-M`）は、インライン方式のディレクトリ改名の許容判定と、独立ファイル
 方式の ADR 改名検出のためだけに使う。
+`## 決定ログ` / `## ステータス` の見出しは `^##[ \t]+<見出し>[ \t]*$`（半角スペース・
+タブのみ）で判定する。全角空白は見出しの区切りとして認めない（見た目は似ているが
+Markdown の見出しとして機能しないため、同じものとして素通りさせない）。
 
 使い方:
   # 既定（origin/main または main の merge-base と、作業ツリーを比較）
@@ -64,6 +83,7 @@ git の出力は `-c core.quotePath=false -c diff.noprefix=false -c diff.mnemoni
 """
 
 import argparse
+import difflib
 import re
 import subprocess
 import sys
@@ -76,8 +96,8 @@ GIT_CONFIG_ARGS = [
 ]
 DIFF_FIXED_ARGS = ["--no-ext-diff", "--no-textconv", "--no-color", "--text"]
 
-RE_DECISION_LOG_HEADING = re.compile(r"^##\s+決定ログ\s*$")
-RE_STATUS_HEADING = re.compile(r"^##\s+ステータス\s*$")
+RE_DECISION_LOG_HEADING = re.compile(r"^##[ \t]+決定ログ[ \t]*$")
+RE_STATUS_HEADING = re.compile(r"^##[ \t]+ステータス[ \t]*$")
 # 節の終端。h1 / h2 が来たらそこまで（h3 以下は節の内側）。
 RE_SECTION_END = re.compile(r"^#{1,2}\s+\S")
 RE_FENCE = re.compile(r"^(`{3,}|~{3,})")
@@ -114,8 +134,8 @@ def repo_root():
 def show_blob(root, commit, rel):
     """`<commit>:<rel>` の内容を返す。パスが無ければ None。
 
-    `git show` が失敗しても、`git cat-file -e` でパス自体の存在を別途確認する。
-    パスがあるのに `git show` が失敗する（壊れたオブジェクト等）場合は、
+    `git show` が失敗しても、`path_exists_at()`（`git ls-tree`）でパス自体の存在を
+    別途確認する。パスがあるのに `git show` が失敗する（壊れたオブジェクト等）場合は、
     「存在しない」に寄せず git_failed() で exit 2 にする。
     """
     proc = subprocess.run(
@@ -147,17 +167,19 @@ def read_current(root, head, rel):
 
 
 def path_exists_at(root, commit, rel):
-    """`<commit>:<rel>` が存在するかを `git cat-file -e` の終了コードだけで判定する。
+    """`<commit>` の親ツリーに対する `git ls-tree <commit> -- <rel>` でパスの有無を判定する。
 
-    （`ls-tree` の出力の有無で判定すると、git 自体の失敗で出力が空になった場合も
-    「存在しない」と誤判定してしまうため使わない。）
+    終了コードが 0 でも出力が空なら「パスが無い」。終了コードが 0 以外なら git 自体の
+    失敗（壊れた commit 参照等）として `git_failed()` 経由で exit 2 にする。
+    `git cat-file -e <commit>:<rel>` は使わない。対象の blob オブジェクトがツリー上には
+    残っていても物理的に欠落・破損している場合でも `cat-file -e` は「存在しない」と
+    判定してしまうため（`ls-tree` はツリーの一覧だけで判定でき、blob の内容を読む必要が
+    ない）。
     """
-    proc = subprocess.run(
-        ["git", *GIT_CONFIG_ARGS, "cat-file", "-e", f"{commit}:{rel}"],
-        cwd=str(root),
-        capture_output=True,
-    )
-    return proc.returncode == 0
+    proc = run_git(root, "ls-tree", commit, "--", rel)
+    if proc.returncode != 0:
+        git_failed(proc, f"ls-tree {commit} -- {rel}")
+    return bool(proc.stdout.strip())
 
 
 def list_md_files(root, commit, directory, recursive):
@@ -172,7 +194,7 @@ def list_md_files(root, commit, directory, recursive):
         # その時点にディレクトリが無いだけなら対象なし。それ以外の失敗は判定不能として止める
         # （空として扱うと、検査を素通りさせてしまう）。
         commit_ok = run_git(root, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}").returncode == 0
-        dir_missing = run_git(root, "cat-file", "-e", f"{commit}:{norm_dir}").returncode != 0
+        dir_missing = not path_exists_at(root, commit, norm_dir)
         if commit_ok and dir_missing:
             return []
         git_failed(proc, f"ls-tree {commit}:{norm_dir}")
@@ -211,16 +233,42 @@ def list_dir_tree_entries(root, commit, directory):
 def list_current_dir_entries(root, head, directory):
     """`directory` 直下のエントリを (name, kind) で返す（`head` 指定時はそのコミット、
     無指定なら作業ツリー）。`kind` は 'blob' か 'tree'。
+
+    作業ツリーの場合は、追跡済みファイルと `.gitignore` の対象外の未追跡ファイルだけを
+    対象にする（`git ls-files --cached --others --exclude-standard`）。ディレクトリを
+    素朴に `iterdir()` すると `.gitignore` 対象の未追跡ファイル（`.DS_Store` 等）まで
+    ノイズとして拾ってしまうため使わない。
     """
     if head is None:
-        path = root / directory
-        if not path.is_dir():
-            return []
-        return sorted(
-            (child.name, "tree" if child.is_dir() else "blob")
-            for child in path.iterdir()
-        )
+        return list_worktree_dir_entries(root, directory)
     return list_dir_tree_entries(root, head, directory)
+
+
+def list_worktree_dir_entries(root, directory):
+    """`directory` 直下のエントリを作業ツリーから (name, kind) で返す。
+    追跡済みファイルと `.gitignore` の対象外の未追跡ファイルだけが対象（`kind` は
+    'blob' か 'tree'。`directory` 配下にサブディレクトリがあれば、そのサブディレクトリ
+    自身を 'tree' として 1 件にまとめる）。
+    """
+    norm_dir = directory.rstrip("/")
+    proc = run_git(root, "ls-files", "--cached", "--others", "--exclude-standard", "--", norm_dir)
+    if proc.returncode != 0:
+        git_failed(proc, f"ls-files {norm_dir}")
+    prefix = norm_dir + "/"
+    entries = {}
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line.startswith(prefix):
+            continue
+        rel = line[len(prefix):]
+        if not rel:
+            continue
+        head_name, _, remainder = rel.partition("/")
+        if remainder:
+            entries[head_name] = "tree"
+        else:
+            entries.setdefault(head_name, "blob")
+    return sorted(entries.items())
 
 
 def run_diff_name_status(root, base_sha, head, paths=None, rename=True, diff_filter=None):
@@ -256,12 +304,14 @@ def file_rename_map(root, base_sha, head, scope_dir):
 def detect_path_renames(root, base_sha, head):
     """base..head（or 作業ツリー）間のファイルリネームからディレクトリリネームを検出する。
 
-    返り値は (旧 full path, 新 full path) のリスト（長い順）。base の行に適用して
-    現在の行と一致すれば「パスリネームのみの変更」と判定できる。置換ペアは改名の
-    前後のディレクトリの full path だけにする。末尾成分だけのペア（例:
-    `src/v1` → `src/v2` の改名から `v1` → `v2` を作る）は作らない。これを作ると、
-    改名と無関係な本文中の同名の文字列（例: 「方式 v1 を採用する」の `v1`）まで
-    書き換えを許容してしまい、決定の書き換えを見逃す。
+    返り値は (旧, 新) のパスのリスト（長い順）。base の行に適用して現在の行と一致
+    すれば「パスリネームのみの変更」と判定できる。置換ペアは改名の前後のディレクトリ
+    について、`/` を含む full path のペア（例: `knowledge/old` → `knowledge/new`）と、
+    末尾成分だけのペア（例: `old` → `new`）の両方を作る。末尾成分だけのペアは、相対
+    リンクの途中に出てくるディレクトリ名（例: `](../old/a.md)`）を追従させるために
+    必要だが、`apply_renames()` 側で「直後に `/` が続く一致だけ」に絞って適用し、
+    地の文に現れる無関係な同名の語（例: 「方式 v1 を採用する」の `v1`）への誤爆を
+    避ける。full path のペアはパス区切り等で挟まれた一致だけに当てる。
     リポジトリ全体を対象にする（リンク先が --dir の外にあることがあるため）。
     """
     lines = run_diff_name_status(root, base_sha, head, paths=None, rename=True, diff_filter="R")
@@ -275,6 +325,9 @@ def detect_path_renames(root, base_sha, head):
         new_dir = str(Path(parts[2]).parent)
         if old_dir != new_dir:
             dir_renames.add((old_dir, new_dir))
+            old_leaf, new_leaf = Path(old_dir).name, Path(new_dir).name
+            if old_leaf and new_leaf and old_leaf != new_leaf:
+                dir_renames.add((old_leaf, new_leaf))
 
     subs = sorted(dir_renames, key=lambda p: len(p[0]), reverse=True)
     return subs
@@ -286,9 +339,16 @@ _NOT_BOUNDARY_CHARS = r"[\w\-.]"
 
 
 def _path_boundary_pattern(token):
-    return re.compile(
-        rf"(?<!{_NOT_BOUNDARY_CHARS}){re.escape(token)}(?!{_NOT_BOUNDARY_CHARS})"
-    )
+    """`/` を含む full path のトークンは前後とも境界で挟まれた一致だけに当てる。
+    `/` を含まない単一成分のトークン（トップレベルのディレクトリ名・末尾成分）は、
+    直後に `/` が続く一致だけに絞る。地の文中の単語（例: 「正本は docs」の `docs`、
+    「方式 v1 を採用する」の `v1`）への誤爆を避けるため。
+    """
+    if "/" in token:
+        return re.compile(
+            rf"(?<!{_NOT_BOUNDARY_CHARS}){re.escape(token)}(?!{_NOT_BOUNDARY_CHARS})"
+        )
+    return re.compile(rf"(?<!{_NOT_BOUNDARY_CHARS}){re.escape(token)}(?=/)")
 
 
 def apply_renames(line, renames):
@@ -387,14 +447,50 @@ def strip_section(text, heading_re):
     return result
 
 
-def first_diff(base_lines, current_lines):
-    """最初に異なる行の (index, base の行 or None, 現在の行 or None) を返す。無ければ None。"""
+def format_line_pairs(base_lines, current_lines):
+    """変わった行をすべて base と現在の対で表示する（対応するものが無い側は
+    `(行が無い)` と表示する）。
+    """
+    rows = []
     for i in range(max(len(base_lines), len(current_lines))):
         b = base_lines[i] if i < len(base_lines) else None
         c = current_lines[i] if i < len(current_lines) else None
-        if b != c:
-            return i, b, c
-    return None
+        rows.append(
+            f"      - base:  {b if b is not None else '(行が無い)'}\n"
+            f"      + 現在:  {c if c is not None else '(行が無い)'}"
+        )
+    return "\n".join(rows)
+
+
+def diff_rest_outside_status(rel, base_rest, current_rest):
+    """`## ステータス` 節の外の本文（行リスト）を `difflib.SequenceMatcher` の opcode
+    で比較する。`equal` 以外の区間のうち、行数が変わらない `replace`（誤字修正や決定の
+    書き換えが同じ位置の行の中だけに収まっている）は警告、`insert`・`delete`・行数が
+    変わる `replace` は、機械で誤字修正と判定できないため error にする。警告・error
+    とも、変わった行はすべて base と現在の対で表示する。
+    """
+    matcher = difflib.SequenceMatcher(None, base_rest, current_rest, autojunk=False)
+    errors = []
+    warnings = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        base_chunk = base_rest[i1:i2]
+        current_chunk = current_rest[j1:j2]
+        block = format_line_pairs(base_chunk, current_chunk)
+        if tag == "replace" and (i2 - i1) == (j2 - j1):
+            warnings.append(
+                f"{rel}: `## ステータス` 節の外で内容が変わっている（誤字修正に限る）。"
+                f"base の {i1 + 1} 行目相当\n{block}"
+            )
+        else:
+            errors.append(
+                f"{rel}: `## ステータス` 節の外で行の追加・削除がある"
+                f"（base の {i1 + 1} 行目相当、base {i2 - i1} 行 → 現在 {j2 - j1} 行）。"
+                "行数が変わる変更・対応が取れない変更は機械では誤字修正と判定できないため"
+                f"禁止する\n{block}"
+            )
+    return errors, warnings
 
 
 def extract_status_value(text):
@@ -408,6 +504,20 @@ def extract_status_value(text):
             continue
         return re.split(r"\s+—\s+", line, maxsplit=1)[0].strip()
     return None
+
+
+def status_section_lines_excluding_value(text):
+    """`## ステータス` 節の行のうち、ステータス値の行（節内の最初の非空行）を除いた
+    残りの行を返す（行末空白は落とす）。節が無ければ None。
+    """
+    section = extract_section(text, RE_STATUS_HEADING)
+    if section is None:
+        return None
+    lines = [line for _, line in section]
+    value_idx = next((i for i, line in enumerate(lines) if line.strip()), None)
+    if value_idx is None:
+        return lines
+    return lines[:value_idx] + lines[value_idx + 1:]
 
 
 def parse_tables(text):
@@ -476,6 +586,28 @@ def compare_prefix(rel, base_log, current_log, renames, errors):
             return
 
 
+def list_worktree_md_files(root, directory):
+    """作業ツリーの `directory` 配下の `.md` を再帰的に列挙する。追跡済みファイルと
+    `.gitignore` の対象外の未追跡ファイルだけが対象。
+    """
+    norm_dir = directory.rstrip("/")
+    proc = run_git(root, "ls-files", "--cached", "--others", "--exclude-standard", "--", norm_dir)
+    if proc.returncode != 0:
+        git_failed(proc, f"ls-files {norm_dir}")
+    return sorted(
+        line.strip() for line in proc.stdout.splitlines() if line.strip().endswith(".md")
+    )
+
+
+def list_current_md_files(root, head, directory):
+    """現在（`head` 指定時はそのコミット、無指定なら作業ツリー）の `directory` 配下の
+    `.md` を再帰的に列挙する。
+    """
+    if head is None:
+        return list_worktree_md_files(root, directory)
+    return list_md_files(root, head, directory, recursive=True)
+
+
 def check_inline_method(root, base_sha, head, dir_, adr_dir, path_renames):
     base_files = list_md_files(root, base_sha, dir_, recursive=True)
     adr_prefix = adr_dir.rstrip("/") + "/"
@@ -484,7 +616,9 @@ def check_inline_method(root, base_sha, head, dir_, adr_dir, path_renames):
     rename_map = file_rename_map(root, base_sha, head, dir_)
 
     errors = []
+    warnings = []
     checked = 0
+    handled_current_rels = set()
     for rel in base_files:
         base_text = show_blob(root, base_sha, rel)
         if base_text is None:
@@ -493,15 +627,17 @@ def check_inline_method(root, base_sha, head, dir_, adr_dir, path_renames):
         if base_log is None:
             continue  # base に決定ログが無い＝対象外
 
-        if count_headings(base_text, RE_DECISION_LOG_HEADING) >= 2:
-            errors.append(
+        # G19: `## 決定ログ` 見出しの重複は、base の時点で既に重複していたなら警告に
+        # とどめる（節の境界が base の時点からすでに一意に決まらない、既知の状態）。
+        base_dup = count_headings(base_text, RE_DECISION_LOG_HEADING) >= 2
+        if base_dup:
+            warnings.append(
                 f"{rel}: `## 決定ログ` 見出しが 2 つ以上ある（base）。"
-                "節の境界が一意に決まらないため、1 文書に 1 節だけ許可する"
+                "節の境界が base の時点からすでに一意に決まらない"
             )
-            checked += 1
-            continue
 
         current_rel = rename_map.get(rel, rel)
+        handled_current_rels.add(current_rel)
         current_text = read_current(root, head, current_rel)
         if current_text is None:
             errors.append(
@@ -520,9 +656,13 @@ def check_inline_method(root, base_sha, head, dir_, adr_dir, path_renames):
             checked += 1
             continue
 
-        if count_headings(current_text, RE_DECISION_LOG_HEADING) >= 2:
+        # base では重複していなかったのに現在重複していれば、新たに生じた重複として
+        # error にする。base で既に重複していた場合は上の警告のままにする（無関係な
+        # 変更のたびにエラー化すると、既存の重複を解消するまで何もできなくなるため）。
+        current_dup = count_headings(current_text, RE_DECISION_LOG_HEADING) >= 2
+        if current_dup and not base_dup:
             errors.append(
-                f"{current_rel}: `## 決定ログ` 見出しが 2 つ以上ある。"
+                f"{current_rel}: `## 決定ログ` 見出しが 2 つ以上ある（新たに重複した）。"
                 "節の境界が一意に決まらないため、1 文書に 1 節だけ許可する"
             )
             checked += 1
@@ -531,7 +671,26 @@ def check_inline_method(root, base_sha, head, dir_, adr_dir, path_renames):
         checked += 1
         compare_prefix(current_rel, base_log, current_log, path_renames, errors)
 
-    return checked, errors
+    # G19: base に無い新規文書（リネーム先も含め、上のループで扱っていない文書）で
+    # `## 決定ログ` 見出しが重複していれば error にする。新規文書自体は append-only
+    # 検査の対象外だが、見出しの重複は新規文書でも許可しない。
+    current_files = [
+        f for f in list_current_md_files(root, head, dir_)
+        if not f.startswith(adr_prefix) and f != adr_dir
+    ]
+    for rel in current_files:
+        if rel in handled_current_rels:
+            continue
+        text = read_current(root, head, rel)
+        if text is None:
+            continue
+        if count_headings(text, RE_DECISION_LOG_HEADING) >= 2:
+            errors.append(
+                f"{rel}: `## 決定ログ` 見出しが 2 つ以上ある（新規文書）。"
+                "節の境界が一意に決まらないため、1 文書に 1 節だけ許可する"
+            )
+
+    return checked, errors, warnings
 
 
 # --- 独立ファイル方式 ----------------------------------------------------------
@@ -582,24 +741,28 @@ def check_adr_method(root, base_sha, head, adr_dir):
         base_rest = strip_section(base_text, RE_STATUS_HEADING)
         current_rest = strip_section(current_text, RE_STATUS_HEADING)
         if base_rest != current_rest:
-            diff = first_diff(base_rest, current_rest)
-            idx, b, c = diff
-            if len(base_rest) != len(current_rest):
-                errors.append(
-                    f"{rel}: `## ステータス` 節の外で行の追加・削除がある"
-                    f"（base は {len(base_rest)} 行 / 現在は {len(current_rest)} 行）。"
-                    f"{idx + 1} 行目相当。"
-                    "行数が変わる変更は機械では誤字修正と判定できないため禁止する\n"
-                    f"      - base:  {b if b is not None else '(行が無い)'}\n"
-                    f"      + 現在:  {c if c is not None else '(行が無い)'}"
-                )
+            rest_errors, rest_warnings = diff_rest_outside_status(rel, base_rest, current_rest)
+            if rest_errors:
+                errors.extend(rest_errors)
+                warnings.extend(rest_warnings)
                 checked += 1
                 continue
+            warnings.extend(rest_warnings)
+
+        # G3: `## ステータス` 節自体も、ステータス値の行（節内最初の非空行）以外の
+        # 追加・削除・変更は警告にする（supersede の経緯の追記等、正規の運用でも
+        # 行数が変わり得るため、ここは error にしない）。
+        base_status_rest = status_section_lines_excluding_value(base_text)
+        current_status_rest = status_section_lines_excluding_value(current_text)
+        if (
+            base_status_rest is not None
+            and current_status_rest is not None
+            and base_status_rest != current_status_rest
+        ):
             warnings.append(
-                f"{rel}: `## ステータス` 節の外で内容が変わっている（誤字修正に限る）。"
-                f"{idx + 1} 行目相当\n"
-                f"      - base:  {b if b is not None else '(行が無い)'}\n"
-                f"      + 現在:  {c if c is not None else '(行が無い)'}"
+                f"{rel}: `## ステータス` 節がステータス値の行以外で変わっている"
+                "（supersede の経緯の追記等は許容する）\n"
+                f"{format_line_pairs(base_status_rest, current_status_rest)}"
             )
 
         status_by_number[number] = extract_status_value(current_text)
@@ -777,8 +940,11 @@ def main(argv):
     warnings = []
 
     path_renames = detect_path_renames(root, base_sha, head)
-    inline_checked, inline_errors = check_inline_method(root, base_sha, head, dir_, adr_dir, path_renames)
+    inline_checked, inline_errors, inline_warnings = check_inline_method(
+        root, base_sha, head, dir_, adr_dir, path_renames
+    )
     errors.extend(inline_errors)
+    warnings.extend(inline_warnings)
 
     adr_checked = 0
     if path_exists_at(root, base_sha, adr_dir):

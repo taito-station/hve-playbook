@@ -112,6 +112,9 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
 
 ### 検査スクリプト
 
+これらの検査の目的は、善意の誤操作（うっかりした書き換え・蒸留漏れ・リポジトリの破損）の検出であり、悪意ある改ざんの防御ではない。悪意のある作成者は同じ PR で検査スクリプトや CI の設定を書き換えられ、stale 検査も本物のコミットの sha を書けば黙らせられる。改ざんへの備えは PR のレビューと branch protection に任せる（ADR 0014）。
+
+
 | スクリプト | 役割 | 終了コード |
 |---|---|---|
 | `check-knowledge.py` | frontmatter の必須項目、sources の実在（リポジトリ相対の正規形・大文字小文字まで一致）、stale 判定、解消待ちの報告 | 0 正常 / 1 違反 / 2 判定不能 |
@@ -140,7 +143,9 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
     with:
       fetch-depth: 0
   - run: python3 .claude/scripts/hve/check-knowledge.py
-  - run: python3 .claude/scripts/hve/check-decision-log.py --base origin/${{ github.base_ref }} --head HEAD
+  - run: python3 .claude/scripts/hve/check-decision-log.py --base "origin/$BASE_REF" --head HEAD
+    env:
+      BASE_REF: ${{ github.base_ref }}
   ```
 
   `knowledge/` がまだ無いリポジトリでは、どちらの検査も対象 0 本で通る
@@ -156,6 +161,8 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
     }
   }
   ```
+
+  `check-knowledge.py` に引数（`--required`・`--allow-empty-sources-with-decision-log` など）を渡している導入先は、SessionStart の hook にも同じ引数を渡す（例: `bash "$CLAUDE_PROJECT_DIR"/.claude/scripts/hve/hooks/session-stale-check.sh --required status,kind,sources,distilled_from_sha,updated --allow-empty-sources-with-decision-log`）
 
 SessionStart の hook は全文書の履歴を遡るので、大きなリポジトリでは数十秒かかることがある。セッションの開始が遅くなるなら SessionStart には配線せず、CI と pre-push に任せる。
 

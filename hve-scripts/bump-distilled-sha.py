@@ -74,9 +74,12 @@ source まで変えて squash すると、手元でもすぐ STALE になる（�
   0: 正常（bump 完了、または STALE 0 件、または `--follow-rewritten` で追従が要る文書が無い）
   1: checker の他の error が残っている（bump はしたうえで報告する）、対象の不正
      （指定ファイルが無い・frontmatter に distilled_from_sha の行が無い/複数ある）、または
-     `--follow-rewritten` で追従できない文書が 1 件でもある
-  2: 引数不正、checker が判定不能（exit 2）、または git コマンドの失敗。fail-closed のため
-     何も書き込まない
+     `--follow-rewritten` で追従できない文書が 1 件でもある（祖先判定・旧 sha の解決・
+     source 差分の確認に使う git コマンドが失敗した場合も、追従しない文書として
+     ここに数える＝fail-closed）
+  2: 引数不正、checker が判定不能（exit 2）、`--all-stale` が checker の出力から得た
+     文書パスを root の外と解決した（G11）、または `--follow-rewritten` 自身の
+     `git diff --name-only` の失敗。いずれも何も書き込まない
 """
 
 import importlib.util
@@ -116,7 +119,10 @@ RE_STATUS = re.compile(
 )
 # checker の STALE 行から対象文書を拾う。書式は check-knowledge.py のパース契約どおり
 #   ✗ knowledge/x.md: STALE ← docs-original/... が distilled_from_sha(abc1234) より後に更新されている
-RE_STALE_LINE = re.compile(r"^✗\s+(\S+?):\s+STALE\s+←\s+(\S+)")
+# 文書・source のどちらも `(.+?)` で拾う（空白を含むパスのため。`\S+?` だと空白で
+# 分断されて拾えず、--all-stale の対象から黙って漏れる。A-X1）。source 側は固定の
+# 区切り文言「 が distilled_from_sha(」を手がかりに非貪欲マッチを止める。
+RE_STALE_LINE = re.compile(r"^✗\s+(.+?):\s+STALE\s+←\s+(.+?)\s+が\s+distilled_from_sha\(")
 # 末尾の集計行（`✗ 3 件の不整合（警告 1 件 / 解消待ち 0 件）`）。個別の error と区別する。
 RE_SUMMARY_LINE = re.compile(r"^✗\s+\d+\s*件の不整合")
 # `--follow-rewritten` で git に渡す前に検証する sha の形式（F3）。壊れた・偽装された
@@ -179,6 +185,22 @@ def stale_targets(
         elif stripped.startswith("✗ ") and not RE_SUMMARY_LINE.match(stripped):
             others = True  # STALE 以外の error（bump では消えない）
     return found, others, proc.returncode, output
+
+
+def validate_stale_targets_within_root(root: Path, reasons: "dict[str, set[str]]") -> "str | None":
+    """`--all-stale` が checker の出力（STALE 行）をパースして得た文書パスが、root の中の
+    ファイルに解決されることを確かめる（G11）。解決できないキーがあれば最初の 1 件を
+    返す（無ければ None）。
+
+    通常の checker は `path.relative_to(root)` で得た相対パスしか出力しないので、健全な
+    動作では常に root の中に解決される。これはパース結果を無条件に信用しない防御。
+    """
+    for rel in reasons:
+        try:
+            (root / rel).resolve().relative_to(root.resolve())
+        except ValueError:
+            return rel
+    return None
 
 
 def frontmatter_span(text: str) -> "tuple[int, int] | None":
@@ -309,6 +331,7 @@ def run_follow_rewritten(root: Path, base_ref: str, checker_args: "list[str]", d
     # 対象候補: diff に出るファイルのうち、checker の走査対象（--dir・--exclude）に入り、
     # frontmatter を持ち distilled_from_sha が空でない文書。
     candidates: "list[tuple[str, Path, str, re.Match[str], str | None, list[str]]]" = []
+    failed = 0
     for rel in sorted({line.strip() for line in diff_proc.stdout.splitlines() if line.strip()}):
         if not rel.endswith(".md"):
             continue
@@ -325,13 +348,18 @@ def run_follow_rewritten(root: Path, base_ref: str, checker_args: "list[str]", d
         found = find_distilled(text)
         if not found or not found[0].group(2):
             continue
+        if len(found) > 1:
+            # 通常モードと揃える（G11）。checker は最後の行、bump は最初の行を見るので、
+            # 放置すると追従しても STALE が消えない無言のループになる。
+            print(f"✗ {rel}: frontmatter に distilled_from_sha が {len(found)} 行ある", file=sys.stderr)
+            failed += 1
+            continue
         status = find_status(text)
         sources = checker_mod.parse_frontmatter(text).get("sources", [])
         candidates.append((rel, path, text, found[0], status, sources))
 
     head_sha = head_sha_full(root)
     follow_needed = 0
-    failed = 0
     skipped_conflicts: "list[str]" = []
 
     for rel, path, text, matched, status, sources in candidates:
@@ -474,6 +502,15 @@ def main(argv: "list[str]") -> int:
             print(
                 "checker が判定不能（exit 2）で終了した。先にそちらを直す:\n"
                 + checker_output.rstrip(),
+                file=sys.stderr,
+            )
+            return 2
+        escaping = validate_stale_targets_within_root(root, reasons)
+        if escaping is not None:
+            # G11: checker の出力をパースした文字列をそのままパスに使うため、
+            # root の外を指す値を信用して読み書きしない（fail-closed）。
+            print(
+                f"✗ {escaping}: checker の出力から得た文書パスが root の外を指している",
                 file=sys.stderr,
             )
             return 2

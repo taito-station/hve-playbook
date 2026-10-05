@@ -409,15 +409,80 @@ def test_renamed_heading_is_error():
         shutil.rmtree(repo)
 
 
-def test_duplicate_decision_log_heading_in_base_is_error():
+def test_fullwidth_space_in_heading_is_not_recognized_as_decision_log():
+    """G14: `## 決定ログ` 見出しの区切りは半角スペース・タブだけ。全角空白に変わると
+    見出しとして認識されず（見た目は似ているが Markdown の見出しとして機能しない）、
+    節が消えたものとして扱う。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/a.md", "本文。\n" + LOG_HEADER + ENTRY_A)
+        commit_baseline(repo)
+        text = read_doc(repo, "knowledge/a.md")
+        overwrite(repo, "knowledge/a.md", text.replace("## 決定ログ", "##　決定ログ"))
+        commit_all(repo, "見出しの区切りを全角空白にする")
+        code, out = check(repo)
+        assert code == 1, f"全角空白の見出しをそのまま通してしまっている:\n{out}"
+        assert "決定ログ節ごと消えている" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_duplicate_decision_log_heading_in_base_unrelated_change_passes_with_warning():
+    """G19: base で既に `## 決定ログ` 見出しが重複していた場合、無関係な変更だけなら
+    通る（base の重複は警告にとどめ、新たなエラーとして扱わない）。"""
     repo = new_repo()
     try:
         duplicated = "本文。\n" + LOG_HEADER + ENTRY_A + "\n## 決定ログ\n\n" + ENTRY_B
         write_doc(repo, "knowledge/a.md", duplicated)
         commit_baseline(repo)
+        text = read_doc(repo, "knowledge/a.md")
+        overwrite(repo, "knowledge/a.md", text.replace("本文。", "本文（改稿）。"))
+        commit_all(repo, "本文だけ改稿する（重複見出しはそのまま）")
         code, out = check(repo)
-        assert code == 1, f"base 側の `## 決定ログ` 見出しの重複を検出できていない:\n{out}"
-        assert "knowledge/a.md" in out, out
+        assert code == 0, f"base で既に重複していた見出しを新規エラーとして扱っている:\n{out}"
+        assert "⚠" in out and "knowledge/a.md" in out, f"base の重複を警告していない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_duplicate_decision_log_heading_in_base_resolved_in_current_passes_with_warning():
+    """G19: base で重複していた `## 決定ログ` 見出しが、現在の変更で単一に解消されて
+    いれば通る（base の重複は警告のみで、exit code に影響しない）。
+
+    `extract_section()` は見出しが複数あると最後の出現を基準に節を切り出すため、ここ
+    では「見出しがうっかり連続して 2 回書かれている（間に本来のエントリが無い）」形の
+    重複で検証する。これなら余分な見出し行を取り除くだけで、節の内容自体は base と
+    現在で変わらない。
+    """
+    repo = new_repo()
+    try:
+        comment = "<!-- この節は append-only です。既存エントリの変更・削除は検出されます。 -->\n\n"
+        duplicated = "本文。\n\n---\n\n## 決定ログ\n\n## 決定ログ\n\n" + comment + ENTRY_A
+        write_doc(repo, "knowledge/a.md", duplicated)
+        commit_baseline(repo)
+        resolved = "本文。\n\n---\n\n## 決定ログ\n\n" + comment + ENTRY_A
+        write_doc(repo, "knowledge/a.md", resolved)
+        commit_all(repo, "うっかり連続していた見出しを一つに統合する")
+        code, out = check(repo)
+        assert code == 0, f"base の重複が現在で解消されたのに通らない:\n{out}"
+        assert "⚠" in out, f"base の重複を警告していない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_new_document_with_duplicate_decision_log_heading_is_error():
+    """G19: base に無い新規文書で `## 決定ログ` 見出しが重複していれば error にする
+    （新規文書は append-only 検査の対象外だが、見出しの重複は新規文書でも許可しない）。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/a.md", "本文。\n" + LOG_HEADER + ENTRY_A)
+        commit_baseline(repo)
+        duplicated = "新規文書。\n" + LOG_HEADER + ENTRY_A + "\n## 決定ログ\n\n" + ENTRY_B
+        write_doc(repo, "knowledge/new.md", duplicated)
+        commit_all(repo, "重複した見出しを持つ新規文書を追加する")
+        code, out = check(repo)
+        assert code == 1, f"新規文書の見出し重複を検出できていない:\n{out}"
+        assert "knowledge/new.md" in out, out
     finally:
         shutil.rmtree(repo)
 
@@ -504,6 +569,123 @@ def test_dir_rename_does_not_allow_suffix_only_substring_change():
         code, out = check(repo)
         assert code == 1, f"ディレクトリ改名を理由に本文の書き換えまで許容している:\n{out}"
         assert "既存エントリが変更されている" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_file_move_top_level_dir_rename_does_not_allow_prose_substitution():
+    """G2: 単一ファイルの移動由来の末尾成分だけのトークン（`/` を含まない）は、直後に
+    `/` が続かない地の文の一致（例: 「正本は docs」）には当てない。"""
+    repo = new_repo()
+    try:
+        (repo / "docs").mkdir(parents=True)
+        (repo / "docs/x.md").write_text("# x\n", encoding="utf-8")
+        entry = (
+            "### 正本の選定\n\n"
+            "- 決定: 正本は docs とする\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/a.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        run_git(repo, "mv", "docs/x.md", "knowledge/x.md")
+        text = read_doc(repo, "knowledge/a.md")
+        overwrite(repo, "knowledge/a.md", text.replace("正本は docs とする", "正本は knowledge とする"))
+        commit_all(repo, "docs/x.md を knowledge/x.md へ移動し、地の文も書き換える")
+
+        code, out = check(repo)
+        assert code == 1, f"単一ファイル移動由来のトークンで地の文の書き換えまで通してしまっている:\n{out}"
+        assert "既存エントリが変更されている" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_dir_rename_with_spaces_does_not_allow_prose_substitution():
+    """G2: ディレクトリ名に空白を含む改名でも、地の文の書き換えまでは許容しない
+    （空白を含むトークンでも境界判定・エスケープが正しく働くことの確認）。"""
+    repo = new_repo()
+    try:
+        (repo / "docs/raw data").mkdir(parents=True)
+        (repo / "docs/raw data/note.md").write_text("# note\n", encoding="utf-8")
+        entry = (
+            "### 資料の置き場所\n\n"
+            "- 決定: 資料は raw data に置く\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/a.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        run_git(repo, "mv", "docs/raw data", "docs/clean data")
+        text = read_doc(repo, "knowledge/a.md")
+        overwrite(repo, "knowledge/a.md", text.replace("資料は raw data に置く", "資料は clean data に置く"))
+        commit_all(repo, "docs/raw data → docs/clean data のリネームと同時に決定を書き換える")
+
+        code, out = check(repo)
+        assert code == 1, f"空白を含むディレクトリ名への改名を理由に地の文の書き換えまで許容している:\n{out}"
+        assert "既存エントリが変更されている" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_relative_link_leaf_rename_follows_via_suffix_pair():
+    """G2: ディレクトリの末尾成分だけのリネームでも、相対リンクの途中に出てくる
+    ディレクトリ名（末尾成分）を追従させる（復活させた末尾成分ペア）。"""
+    repo = new_repo()
+    try:
+        (repo / "assets/original-docs").mkdir(parents=True)
+        (repo / "assets/original-docs/a.md").write_text("# a\n", encoding="utf-8")
+        entry = (
+            "### 資料リンクのテスト\n\n"
+            "- 決定: [資料](../original-docs/a.md) を参照\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/b.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        run_git(repo, "mv", "assets/original-docs", "assets/docs-original")
+        text = read_doc(repo, "knowledge/b.md")
+        overwrite(repo, "knowledge/b.md", text.replace("../original-docs/a.md", "../docs-original/a.md"))
+        commit_all(repo, "assets/original-docs → assets/docs-original へリンクを追従させる")
+
+        code, out = check(repo)
+        assert code == 0, f"末尾成分のリネームに伴う相対リンクの追従が通らない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_full_path_after_double_dash_follows_rename():
+    """G2 回帰: `-- docs/original-docs` のような記法内の full path も、ディレクトリ
+    改名に正しく追従する（末尾成分ペアを復活させても full path 側の挙動は変えていない
+    ことの確認）。"""
+    repo = new_repo()
+    try:
+        (repo / "docs/original-docs").mkdir(parents=True)
+        (repo / "docs/original-docs/a.md").write_text("# a\n", encoding="utf-8")
+        entry = (
+            "### 移動コマンドの記録\n\n"
+            "- 決定: `git mv -- docs/original-docs docs/archived-docs` で移動する\n"
+            "- 理由: テスト用の理由\n"
+        )
+        write_doc(repo, "knowledge/c.md", "本文。\n" + LOG_HEADER + entry)
+        commit_baseline(repo)
+        land_on_main(repo)
+
+        run_git(repo, "mv", "docs/original-docs", "docs/archived-docs")
+        text = read_doc(repo, "knowledge/c.md")
+        overwrite(
+            repo, "knowledge/c.md",
+            text.replace(
+                "docs/original-docs docs/archived-docs",
+                "docs/archived-docs docs/archived-docs",
+            ),
+        )
+        commit_all(repo, "リネームに合わせて記述を追従させる")
+
+        code, out = check(repo)
+        assert code == 0, f"-- を伴う full path への追従が通らない:\n{out}"
     finally:
         shutil.rmtree(repo)
 
@@ -686,6 +868,51 @@ def test_adr_body_line_removed_outside_status_is_error():
         shutil.rmtree(repo)
 
 
+def test_adr_body_two_separate_same_position_replacements_are_both_warned():
+    """G1: 別々の位置で行数が変わらない置き換えが複数あれば、両方を警告として表示する
+    （difflib の opcode 単位で、equal 以外の区間すべてを検査する）。"""
+    repo = new_repo()
+    try:
+        write_doc(
+            repo, "knowledge/adr/0001-first.md",
+            adr_text("Accepted — 2026-01-01", body="行1。\n行2。\n行3。\n"),
+        )
+        commit_baseline(repo)
+        overwrite(
+            repo, "knowledge/adr/0001-first.md",
+            adr_text("Accepted — 2026-01-01", body="行1改。\n行2。\n行3改。\n"),
+        )
+        commit_all(repo, "2 か所を同じ行数で置き換える")
+        code, out = check(repo)
+        assert code == 0, f"行数が変わらない複数置換が exit 0 にならない:\n{out}"
+        assert "行1。" in out and "行1改。" in out, f"1 か所目の差分が表示されていない:\n{out}"
+        assert "行3。" in out and "行3改。" in out, f"2 か所目の差分が表示されていない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_body_delete_and_insert_elsewhere_same_total_length_is_error():
+    """G1: 総行数が同じでも、1 行削除＋別の位置への 1 行追加（対応が取れない変更）は
+    difflib では delete/insert の opcode になり error にする。"""
+    repo = new_repo()
+    try:
+        write_doc(
+            repo, "knowledge/adr/0001-first.md",
+            adr_text("Accepted — 2026-01-01", body="行1。\n行2。\n行3。\n"),
+        )
+        commit_baseline(repo)
+        overwrite(
+            repo, "knowledge/adr/0001-first.md",
+            adr_text("Accepted — 2026-01-01", body="行2。\n行3。\n行4追加。\n"),
+        )
+        commit_all(repo, "先頭を削除し末尾に別の行を追加する")
+        code, out = check(repo)
+        assert code == 1, f"総行数が同じ削除＋挿入を見逃している:\n{out}"
+        assert "行の追加・削除" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_adr_deleted_is_error():
     repo = new_repo()
     try:
@@ -732,6 +959,43 @@ def test_adr_status_heading_count_change_is_warn():
         shutil.rmtree(repo)
 
 
+def test_adr_status_section_note_added_is_warn_not_error():
+    """G3: `## ステータス` 節内のステータス値の行（節内最初の非空行）以外への追記は
+    警告にとどめる（supersede の経緯等の追記を許容するため error にしない）。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        overwrite(
+            repo, "knowledge/adr/0001-first.md",
+            adr_text("Accepted — 2026-01-01\n\n- 補足: 運用開始後に確認済み"),
+        )
+        commit_all(repo, "ステータス節に補足を追記する")
+        code, out = check(repo)
+        assert code == 0, f"ステータス節内の追記が error になっている:\n{out}"
+        assert "⚠" in out and "ステータス" in out, f"ステータス節の変化を警告していない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_status_section_note_removed_is_warn_not_error():
+    """G3: `## ステータス` 節内のステータス値の行以外の削除も警告にとどめる。"""
+    repo = new_repo()
+    try:
+        write_doc(
+            repo, "knowledge/adr/0001-first.md",
+            adr_text("Accepted — 2026-01-01\n\n- 補足: 運用開始後に確認済み"),
+        )
+        commit_baseline(repo)
+        overwrite(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_all(repo, "ステータス節の補足を削除する")
+        code, out = check(repo)
+        assert code == 0, f"ステータス節内の削除が error になっている:\n{out}"
+        assert "⚠" in out and "ステータス" in out, f"ステータス節の変化を警告していない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_adr_dir_subdirectory_is_warn():
     """F9: `--adr-dir` 配下にサブディレクトリがあれば、検査対象外になる旨を警告する。"""
     repo = new_repo()
@@ -773,6 +1037,23 @@ def test_adr_dir_irregular_file_deleted_is_warn():
         code, out = check(repo)
         assert code == 0, out
         assert "notes.txt" in out, f"対象外ファイルの削除を警告していない:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_gitignored_untracked_file_in_adr_dir_is_not_warned():
+    """G16: 作業ツリーと比べるとき、`--adr-dir` 配下の一覧は追跡済みファイルと
+    `.gitignore` の対象外の未追跡ファイルだけにする。`.gitignore` 対象の未追跡ファイル
+    （`.DS_Store` 等）はノイズとして警告しない。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        write_doc(repo, ".gitignore", ".DS_Store\n")
+        commit_baseline(repo)
+        (repo / "knowledge/adr/.DS_Store").write_text("ds\n", encoding="utf-8")
+        code, out = check(repo)
+        assert code == 0, out
+        assert ".DS_Store" not in out, f".gitignore 対象のファイルを警告している:\n{out}"
     finally:
         shutil.rmtree(repo)
 
@@ -945,6 +1226,56 @@ def test_corrupt_blob_is_not_mistaken_for_missing_path_exits_2():
 
         code, out = check(repo)
         assert code == 2, f"壊れたオブジェクトを「存在しない」と誤判定している:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def _delete_blob_object(repo, blob_sha):
+    obj_path = repo / ".git" / "objects" / blob_sha[:2] / blob_sha[2:]
+    assert obj_path.is_file(), f"loose object が見つからない: {obj_path}"
+    obj_path.unlink()
+
+
+def test_deleted_blob_object_in_adr_method_exits_2():
+    """G12: base の ADR の blob オブジェクトが（ツリーには残るが）物理的に無くなって
+    いる場合、`git ls-tree` でパス自体の存在は確認できるので「存在しない」と誤判定
+    せず、内容読み取りの失敗を判定不能として exit 2 にする
+    （修正前は独立ファイル方式が AttributeError で落ちていた）。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        base_sha = run_git(repo, "rev-parse", "HEAD")
+
+        write_doc(repo, "knowledge/adr/0002-second.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "ADR を追加する")
+
+        blob_sha = run_git(repo, "rev-parse", f"{base_sha}:knowledge/adr/0001-first.md")
+        _delete_blob_object(repo, blob_sha)
+
+        code, out = check(repo)
+        assert code == 2, f"blob オブジェクトの欠落を「存在しない」と誤判定している:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_deleted_blob_object_in_inline_method_exits_2():
+    """G12: インライン方式でも、base の blob オブジェクトの物理的な欠落は exit 2 に
+    する（修正前は「文書が存在しない」と誤判定して黒く通過していた）。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/a.md", "本文。\n" + LOG_HEADER + ENTRY_A)
+        commit_baseline(repo)
+        base_sha = run_git(repo, "rev-parse", "HEAD")
+
+        write_doc(repo, "knowledge/other.md", "別の本文。\n")
+        commit_all(repo, "別の文書を追加する")
+
+        blob_sha = run_git(repo, "rev-parse", f"{base_sha}:knowledge/a.md")
+        _delete_blob_object(repo, blob_sha)
+
+        code, out = check(repo)
+        assert code == 2, f"blob オブジェクトの欠落を「存在しない」と誤判定している:\n{out}"
     finally:
         shutil.rmtree(repo)
 

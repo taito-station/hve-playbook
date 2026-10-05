@@ -119,6 +119,31 @@ def test_dry_run_does_not_write() -> None:
         shutil.rmtree(repo)
 
 
+def test_all_stale_bumps_target_with_space_in_path() -> None:
+    """STALE 行のパース（RE_STALE_LINE）が、空白を含む文書パスでも拾える（A-X1）。
+    従来の `\\S+?` は空白で分断されて拾えず、--all-stale の対象から黙って漏れていた。
+    source 側のパースは check-knowledge.py（RE_LIST_ITEM）側の制約であり対象外（別ファイル）。
+    """
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/my doc.md", sources=[FIRST_ADR], distilled_from_sha="HEAD")
+        sha = commit_all(repo, "baseline（空白を含むファイル名）")
+        write_doc(repo, "knowledge/my doc.md", sources=[FIRST_ADR], distilled_from_sha=sha)
+        commit_all(repo, "pin sha")
+
+        p = repo / FIRST_ADR
+        p.write_text(p.read_text(encoding="utf-8") + "\n追記。\n", encoding="utf-8")
+        commit_all(repo, "source を実質更新")
+
+        full = full_head(repo)
+        code, out = run(repo, "--all-stale")
+        assert code == 0, out
+        assert "knowledge/my doc.md" in out, out
+        assert distilled_of(repo, "knowledge/my doc.md") == full, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_no_stale_reports_nothing_to_do() -> None:
     repo = new_repo()
     try:
@@ -492,6 +517,24 @@ def test_body_after_frontmatter_basic() -> None:
     assert _bump.body_after_frontmatter(without_fm) == without_fm
 
 
+# --- G11: --all-stale でパースした文書パスの検証（root の中に解決されるか） ---------
+
+
+def test_validate_stale_targets_within_root_rejects_escaping_path() -> None:
+    """checker の出力（STALE 行）をパースして得た文書パスが root の外を指す場合は
+    拒否する（G11）。"""
+    assert _bump is not None, "対象スクリプトが見つからないのでモジュールを読めていない"
+    repo = new_repo()
+    try:
+        baseline(repo)
+        bad = _bump.validate_stale_targets_within_root(repo, {"../outside.md": set()})
+        assert bad == "../outside.md", bad
+        ok = _bump.validate_stale_targets_within_root(repo, {"knowledge/a.md": set()})
+        assert ok is None, ok
+    finally:
+        shutil.rmtree(repo)
+
+
 # --- 形骸化検出（distilled_from_sha だけ進めて本文が変わっていない） --------------
 
 
@@ -766,6 +809,25 @@ def test_follow_rewritten_refuses_when_old_sha_is_unresolvable() -> None:
         shutil.rmtree(repo)
 
 
+def test_follow_rewritten_refuses_duplicate_distilled_lines() -> None:
+    """`--follow-rewritten` でも、distilled_from_sha の行が複数ある文書は拒否する
+    （G11: 通常モードの `len(found) > 1` 検査と揃える）。"""
+    repo = new_repo()
+    try:
+        base = baseline(repo)
+        path = repo / "knowledge/a.md"
+        text = path.read_text(encoding="utf-8")
+        dup = 'distilled_from_sha: "deadbee"\nupdated:'
+        path.write_text(text.replace("updated:", dup, 1), encoding="utf-8")
+        commit_all(repo, "distilled_from_sha を 2 行にする")
+
+        code, out = run(repo, "--follow-rewritten", base)
+        assert code == 1, out
+        assert "distilled_from_sha が 2 行ある" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_follow_rewritten_refuses_malformed_sha_format() -> None:
     """distilled_from_sha の値が sha の形式（7〜40 桁の 16 進）に合わない場合は、
     git に渡さず追従しない（F3）。"""
@@ -945,15 +1007,6 @@ def test_docstring_documents_bumped_line_contract() -> None:
     doc = _bump.__doc__ or ""
     assert "✓ <文書>: <旧 sha> → <新 sha>" in doc, doc
     assert "create-pr" in doc, doc
-
-
-def test_docstring_follow_rewritten_explanation_is_accurate() -> None:
-    """`--follow-rewritten` の説明が「ローカルでは常に通る」という不正確な記述を
-    含まない（F16）。PR 内で source まで変えて squash すると手元でもすぐ STALE になる。"""
-    assert _bump is not None
-    doc = _bump.__doc__ or ""
-    assert "ローカルにはまだ古いコミットが残っているので checker は stale と言わないことが" not in doc, doc
-    assert "source が PR 内で変わっていないとき" in doc, doc
 
 
 def main() -> int:

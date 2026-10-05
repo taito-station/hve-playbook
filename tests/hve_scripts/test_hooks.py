@@ -77,9 +77,9 @@ def install_hve_scripts(repo: Path) -> Path:
 # --- session-stale-check.sh ---------------------------------------------------
 
 
-def run_session_hook(cwd: Path, script: Path) -> "tuple[int, str]":
+def run_session_hook(cwd: Path, script: Path, *extra_args: str) -> "tuple[int, str]":
     proc = subprocess.run(
-        ["bash", str(script)], cwd=cwd, capture_output=True, text=True, env=_clean_env()
+        ["bash", str(script), *extra_args], cwd=cwd, capture_output=True, text=True, env=_clean_env()
     )
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
@@ -199,6 +199,99 @@ def test_session_hook_indeterminate_bump_reports_one_line() -> None:
         assert out.count("\n") == 0, f"1 行のはずが複数行: {out!r}"
     finally:
         shutil.rmtree(base)
+
+
+def test_session_hook_forwards_args_to_checker() -> None:
+    """hook 自身が受け取った引数が、bump の `--` 以降（checker への転送引数）に渡る
+    （G20）。`--required` で title を必須から外すと、title 欠落の文書が error でなく
+    なる。"""
+    repo = new_repo()
+    try:
+        dest = install_hve_scripts(repo)
+        sha = baseline(repo)
+        write_doc(repo, "knowledge/b.md", title=None, sources=[FIRST_ADR], distilled_from_sha=sha)
+        commit_all(repo, "title を欠落させた文書を追加")
+
+        # 引数なし: title 欠落が他の error として残る
+        code, out = run_session_hook(repo, dest / SESSION_HOOK_REL)
+        assert code == 0, out
+        assert "STALE 以外の error" in out, out
+
+        # --required を転送して title を外すと、b.md は error にならない
+        code, out = run_session_hook(
+            repo, dest / SESSION_HOOK_REL,
+            "--required", "status,kind,sources,distilled_from_sha,updated",
+        )
+        assert code == 0, out
+        assert "STALE 以外の error" not in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_session_hook_stale_message_includes_forwarded_args_example() -> None:
+    """stale 時の案内に、転送した引数付きの check-knowledge.py 実行例が出る（G20）。"""
+    repo = new_repo()
+    try:
+        dest = install_hve_scripts(repo)
+        write_doc(repo, "knowledge/a.md", sources=[FIRST_ADR], distilled_from_sha="HEAD")
+        sha = commit_all(repo, "baseline")
+        write_doc(repo, "knowledge/a.md", sources=[FIRST_ADR], distilled_from_sha=sha)
+        commit_all(repo, "pin sha")
+        p = repo / FIRST_ADR
+        p.write_text(p.read_text(encoding="utf-8") + "\n追記。\n", encoding="utf-8")
+        commit_all(repo, "source を実質更新")
+
+        code, out = run_session_hook(
+            repo, dest / SESSION_HOOK_REL,
+            "--required", "title,status,kind,sources,distilled_from_sha,updated",
+        )
+        assert code == 0, out
+        assert (
+            "check-knowledge.py --required title,status,kind,sources,distilled_from_sha,updated"
+            in out
+        ), out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_session_hook_non_stale_error_message_includes_forwarded_args_example() -> None:
+    """STALE 以外の error 時の案内にも、転送した引数付きの実行例が出る（G20）。"""
+    repo = new_repo()
+    try:
+        dest = install_hve_scripts(repo)
+        sha = baseline(repo)
+        write_doc(repo, "knowledge/b.md", status=None, sources=[FIRST_ADR], distilled_from_sha=sha)
+        commit_all(repo, "status を欠落させた文書を追加")
+
+        code, out = run_session_hook(
+            repo, dest / SESSION_HOOK_REL, "--allow-empty-sources-with-decision-log",
+        )
+        assert code == 0, out
+        assert "check-knowledge.py --allow-empty-sources-with-decision-log" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_session_hook_rc_nonzero_full_line_match_required_for_no_stale() -> None:
+    """frontmatter の値に『STALE な文書は無い』という文言が入っていても、grep の部分
+    一致で誤って『STALE が無い』と判定しない（G9）。distilled_from_sha を sha 形式でない
+    値にして checker を他の error（rc=1）で落とす。"""
+    repo = new_repo()
+    try:
+        dest = install_hve_scripts(repo)
+        baseline(repo)
+        write_doc(
+            repo, "knowledge/a.md", sources=[FIRST_ADR],
+            distilled_from_sha="STALE な文書は無い",
+        )
+        commit_all(repo, "distilled_from_sha を不正な値にする")
+
+        code, out = run_session_hook(repo, dest / SESSION_HOOK_REL)
+        assert code == 0, out
+        assert out != "", "STALE 以外の error を部分一致で握りつぶして何も出していない"
+        assert "STALE 以外の error" in out, out
+    finally:
+        shutil.rmtree(repo)
 
 
 # --- check-knowledge-impact.py ------------------------------------------------

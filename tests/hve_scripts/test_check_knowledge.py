@@ -494,7 +494,7 @@ def test_source_case_mismatch_is_error() -> None:
 
 
 def test_source_symlink_outside_repo_is_error() -> None:
-    """F14: symlink の解決先がリポジトリの外を指している場合は error にする。"""
+    """F14/G5: symlink はリポジトリの外を指していても error にする。"""
     repo = new_repo()
     outside_dir = Path(tempfile.mkdtemp(prefix="check-knowledge-outside-"))
     try:
@@ -508,10 +508,31 @@ def test_source_symlink_outside_repo_is_error() -> None:
         commit_all(repo, "symlink で外部ファイルを source にする")
         code, out = check(repo)
         assert code == 1, out
-        assert "sources がリポジトリの外を指している" in out, out
+        assert "sources にシンボリックリンクは使えない" in out, out
     finally:
         shutil.rmtree(repo)
         shutil.rmtree(outside_dir, ignore_errors=True)
+
+
+def test_source_symlink_inside_repo_is_error() -> None:
+    """G5: symlink の解決先がリポジトリの中（実在するファイル）でも error にする。
+
+    stale 判定（last_content_change）はリンクのパスではなく指し先の履歴を追えない
+    ため、リポジトリ内を指す symlink も免除しない。
+    """
+    repo = new_repo()
+    try:
+        sha = baseline(repo)
+        link = repo / "docs-original" / "inside-link.md"
+        os.symlink(repo / FIRST_ADR, link)
+        write_doc(repo, "knowledge/a.md", sources=["docs-original/inside-link.md"],
+                  distilled_from_sha=sha)
+        commit_all(repo, "リポジトリ内を指す symlink を source にする")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "sources にシンボリックリンクは使えない。実体のパスを書く" in out, out
+    finally:
+        shutil.rmtree(repo)
 
 
 # --- 空 sources ---------------------------------------------------------------
@@ -571,6 +592,23 @@ def test_flag_without_decision_log_heading_still_errors() -> None:
         code, out = check(repo, "--allow-empty-sources-with-decision-log")
         assert code == 1, out
         assert "sources が空" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_decision_log_heading_with_multiple_spaces_or_tab_is_recognized() -> None:
+    """G14: 見出し判定を check-decision-log.py に揃え、`##` と `決定ログ` の間の
+    空白が 1 個の半角スペースに限らなくても認識する。
+    """
+    repo = new_repo()
+    try:
+        baseline(repo)
+        write_doc(repo, "knowledge/b.md", sources=[], distilled_from_sha=None,
+                  body="##  決定ログ\n\n内容は省略。\n")
+        commit_all(repo, "決定ログ見出しの空白を 2 個にする")
+        code, out = check(repo, "--allow-empty-sources-with-decision-log")
+        assert code == 0, out
+        assert "sources が空" not in out, out
     finally:
         shutil.rmtree(repo)
 
@@ -789,6 +827,41 @@ def test_unresolvable_sha_on_full_clone_is_error() -> None:
         shutil.rmtree(repo)
 
 
+def test_distilled_from_sha_resolving_to_same_named_ref_is_error() -> None:
+    """G6: 書いた値と同名の tag・branch に解決された場合は error にする。
+
+    7 桁の hex に見える値をそのまま tag 名にできる（`rev-parse --verify` は ref 名も
+    受け付けるため）。tag の指す commit が無関係なら、解決したフル sha は書いた値で
+    始まらない。
+    """
+    repo = new_repo()
+    try:
+        baseline(repo)
+        run_git(repo, "tag", "abc1234", "HEAD")
+        write_doc(repo, "knowledge/b.md", sources=[FIRST_ADR], distilled_from_sha="abc1234")
+        commit_all(repo, "distilled_from_sha を tag と同名にする")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "distilled_from_sha が同名の ref（tag・branch）に解決された" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_invalid_format_distilled_from_sha_does_not_double_report() -> None:
+    """G15: 形式が不正な値は「形式不正」と「解決できない」を二重報告しない。"""
+    repo = new_repo()
+    try:
+        baseline(repo)
+        write_doc(repo, "knowledge/b.md", sources=[FIRST_ADR], distilled_from_sha="ABCDEF1")
+        commit_all(repo, "distilled_from_sha を不正な形式にする")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "sha 形式でない" in out, out
+        assert "を解決できない" not in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_help_flag_exits_zero() -> None:
     repo = new_repo()
     try:
@@ -868,6 +941,34 @@ def test_rename_chain_is_not_stale() -> None:
         assert code == 0, out
         assert "STALE" not in out, f"2 段のリネームを stale と誤判定した:\n{out}"
         assert "履歴が無く" not in out, f"履歴を辿れなくなっている:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_quoted_filename_source_is_still_detected_as_stale() -> None:
+    """G7: `"` を含むファイル名でも終点一致が外れず STALE を検出する。
+
+    `-z` なしの `git show --name-status` は `core.quotePath=false` でも二重引用符や
+    バックスラッシュを含むファイル名を C クォートするため、素朴な文字列比較では
+    `path_status` が一致を見つけられず、stale 判定が「履歴が無い」警告に落ちてしまう。
+    """
+    repo = new_repo()
+    try:
+        rel = 'docs-original/q"x.md'
+        (repo / rel).write_text("内容\n", encoding="utf-8")
+        commit_all(repo, "二重引用符を含む source を追加")
+        sha = run_git(repo, "rev-parse", "HEAD")
+        write_doc(repo, "knowledge/a.md", sources=[rel], distilled_from_sha=sha)
+        commit_all(repo, "pin sha")
+        assert check(repo)[0] == 0, "前提: ここでは stale でない"
+
+        p = repo / rel
+        p.write_text(p.read_text(encoding="utf-8") + "追記。\n", encoding="utf-8")
+        commit_all(repo, "source を実質更新")
+        code, out = check(repo)
+        assert code == 1, out
+        assert "STALE" in out, f"二重引用符を含むファイル名で stale 判定が外れた:\n{out}"
+        assert "履歴が無く" not in out, out
     finally:
         shutil.rmtree(repo)
 
@@ -1059,6 +1160,42 @@ def test_merge_taking_one_side_is_attributed_to_ancestor() -> None:
         assert code == 1, out
         assert side[:7] in out, f"祖先ではなくマージに帰属した:\n{out}"
         assert merge[:7] not in out, f"マージに帰属した:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_merge_base_failure_is_error_not_stale_line() -> None:
+    """G13: `merge-base --is-ancestor` が 0（祖先）/1（祖先でない）以外で終了したら、
+    STALE 行の書式ではなく判定不能の error にする（bump-distilled-sha.py 等の
+    後続スクリプトが STALE 行として誤ってパースし、誤って sha を進めるのを防ぐ）。
+    """
+    repo = new_repo()
+    try:
+        m = load_checker(repo)
+        baseline(repo)
+        original_git = m.git
+
+        def fake_git(*args: str) -> "subprocess.CompletedProcess[str]":
+            if args[:2] == ("merge-base", "--is-ancestor"):
+                return subprocess.CompletedProcess(args, 128, stdout="", stderr="致命的: テスト用")
+            return original_git(*args)
+
+        m.git = fake_git
+        p = repo / FIRST_ADR
+        p.write_text(p.read_text(encoding="utf-8") + "\n追記。\n", encoding="utf-8")
+        commit_all(repo, "source を実質更新")
+        out = io.StringIO()
+        cwd = Path.cwd()
+        try:
+            os.chdir(repo)
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                code = m.main([])
+        finally:
+            os.chdir(cwd)
+        text = out.getvalue()
+        assert code == 1, text
+        assert "STALE" not in text, f"merge-base の異常終了を STALE 行にしてしまっている:\n{text}"
+        assert "祖先判定ができない" in text, text
     finally:
         shutil.rmtree(repo)
 
