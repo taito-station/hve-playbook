@@ -33,7 +33,8 @@ has_all_steps() { local n; for n in 0 1 2 3 4 5 6 7 8; do grep -q "^### Step $n:
 # 1) skill 本体
 check "skill: SKILL.md がある" [ -f "$SKILL" ]
 check "skill: frontmatter の name が hve-implement" frontmatter_name
-check "skill: frontmatter に description がある" has "$SKILL" "description:"
+frontmatter_has_description() { awk 'NR==1&&$0!="---"{exit 1} NR>1&&$0=="---"{exit 1} NR>1&&/^description:/{found=1; exit} END{exit !found}' "$SKILL" 2>/dev/null; }
+check "skill: frontmatter に description がある" frontmatter_has_description
 check "skill: Step 0〜8 の見出しがある" has_all_steps
 for w in "■ 停止ゲート:" "■ 理由:" "■ 試みたこと:" "■ 推奨アクション:"; do
     check "skill: STOP 報告の節に「${w}」の行がある" section_has "$SKILL" "## STOP 時の報告" "## 注意事項" "$w"
@@ -56,15 +57,16 @@ check "skill: 決定ログの置き場所は artifact-management に従う" has 
 # 4) モードと承認
 check "skill: 単独モードは ExitPlanMode で承認を得る" has "$SKILL" "ExitPlanMode"
 check "skill: Plan モードを使えない環境でも承認前に Step 5 へ進まない" has "$SKILL" "承認を得るまで Step 5 へ進まない"
-row_has() { grep -F -- "$2" "$SKILL" 2>/dev/null | grep -qF -- "$3"; }
-check "skill: モード表で --phase pre は Step 2〜4" row_has "" "--phase pre" "Step 2〜4"
-check "skill: モード表で --phase post は Step 5〜7" row_has "" "--phase post" "Step 5〜7"
-check "skill: 単独モードは Issue でなく実装したい内容を受ける" row_has "" "| 単独 |" "<実装したい内容>"
+# ファイル $1 の、$2 を含む行に $3 があるか
+row_has() { grep -F -- "$2" "$1" 2>/dev/null | grep -qF -- "$3"; }
+check "skill: モード表で --phase pre は Step 2〜4" row_has "$SKILL" "--phase pre" "Step 2〜4"
+check "skill: モード表で --phase post は Step 5〜7" row_has "$SKILL" "--phase post" "Step 5〜7"
+check "skill: 単独モードは Issue でなく実装したい内容を受ける" row_has "$SKILL" "| 単独 |" "<実装したい内容>"
 check "skill: depth は Step 1 の分類で決める" has "$SKILL" "承認された計画の分類（Step 1）で決める"
-check "skill: バグ修正は --depth lightweight" row_has "" "バグ修正 →" "--depth lightweight"
-check "skill: それ以外は --depth full" row_has "" "それ以外 →" "--depth full"
+check "skill: バグ修正は --depth lightweight" row_has "$SKILL" "バグ修正 →" "--depth lightweight"
+check "skill: それ以外は --depth full" row_has "$SKILL" "それ以外 →" "--depth full"
 check "skill: depth をブランチの type で決めない" lacks "$SKILL" "ブランチの type"
-check "skill: feature の前段の回答は qa/ に保存する" row_has "" "resolve-issue の前段（feature）" "qa/"
+check "skill: feature の前段の回答は qa/ に保存する" row_has "$SKILL" "resolve-issue の前段（feature）" "qa/"
 
 # 5) resolve-issue の 2 段呼び出し（skill があるときだけ）
 check "resolve-issue: skill の有無で分岐する" has "$RI" ".claude/skills/hve-implement/SKILL.md"
@@ -72,7 +74,10 @@ check "resolve-issue: bug パスで前段（--phase pre）を呼ぶ" section_has
 check "resolve-issue: bug パスで後段を呼ばない" bash -c '! awk '"'"'index($0,"#### [bug]")==1{on=1;next} on&&index($0,"#### [feature]")==1{on=0} on'"'"' "$1" | grep -qF -- "--phase post"' _ "$RI"
 check "resolve-issue: feature パスで前段（--phase pre）を呼ぶ" section_has "$RI" "#### [feature]" "#### [ops]" "--phase pre"
 check "resolve-issue: feature パスで後段を呼ばない" bash -c '! awk '"'"'index($0,"#### [feature]")==1{on=1;next} on&&index($0,"#### [ops]")==1{on=0} on'"'"' "$1" | grep -qF -- "--phase post"' _ "$RI"
-check "resolve-issue: feature の前段の回答は qa/ に保存する" section_has "$RI" "#### [feature]" "#### [ops]" "\`qa/\` に保存する"
+check "resolve-issue: feature の前段の PO 回答は questionnaire の qa/*.md を正とする" section_has "$RI" "#### [feature]" "#### [ops]" "questionnaire skill が書く \`qa/*.md\`"
+check "resolve-issue: Gmail の回答を qa に置くときも PII の規則を適用する" section_has "$RI" "#### [feature]" "#### [ops]" "項目 1 の書式と PII の規則"
+check "resolve-issue: PO 承認後に ADR を飛ばすのは前段を呼んだときだけ" section_has "$RI" "#### [feature]" "#### [ops]" "前処理で hve-implement の前段を呼んだ場合は ADR を Step 7 で書く"
+check "resolve-issue: revert はテストの 3 回失敗の STOP に限る" section_has "$RI" "### Step 3" "### Step 4" "テストの 3 回失敗で STOP したら項目 3 の revert"
 check "resolve-issue: ops パスでは呼ばない" bash -c '! awk '"'"'index($0,"#### [ops]")==1{on=1;next} on&&index($0,"### Step 3")==1{on=0} on'"'"' "$1" | grep -qF hve-implement' _ "$RI"
 nodoc_all() { [ "$(grep -c 'hve-implement/SKILL.md` がある場合' "$RI")" -ge 3 ] && ! grep 'hve-implement/SKILL.md` がある場合' "$RI" | grep -vqF 'ドキュメントのみ・設定変更のみ・依存更新のみの変更を除く'; }
 check "resolve-issue: 呼び出し条件の 3 か所すべてで implement-flow の対象外を除く" nodoc_all
