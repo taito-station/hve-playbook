@@ -125,7 +125,7 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 | AAS | `/hve-aas` | アーキテクチャ選定 → DDD ドメイン分析 → データモデル → テスト戦略 |
 | AAD-WEB | `/hve-aad-web` | 画面設計 → サービス設計 → テストスペック → 一貫性レビュー |
 
-補助スキル: `/hve-review`（敵対的レビュー）、`/hve-qa`（QA 質問票生成）
+補助スキル: `/hve-review`（敵対的レビュー）、`/hve-qa`（QA 質問票生成）、`/hve-implement`（implement-flow に沿った実装）
 
 ## Global Skills（user-level）
 

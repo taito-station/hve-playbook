@@ -113,6 +113,7 @@ check "setup.sh: rules/<category> は配らない" [ ! -e "$T/.claude/rules/$CAT
 check "setup.sh: agents/global は配らない" [ ! -e "$T/.claude/agents/global" ]
 check "setup.sh: global の agent は配らない" [ ! -e "$T/.claude/agents/$AGENT" ]
 check "setup.sh: global skill は配らない" [ ! -e "$T/.claude/skills/learn" ]
+check "setup.sh: hve-implement skill を配る" [ -f "$T/.claude/skills/hve-implement/SKILL.md" ]
 
 # 6) workflow が Read させる SKILL.md は、導入先でも hve-playbook 自身でもルートから解決できる
 read_paths() { grep -ohE 'Read [^ ]+/SKILL\.md' "$1"/hve-*.js | sed 's/^Read //' | sort -u; }
