@@ -195,7 +195,8 @@ sed \
   tmux 外では何もしない。
 - **`notify-sound.sh`**（音・クロスプラットフォーム）— Notification /
   PermissionRequest / Stop で通知音を鳴らす。WSL2 は powershell.exe で
-  Windows 音、native Linux は `paplay` / `pw-play` / `ffplay` / `aplay`。
+  Windows 音、macOS は `afplay` で Glass（裏で再生し hook を待たせない）、
+  native Linux は `paplay` / `pw-play` / `ffplay` / `aplay`。
   再生手段が無ければ無音で no-op。tmux の有無に関わらず鳴る。
 
 設定ポイント:
@@ -206,6 +207,7 @@ sed \
 - N の抽出は cwd の `-parallel-(\d+)` に依存する。命名規約を変えるなら
   `tmux-pane-awaiting.sh` / `permission-request-logger.py` の正規表現も合わせる。
 - Linux / macOS の音源は `CLAUDE_NOTIFY_SOUND` 環境変数で差し替えできる。
+  存在しないパスを指定すると鳴らない。
 
 ## セットアップフロー
 

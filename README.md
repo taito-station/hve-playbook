@@ -39,7 +39,7 @@ user-level から一部の skill などだけを使いたいときは、sync は
 | 対象 | 必須 | 任意 |
 |---|---|---|
 | project-level（`setup.sh` と導入先の `scripts/hve/`） | bash | git・python3・pip（cq/mdq の導入。失敗しても警告して続行する）、python3・git（`scripts/hve/` の knowledge の検査スクリプト） |
-| user-level（`sync-dotclaude.sh` と hook・statusline） | bash、git、python3 3.9 以上（標準ライブラリのみ。`settings.json` の生成と hook）、jq（statusline） | gh（マージ済み PR への push の検査と一部の skill）、tmux（ペインの状態表示の hook。リポ直下の `tmux-grid.sh` も使う）、drawio・Xvfb（drawio の SVG 書き出し。一部の skill が使う）、通知音のプレイヤー（WSL2 は powershell.exe、Linux は paplay・pw-play・ffplay・aplay のどれか。無ければ鳴らない） |
+| user-level（`sync-dotclaude.sh` と hook・statusline） | bash、git、python3 3.9 以上（標準ライブラリのみ。`settings.json` の生成と hook）、jq（statusline） | gh（マージ済み PR への push の検査と一部の skill）、tmux（ペインの状態表示の hook。リポ直下の `tmux-grid.sh` も使う）、drawio・Xvfb（drawio の SVG 書き出し。一部の skill が使う）、通知音のプレイヤー（WSL2 は powershell.exe、macOS は afplay、Linux は paplay・pw-play・ffplay・aplay のどれか。無ければ鳴らない） |
 
 ### user-level を使う場合
 
