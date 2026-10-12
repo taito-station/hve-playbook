@@ -107,7 +107,8 @@ AskUserQuestion({
       （扱いは resolve-issue skill Step 2 [feature] 項目 1 の手順 2 に定義）
    3. 残った未解決の質問と、手順 2 で回答候補が見つかった質問を、件数に関わらず `/questionnaire` スキルで PO に質問する（resolve-issue skill Step 2 と同一）
    4. PO 回答を `knowledge/<domain>/` に永続化する
-      （HVE 導入先では書かず、questionnaire skill の `qa/*.md` を正とする。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義。同じ質問の `source: gmail` の Q&A も同じ定義のとおり置き換える）
+      （HVE 導入先では書かず、questionnaire skill の `qa/*.md` を正とする。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義）。
+      同じ質問の `source: gmail` の Q&A は、resolve-issue skill Step 2 [feature] 項目 1 の手順 4 のとおり置き換える
    回答を受領後、回答内容をもとに Step 1 の要件・背景セクションを具体化して Step 2 へ
 4. 「スキップ」→ そのまま Step 2 へ
 

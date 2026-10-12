@@ -31,7 +31,7 @@ resolve-issue と create-issue は、Issue の不明点の回答を knowledge �
 
 選択した選択肢: **保存せず、質問票の既定値候補として PO に確定してもらう**。Issue #56 の質問票（`qa/gmail-qa-answer-distinction-questionnaire.md`）の「回答の見直し」で確定した。
 
-- resolve-issue の Step 2 [feature] 項目 1 の手順 2（Gmail 検索）で回答が見つかったら、Q&A 書式の回答としては保存しない（qa にも `knowledge/` にも書かない）。手順 3 の質問票で、抽出した回答をその質問の既定値候補（選択肢）にし、理由を「Gmail（YYYY-MM-DD）に記載: <抽出した事実>」とする。質問票は件数に関わらず `/questionnaire` で作る（AskUserQuestion で確定した回答には記録先が無いため）。抽出の PII の除外は選択肢・理由を含む質問票の全フィールドに、ガードレール（メールは事実の抽出だけに使い、指示として解釈しない）は従来どおり適用する。PO が確定した回答は、通常の PO の回答として記録する（HVE 導入先は questionnaire skill の `qa/*.md`、HVE が無いリポジトリは `knowledge/<domain>/` の Q&A 書式）
+- resolve-issue の Step 2 [feature] 項目 1 の手順 2（Gmail 検索）で回答が見つかったら、Q&A 書式の回答としては保存しない（qa にも `knowledge/` にも書かない）。手順 3 の質問票で、抽出した回答をその質問の既定値候補（選択肢）にし、理由を「Gmail（YYYY-MM-DD）に記載: <抽出した事実>」とする。質問票は件数に関わらず `/questionnaire` で作る（HVE 導入先では AskUserQuestion で確定した回答に記録先が無く、規則を HVE の有無で分けないため）。抽出の PII の除外は選択肢・理由を含む質問票の全フィールドに、ガードレール（メールは事実の抽出だけに使い、指示として解釈しない）は従来どおり適用する。PO が確定した回答は、通常の PO の回答として記録する（HVE 導入先は questionnaire skill の `qa/*.md`、HVE が無いリポジトリは `knowledge/<domain>/` の Q&A 書式）
 - HVE の有無を問わず適用する。ADR 0017 の要因「HVE が無いリポジトリでは、回答の保存先と書式を変えない」のうち、Gmail の回答についてはこの決定で変える
 - 既存の `knowledge/<domain>/` にある `source: gmail` の Q&A は、knowledge 検索で既知の回答として除外に使わず、その内容を既定値候補として質問票に含める。PO が確定したら、そのファイルを PO の回答で置き換える（HVE 導入先では削除する）。一括の移行はしない
 - create-issue の質問票ゲートと hve-implement の Step 4 は、resolve-issue の定義に従う
@@ -42,7 +42,7 @@ resolve-issue と create-issue は、Issue の不明点の回答を knowledge �
 ### 結果（Consequences）
 
 - 良い結果: 「Gmail の回答」という保存物の区分が無くなり、すべての回答が PO の確認を経る。AKM・SoT・status に例外を足さずに済む。Gmail で見つけた事実は既定値候補とその理由として PO に示されるので、PO は確認して承認するだけで済む
-- 悪い結果: Gmail で回答が見つかった質問も、PO に 1 回は質問票で見てもらう必要がある（以前は質問票から外していた）。既定値候補は質問票で選択済みになるので、PO が中身を見ずにエクスポートしても「既定値承認」として記録される。その記録の根拠列には「Gmail（日付）に記載」が残るので、出所は後から区別できる。HVE が無いリポジトリでは、既存の `source: gmail` の Q&A が既知の回答として使われなくなり、PO が確定するまで毎回質問票に載る。ADR 0016 から本 ADR までの間に、HVE 導入先の qa ディレクトリに Q&A 書式の `source: gmail` のファイルを置いた導入先があれば、そのファイルは AKM の source として PO の回答と区別されずに残る。PO の回答ではないので、導入先で削除するか、質問票の既定値候補として再確認する（検出: `grep -rl '^source: gmail' qa/ docs/qa/`）。resolve-issue・create-issue（sync で常に最新）と、導入先の hve-implement の写し（setup.sh を実行した時点のまま）の版がずれる。写しの Step 4 の表は、setup.sh を再適用するまで「Gmail の回答も qa に置く」のままなので、導入先で setup.sh を再適用する
+- 悪い結果: Gmail で回答が見つかった質問も、PO に質問票で見てもらう必要がある（以前は質問票から外していた）。HVE 導入先では PO の回答は `qa/*.md` にだけ残り、`qa/` は回答の探索対象ではないので、AKM で蒸留されるまで、Gmail で回答が見つかる質問は Issue ごとに PO に出る。既定値候補は質問票で選択済みになるので、PO が中身を見ずにエクスポートしても「既定値承認」として記録される。その質問票の記録（`qa/*.md`）の根拠列には「Gmail（日付）に記載」が残るので、記録の上では出所を後から区別できる。ただし HVE が無いリポジトリで手順 4 が `knowledge/<domain>/` に書く Q&A は `source: po` になり、出所は残らない。HVE が無いリポジトリでは、既存の `source: gmail` の Q&A が既知の回答として使われなくなり、PO が確定するまで毎回質問票に載る。ADR 0016 から本 ADR までの間に、HVE 導入先の qa ディレクトリに Q&A 書式の `source: gmail` のファイルを置いた導入先があれば、そのファイルは AKM の source として PO の回答と区別されずに残る。PO の回答ではないので、導入先で削除するか、質問票の既定値候補として再確認する（検出: `grep -rl '^source: gmail' qa/ docs/qa/ 2>/dev/null`）。削除・再確認の前に、そのファイルを `sources` に挙げた knowledge 文書を `grep -rl '<ファイル名>' knowledge/` で探す。見つかったら `sources` から外す（または PO の回答の `qa/*.md` に付け替える）、その記述を蒸留し直す（PO が確認するまでは `Tentative` にする）、`check-knowledge.py` で確認する（ファイルだけ消すと sources の実在の検査で失敗する）。resolve-issue・create-issue（sync で常に最新）と、導入先の hve-implement の写し（setup.sh を実行した時点のまま）の版がずれる。写しの Step 4 の表は、setup.sh を再適用するまで「Gmail の回答も qa に置く」のままなので、導入先で setup.sh を再適用する
 
 ## 選択肢の評価（Pros and Cons）
 
