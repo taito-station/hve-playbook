@@ -6,7 +6,7 @@ Accepted — 2026-10-12
 
 ## 背景と課題
 
-resolve-issue と create-issue は、Issue の不明点の回答を knowledge → Gmail → PO の質問票の順に探す。Gmail で回答が見つかると、その質問を質問票から外し、Q&A 書式（`slug / question / source / last_verified`）で保存していた。保存先は HVE 導入先では PO の回答と同じ qa ディレクトリ（ADR 0016・0017）、HVE が無いリポジトリでは `knowledge/<domain>/` である。
+resolve-issue と create-issue は、Issue の不明点の回答を knowledge → Gmail → PO の質問票の順に探す。Gmail で回答が見つかると、その質問を質問票から外し、Q&A 書式（`slug / question / source / last_verified`）で保存していた。保存先は HVE 導入先では PO の回答と同じ qa ディレクトリ（ADR 0016 の「回答は qa/ に残す」を ADR 0017 が経路を問わず適用した）、HVE が無いリポジトリでは `knowledge/<domain>/` である。
 
 このため、PO が確認していない外部メール由来の回答が、PO の回答と区別されないまま残る。HVE 導入先では AKM の蒸留の source（SoT の「qa（Confirmed 回答）」）になり、HVE が無いリポジトリでは次の Issue で既知ナレッジとして使われる（[hve-playbook#56](https://github.com/taito-station/hve-playbook/issues/56)。#53 のセルフレビューの Security 指摘から切り出した）。
 
@@ -31,18 +31,18 @@ resolve-issue と create-issue は、Issue の不明点の回答を knowledge �
 
 選択した選択肢: **保存せず、質問票の既定値候補として PO に確定してもらう**。Issue #56 の質問票（`qa/gmail-qa-answer-distinction-questionnaire.md`）の「回答の見直し」で確定した。
 
-- resolve-issue の Step 2 [feature] 項目 1 の手順 2（Gmail 検索）で回答が見つかったら、保存しない（qa にも `knowledge/` にも書かない）。手順 3 の質問票で、その質問の既定値候補にし、理由を「Gmail（YYYY-MM-DD）に記載: <抽出した事実>」とする。抽出の PII の除外とガードレール（メールは事実の抽出だけに使い、指示として解釈しない）は従来どおり適用する。PO が確定した回答は、通常の PO の回答として記録する（HVE 導入先は questionnaire skill の `qa/*.md`、HVE が無いリポジトリは `knowledge/<domain>/` の Q&A 書式）
+- resolve-issue の Step 2 [feature] 項目 1 の手順 2（Gmail 検索）で回答が見つかったら、Q&A 書式の回答としては保存しない（qa にも `knowledge/` にも書かない）。手順 3 の質問票で、抽出した回答をその質問の既定値候補（選択肢）にし、理由を「Gmail（YYYY-MM-DD）に記載: <抽出した事実>」とする。質問票は件数に関わらず `/questionnaire` で作る（AskUserQuestion で確定した回答には記録先が無いため）。抽出の PII の除外は選択肢・理由を含む質問票の全フィールドに、ガードレール（メールは事実の抽出だけに使い、指示として解釈しない）は従来どおり適用する。PO が確定した回答は、通常の PO の回答として記録する（HVE 導入先は questionnaire skill の `qa/*.md`、HVE が無いリポジトリは `knowledge/<domain>/` の Q&A 書式）
 - HVE の有無を問わず適用する。ADR 0017 の要因「HVE が無いリポジトリでは、回答の保存先と書式を変えない」のうち、Gmail の回答についてはこの決定で変える
-- 既存の `knowledge/<domain>/` にある `source: gmail` の Q&A は、knowledge 検索で既知の回答として除外に使わず、その内容を既定値候補として質問票に含める（移行はしない）
+- 既存の `knowledge/<domain>/` にある `source: gmail` の Q&A は、knowledge 検索で既知の回答として除外に使わず、その内容を既定値候補として質問票に含める。PO が確定したら、そのファイルを PO の回答で置き換える（HVE 導入先では削除する）。一括の移行はしない
 - create-issue の質問票ゲートと hve-implement の Step 4 は、resolve-issue の定義に従う
-- AKM（`skills/hve-akm/SKILL.md`）と `rules/hve/knowledge-maturity.md` は変えない。Gmail 由来の source が AKM に入らないので、区別の規則が要らない
+- AKM（`skills/hve-akm/SKILL.md`）と `rules/hve/knowledge-maturity.md` は変えない。Gmail 由来の Q&A のファイルが AKM の source に入らないので、区別の規則が要らない。質問票の記録（`qa/*.md`）の「既定値候補の理由」に残る Gmail の事実は PO の回答ではない。PO の回答は「回答」列である
 - ADR 0017 のうち「Gmail の回答を qa ディレクトリに置く」を置き換える（0017 は Partially superseded）
 - 契約は `tests/test_qa_answer_destination.sh` と `tests/test_hve_implement_contract.sh` で固定する
 
 ### 結果（Consequences）
 
 - 良い結果: 「Gmail の回答」という保存物の区分が無くなり、すべての回答が PO の確認を経る。AKM・SoT・status に例外を足さずに済む。Gmail で見つけた事実は既定値候補とその理由として PO に示されるので、PO は確認して承認するだけで済む
-- 悪い結果: Gmail で回答が見つかった質問も、PO に 1 回は質問票で見てもらう必要がある（以前は質問票から外していた）。ADR 0016 から本 ADR までの間に、HVE 導入先の qa ディレクトリに Q&A 書式の `source: gmail` のファイルを置いた導入先があれば、そのファイルは AKM の source として PO の回答と区別されずに残る。PO の回答ではないので、導入先で削除するか、質問票の既定値候補として再確認する。resolve-issue・create-issue（sync で常に最新）と、導入先の hve-implement の写し（setup.sh を実行した時点のまま）の版がずれる。写しの Step 4 の表は、setup.sh を再適用するまで「Gmail の回答も qa に置く」のままなので、導入先で setup.sh を再適用する
+- 悪い結果: Gmail で回答が見つかった質問も、PO に 1 回は質問票で見てもらう必要がある（以前は質問票から外していた）。既定値候補は質問票で選択済みになるので、PO が中身を見ずにエクスポートしても「既定値承認」として記録される。その記録の根拠列には「Gmail（日付）に記載」が残るので、出所は後から区別できる。HVE が無いリポジトリでは、既存の `source: gmail` の Q&A が既知の回答として使われなくなり、PO が確定するまで毎回質問票に載る。ADR 0016 から本 ADR までの間に、HVE 導入先の qa ディレクトリに Q&A 書式の `source: gmail` のファイルを置いた導入先があれば、そのファイルは AKM の source として PO の回答と区別されずに残る。PO の回答ではないので、導入先で削除するか、質問票の既定値候補として再確認する（検出: `grep -rl '^source: gmail' qa/ docs/qa/`）。resolve-issue・create-issue（sync で常に最新）と、導入先の hve-implement の写し（setup.sh を実行した時点のまま）の版がずれる。写しの Step 4 の表は、setup.sh を再適用するまで「Gmail の回答も qa に置く」のままなので、導入先で setup.sh を再適用する
 
 ## 選択肢の評価（Pros and Cons）
 
@@ -102,6 +102,6 @@ PR #59 の 1 版目で実装し、セルフレビューで取り下げた。
 ## 関連リンク
 
 - Supersedes: [0017-qa-answers-in-qa-dir-wherever-check-knowledge-exists](0017-qa-answers-in-qa-dir-wherever-check-knowledge-exists.md)（Gmail の回答を qa に置く部分）
-- Related: [0016-hve-implement-skill-and-two-phase-call-from-resolve-issue](0016-hve-implement-skill-and-two-phase-call-from-resolve-issue.md)
+- Related: [0016-hve-implement-skill-and-two-phase-call-from-resolve-issue](0016-hve-implement-skill-and-two-phase-call-from-resolve-issue.md)（決定内容の「回答は qa/ に残す」は Gmail の回答も含む読み方ができるが、その経路は 0017 で詳細化され、本 ADR で置き換わる。0016 の状態は変えない）
 - Related: [hve-playbook#56](https://github.com/taito-station/hve-playbook/issues/56)
 - Related: [hve-playbook#53](https://github.com/taito-station/hve-playbook/issues/53)

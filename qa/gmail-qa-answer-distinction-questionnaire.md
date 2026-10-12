@@ -1,4 +1,4 @@
-# Issue #56 Gmail 由来の回答を qa/ で PO の回答と区別する方式
+# Issue #56 Gmail で見つけた質問の回答の扱い
 
 - 対象スコープ: Issue #56: HVE 導入先で qa/ に置く Gmail 由来の Q&A と、PO の回答（questionnaire の qa/*.md）の扱いの区別
 - 対象ドキュメント:
@@ -10,7 +10,7 @@
 - 関連スコープ: Issue #56（関連: #53、ADR 0016、ADR 0017）
 - 生成: aqod（Issue #56 の implement-flow Step 4 で見つかったブロッキングな論点。Gmail 由来の回答を PO の確認を経ずに確定知にしない方式・示し方・AKM 側の扱いを決める）
 - 状態: 回答済み
-- 推論許可: 3 問とも人間判断（既定値は推奨解）
+- 推論許可: 4 問とも人間判断（既定値は推奨解。Q01〜Q03 は会話で推奨解を承認、Q04 は会話で選択。Q01 は「回答の見直し」で変更）
 - 作成日: 2026-10-12
 - 回答確定日: 2026-10-12
 - 反映先: `knowledge/adr/0019-gmail-answers-as-questionnaire-defaults.md`（新規）、`knowledge/adr/0017-*.md`（ステータス）、`skills/global/resolve-issue/SKILL.md`、`skills/global/create-issue/SKILL.md`、`skills/hve-implement/SKILL.md`（見直し前の反映先だった `rules/hve/knowledge-maturity.md`・`skills/hve-akm/SKILL.md` は、見直しで変更しないことになった）
@@ -62,9 +62,9 @@
 
 | No. | 回答 | 判断 | 根拠 |
 |---|---|---|---|
-| Q01 | **A) qa に置き続け、未確定であることを規則で示す。AKM は Gmail 由来だけを根拠に Confirmed にしない** | 既定値承認 | 見つけた事実を捨てずに残せ、蒸留の source にもできる。既存の source フィールドで判別できるので書式の変更が小さい（会話で「推奨」と回答） |
-| Q02 | **A) 既存の `source: gmail (日付)` を判定に使う（書式は変えない）** | 既定値承認 | 既にある項目で判別でき、項目の追加を避けられる。既存の Gmail Q&A もそのまま判定に当たる（会話で「推奨」と回答） |
-| Q03 | **A) SoT の「qa（Confirmed 回答）」に含めない。蒸留は可だが、それだけを根拠にした内容は Tentative に留め、他の source と食い違えば他を優先する** | 既定値承認 | 要件を昇格と矛盾時の両面で満たす。既存の Tentative/Confirmed の仕組みを使い、新しい status を作らない（会話で「推奨」と回答） |
+| Q01 | **（見直しで失効。下記参照）A) qa に置き続け、未確定であることを規則で示す。AKM は Gmail 由来だけを根拠に Confirmed にしない** | 既定値承認 | 見つけた事実を捨てずに残せ、蒸留の source にもできる。既存の source フィールドで判別できるので書式の変更が小さい（会話で「推奨」と回答） |
+| Q02 | **（見直しで失効。下記参照）A) 既存の `source: gmail (日付)` を判定に使う（書式は変えない）** | 既定値承認 | 既にある項目で判別でき、項目の追加を避けられる。既存の Gmail Q&A もそのまま判定に当たる（会話で「推奨」と回答） |
+| Q03 | **（見直しで失効。下記参照）A) SoT の「qa（Confirmed 回答）」に含めない。蒸留は可だが、それだけを根拠にした内容は Tentative に留め、他の source と食い違えば他を優先する** | 既定値承認 | 要件を昇格と矛盾時の両面で満たす。既存の Tentative/Confirmed の仕組みを使い、新しい status を作らない（会話で「推奨」と回答） |
 
 ---
 
