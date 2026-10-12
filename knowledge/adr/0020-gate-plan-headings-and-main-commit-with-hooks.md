@@ -33,7 +33,7 @@ Accepted — 2026-10-12
 
 - **A: `hooks/plan-gate-check.py`**（PermissionRequest、matcher `ExitPlanMode`）
   - 計画本文（`tool_input.plan`、無ければ `tool_input.planFilePath` のファイル）に、見出し「ゲートの確認結果」と「ルール準拠表」があるかを検査する
-  - 見出しは `#`〜`####`。見出しの文字列が語を含めばよい。ルール準拠表の節（同じか上位のレベルの次の見出しまで）に `|` を含む行が 1 行以上必要。コードフェンスの中の行は数えない
+  - 見出しは `#`〜`####`（行頭の空白は 3 つまで）。見出しの文字列が語を含めばよい。ルール準拠表の節（同じか上位のレベルの次の見出しまで）に `|` を含む行が 1 行以上必要。コードフェンスの中の行は数えない
   - 全計画に適用する。implement-flow の対象外の計画は「ゲートの確認結果」に「対象外: <理由>」と書く。専用の逃げ道は設けない
   - 欠けていれば `hookSpecificOutput.decision.behavior = "deny"` の JSON で止め、足りない見出しと書き方を message で返す。計画本文が無い（`tool_input` が `{}`）ときも止める。Claude Code は計画ファイルの中身を `tool_input.plan` に入れて渡すが、計画ファイルの Write と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容（初回はファイルが無いので `{}`）で判定される（2026-10-12 の E2E で、transcript の message id と debug ログの入力から確認した）。deny の message でこの並列呼び出しも案内する。過去の差し戻し 3 件も `{}` だった
 - **B: `hooks/main-commit-guard.py`**（PreToolUse、matcher `Bash`）
@@ -45,13 +45,15 @@ Accepted — 2026-10-12
 
 ### 結果（Consequences）
 
-- 良い結果: ゲートの結果と準拠表の無い計画は、承認画面に出る前に足りない見出しを示して差し戻される。main への commit は、正規の手順を止めずに防げる。どちらも ADR 0004 の範囲（ExitPlanMode を呼ぶのは Plan モードの計画だけ、commit は作業ブランチ上で行う）に収まり、サブエージェントや自動フローの正規の動きを止めない
+- 良い結果: ゲートの結果と準拠表の無い計画は、承認画面に出る前に足りない見出しを示して差し戻される。main 上でうっかり commit することを、正規の手順を止めずに防げる。どちらも ADR 0004 の範囲（ExitPlanMode を呼ぶのは Plan モードの計画だけ、commit は作業ブランチ上で行う）に収まり、サブエージェントや自動フローの正規の動きを止めない
 - 悪い結果・既知の限界:
   - A は見出しがあるかを検査するだけで、中身が検討されたかは検査できない。Plan モードを経ない承認（resolve-issue の AskUserQuestion）は A の対象外で、テンプレートの見出しで補う
+  - Plan モードに入らずに実装を始めた場合、A は発動しない（Plan モードの開始は CLAUDE.md の規則に頼る）
   - Claude Code の将来の版で ExitPlanMode が常に `{}` で呼ばれるようになると、A がすべての計画を止める（deny の message で気づける。Plan モードは手動で抜けられる）
-  - deny のあと、PermissionRequest の他の hook（tmux のペインの表示・通知音）も発火し、ペインは Stop まで赤のまま残る
-  - B は静的判定なので、変数展開・コマンド置換・eval で組み立てた commit、`pushd` など `cd` 以外で移ったディレクトリでの commit、`--git-dir` / `--work-tree` で別のリポジトリを指した commit、`git merge` や `cherry-pick` など commit 以外で main に履歴を積む操作は止めない。クォートの対応が取れないコマンドは分割に失敗するので通す
+  - deny のあと、同じ event の他の hook（応答待ちの表示（この環境では Orca の agent hook）や通知音）も発火するので、人の入力が要らない自動の差し戻しでも応答待ちのように見える
+  - B は静的判定なので、変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、`sudo` / `exec` / `nohup` などの前置コマンドや絶対パスで呼んだ git、クォートやエスケープで分けた subcommand、git の alias、`pushd` など `cd` 以外で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や `GIT_DIR` などの環境変数で別のリポジトリを指した commit、`git merge` や `cherry-pick` など commit 以外で main に履歴を積む操作は止めない。クォートの対応が取れないコマンドは分割に失敗するので通す
   - add-hook skill の規約（block は exit 2、PermissionRequest の matcher は `""` など）から A は外れる。PermissionRequest で拒否する公式の方式は JSON の decision で、matcher は tool_name に当たるため
+  - A・B の目的は善意の誤操作（規則の見落とし）の防止で、意図的な迂回への防御ではない。via は自己申告の逃げ道で、上の限界のとおり迂回の手段もある。main の保護は branch protection に任せる（knowledge-maturity の検査スクリプトと同じ位置付け。ADR 0014）
   - ADR 0003・0010 の「止めるより注意に留める」方向を、この 2 点に限って覆す
 
 ## 選択肢の評価（Pros and Cons）

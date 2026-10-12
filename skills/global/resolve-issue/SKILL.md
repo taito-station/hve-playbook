@@ -130,7 +130,7 @@ Skill ツールで呼び、Knowledge 検索・棄却済み案チェック・質�
 質問票の回答探索は項目 1 の探索順とガードレールに従う（hve-implement が参照する）。ただし PO の回答は `knowledge/<domain>/` に保存せず（HVE の check-knowledge.py は項目 1 の書式を knowledge 文書として扱えない）、次のとおり `qa/` に残す。knowledge には AKM の蒸留で入れる。Gmail で見つけた回答は保存しない。導入先の hve-implement の写しの記述と食い違うときは、本 skill の定義を優先する:
 - PO の回答: questionnaire skill が書く `qa/*.md`（`docs/qa/` があればそこ）を正とする。項目 4 は Issue コメントへの反映だけにする
 - Gmail で見つけた回答: Q&A 書式の回答としては保存しない（qa にも `knowledge/` にも書かない）。項目 1 の手順 2 のとおり、質問票の既定値候補として PO に渡す（質問票の記録 `qa/*.md` には、既定値候補とその理由として残る）
-結果は項目 2 の Plan の「前提」「設計方針」に書く。
+結果は項目 2 の Plan の「ゲートの確認結果」に書き、前提や設計方針に効くものは「前提」「設計方針」にも書く。
 STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 ではなく hve-implement の Step 7 で書く。
 
 1. **不確定点チェック + 業務ナレッジ駆動の回答探索**:

@@ -10,7 +10,7 @@ ExitPlanMode で計画の承認を求める前に、計画本文に次の 2 つ�
 - 「ルール準拠表」: ルール｜状態｜対応 の表。節の中に `|` を含む行が 1 行以上必要
 
 判定:
-- 見出しは `#`〜`####`。見出しの文字列が上の語を含めばよい（前後の語・括弧書きは許容）
+- 見出しは `#`〜`####`（行頭の空白は 3 つまで）。見出しの文字列が上の語を含めばよい（前後の語・括弧書きは許容）
 - コードフェンス（``` / ~~~）の中の行は見出しとも表の行とも数えない
 - ルール準拠表の節は、同じか上位のレベルの次の見出しまで
 - 計画本文は `tool_input.plan`。無ければ `tool_input.planFilePath` のファイルを読む。
@@ -29,13 +29,15 @@ ExitPlanMode で計画の承認を求める前に、計画本文に次の 2 つ�
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 
 GATE = "ゲートの確認結果"
 TABLE = "ルール準拠表"
 
-HEADING_RE = re.compile(r"^(#{1,4})\s+(.*)$")
+MAX_PLAN_BYTES = 1_000_000
+HEADING_RE = re.compile(r"^ {0,3}(#{1,4})[ \t]+(.*)$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 # 計画ファイルの Write / Edit と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容
 # （初回はファイルが無いので空）で判定される（2026-10-12 の E2E で確認）
@@ -50,10 +52,11 @@ def _plan_text(ti: dict) -> str:
     if isinstance(plan, str) and plan.strip():
         return plan
     path = ti.get("planFilePath")
-    if isinstance(path, str) and path:
+    # 通常のファイルに限り、読む量に上限を付ける（FIFO や巨大なファイルで待たない）
+    if isinstance(path, str) and path and os.path.isfile(path):
         try:
             with open(path, encoding="utf-8") as f:
-                return f.read()
+                return f.read(MAX_PLAN_BYTES)
         except OSError:
             return ""
     return ""

@@ -8,8 +8,7 @@
 # stdout に decision.behavior=deny の JSON を出す (exit 0)。
 # 通すときは何も出さずに exit 0 (承認画面へ進む)。
 #
-# 各テストは `&&` 連結 (bash -e が if 配下で効かない POSIX 仕様への対策。
-# test_destructive_guard.sh と同じ規約)。
+# 各テストは run で包み、PASS / FAIL を数えて最後に終了コードを決める。
 
 HOOK="$(cd "$(dirname "$0")/.." && pwd)/hooks/plan-gate-check.py"
 TMP="$(mktemp -d)"
@@ -41,10 +40,12 @@ print(json.dumps({"hook_event_name": "PermissionRequest", "tool_name": "ExitPlan
 ' "$1" "${2:-}" | python3 "$HOOK" 2>/dev/null
 }
 
-# deny の JSON が出ていて、message に $2 (省略可) を含む
+# deny の JSON が出ていて、message に $2 (省略可) を含み、exit 0
+# (PermissionRequest の decision は exit 0 のときだけ解釈される)
 denied() {
-    local out
-    out="$(_out "$1" "${3:-}")"
+    local out rc
+    out="$(_out "$1" "${3:-}")"; rc=$?
+    [ "$rc" = "0" ] || return 1
     python3 -c '
 import json, sys
 d = json.loads(sys.argv[1])
@@ -107,6 +108,12 @@ run "A19: ~~~ のフェンスの中の \`\`\` で状態を反転させない" \
 ~~~
 $TABLE"
 
+run "A20: 行頭に 3 つまでの空白がある見出しも数える" \
+    allowed "   ## ゲートの確認結果
+- 済み
+  ## ルール準拠表
+| a | b | c |"
+
 PLANFILE="$TMP/plan.md"
 printf '%s\n\n%s\n' "$GATE" "$TABLE" > "$PLANFILE"
 run "A10: plan が無くても planFilePath の中身で判定して通す" \
@@ -151,6 +158,10 @@ run "A9: plan も planFilePath も無い ({}) なら deny" \
 
 run "A11: planFilePath のファイルが無ければ deny" \
     denied "" "計画本文" "$TMP/missing.md"
+
+mkfifo "$TMP/fifo"
+run "A21: planFilePath が通常のファイルでなければ読まずに deny (FIFO で待たない)" \
+    denied "" "計画本文" "$TMP/fifo"
 
 # ---------- 対象外・fail-open ----------
 other_tool_allowed() {

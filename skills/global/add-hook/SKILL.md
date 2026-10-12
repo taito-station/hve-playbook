@@ -63,6 +63,8 @@ if __name__ == "__main__":
 - **block は exit 2** + 理由を stderr に。block hook には **bypass マーカー**
   (`# via:<name>-ok: <非空の理由>`) を設けると、誤検知時の escape hatch になる
   (destructive-guard と同じ流儀)。
+- `PermissionRequest` で拒否するときは、exit 2 ではなく `hookSpecificOutput.decision.behavior = "deny"`
+  と `message` の JSON を stdout に出して exit 0 にする（plan-gate-check と同じ流儀。ADR 0019）。
 - 個人パス・プロジェクト名をハードコードしない (public 共有のため。`~` を使う)。
 
 `chmod +x hooks/<name>.py` は任意 (settings は `python3 ~/.claude/hooks/<name>.py` で
@@ -76,8 +78,8 @@ repo 版と `settings.machine.json` から生成するファイルなので、�
 ADR-0006）。Event と matcher を正しく選ぶ:
 
 - `PreToolUse` / `PostToolUse`: matcher は tool 名 (`"Bash"` / `"Write"` 等)、全 tool は `""`
-- `UserPromptSubmit` / `SessionStart` / `PermissionRequest`: matcher は `""` または
-  source 等 (例: SessionStart の `"startup|clear"`)
+- `UserPromptSubmit` / `SessionStart`: matcher は `""` または source 等 (例: SessionStart の `"startup|clear"`)
+- `PermissionRequest`: matcher は tool 名 (例: `"ExitPlanMode"`)、全 tool は `""`
 
 既存ブロックに `{"type":"command","command":"python3 ~/.claude/hooks/<name>.py"}` を追加。
 **hook の実行順が意味を持つ場合は順序に注意**(例: PreToolUse(Bash) で skill-enforcer.py を

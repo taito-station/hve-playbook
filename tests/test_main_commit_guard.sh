@@ -7,8 +7,7 @@
 # `git commit` を exit 2 で止める。ブランチは一時ディレクトリに作った実リポジトリで判定する。
 # exit 2 = block / exit 0 = allow を検証する。
 #
-# 各テストは `&&` 連結 (bash -e が if 配下で効かない POSIX 仕様への対策。
-# test_destructive_guard.sh と同じ規約)。
+# 各テストは run で包み、PASS / FAIL を数えて最後に終了コードを決める。
 
 HOOK="$(cd "$(dirname "$0")/.." && pwd)/hooks/main-commit-guard.py"
 TMP="$(mktemp -d)"
@@ -69,10 +68,20 @@ run "B28: 値を別トークンで取るグローバルオプション" blocked 
 run "B29: サブシェルの中の commit" blocked '(git commit -m x)' "$TMP/main"
 run "B30: then の後の commit" blocked 'if true; then git commit -m x; fi' "$TMP/main"
 run "B32: メッセージが # で始まる commit" blocked 'git commit -m "#123 fix"' "$TMP/main"
+run "B33: heredoc の本文にアポストロフィ" blocked $'git commit -F - <<\'EOF\'\nfix: don\'t break\nEOF' "$TMP/main"
+run "B34: heredoc の本文の via は通さない" blocked $'git commit -F - <<EOF\n# via:main-commit-ok: x\nEOF' "$TMP/main"
+run "B35: 単語の途中の # に続く via は通さない" blocked 'git commit -m "#1"# via:main-commit-ok: x' "$TMP/main"
+run "B36: if の条件の commit" blocked 'if git commit -m x; then echo ok; fi' "$TMP/main"
+run "B37: while の条件の commit" blocked 'while git commit -m x; do :; done' "$TMP/main"
+run "B38: command の後の commit" blocked 'command git commit -m x' "$TMP/main"
+run "B39: env の後の commit" blocked 'env -u X FOO=1 git commit -m x' "$TMP/main"
+run "B40: cd -P で main のリポジトリに移ってから commit" blocked "cd -P $TMP/main && git commit -m x" "$TMP/norepo"
+run "B41: cd -- で main のリポジトリに移ってから commit" blocked "cd -- $TMP/main && git commit -m x" "$TMP/norepo"
 run "B13: 理由の無い via は通さない" blocked 'git commit -m x # via:main-commit-ok:' "$TMP/main"
 run "B14: クォート内の via は通さない" blocked "git commit -m '# via:main-commit-ok: x'" "$TMP/main"
 
 # ---------- 通す ----------
+run "B42: heredoc の commit も作業ブランチ上なら通す" allowed $'git commit -F - <<\'EOF\'\nfix: don\'t break\nEOF' "$TMP/feature"
 run "B4: 作業ブランチ上の commit" allowed 'git commit -m x' "$TMP/feature"
 run "B5: detached HEAD の commit" allowed 'git commit -m x' "$TMP/detached"
 run "B6: リポジトリ外" allowed 'git commit -m x' "$TMP/norepo"

@@ -10,20 +10,23 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
 実害であるコミットの時点で止める。
 
 判定:
-- コメントを除いてから shlex で分割し、`;` `&&` `||` `|` `&` 括弧・改行で区切ったセグメントごとに見る
-- セグメントの先頭（`VAR=val` の前置と `then` `do` `{` などの予約語を除く）が `git` で、グローバルオプション
+- heredoc の本文とコメントを除いてから shlex で分割し、`;` `&&` `||` `|` `&` 括弧・改行で区切ったセグメントごとに見る
+- セグメントの先頭（`VAR=val` の前置、`if` `while` `then` `do` `{` などの予約語、`command`、
+  `env` とそのオプション・代入を除く）が `git` で、グローバルオプション
   （`-C <path>` / `-c <x=y>` / `--git-dir <path>` など / `--opt[=val]`）の後の subcommand が `commit` なら対象
 - 判定するリポジトリ: `git -C <path>`（複数なら順に連結。相対パスは基準のディレクトリから）。
-  基準のディレクトリは payload の `cwd` で、同じコマンド内の `cd <path>` に追従する
+  基準のディレクトリは payload の `cwd` で、同じコマンド内の `cd [オプション] <path>` に追従する
 - `git symbolic-ref --short -q HEAD` が `main` / `master` なら止める（unborn のブランチも含む）。
   detached HEAD・リポジトリ外・git の失敗は通す
 
-bypass: コマンド末尾の本物のシェルコメント `# via:main-commit-ok: <理由>`（理由必須。
-クォート内に紛れ込ませたものは無効）。
+bypass: コマンド中の本物のシェルコメント（クォートと heredoc の本文の外で、単語の先頭の `#`）が
+`# via:main-commit-ok: <理由>` のとき（理由必須）。
 
-静的判定の限界（止めない）: 変数展開・コマンド置換・eval で組み立てた commit、
-`cd` 以外の手段（pushd など）で移ったディレクトリでの commit、`--git-dir` / `--work-tree` で
-別のリポジトリを指した commit（基準のディレクトリのブランチで判定する）、
+静的判定の限界（止めない）: 変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、
+`sudo` / `exec` / `nohup` などの前置コマンドや絶対パス（`/usr/bin/git`）で呼んだ git、
+クォートやエスケープで分けた subcommand（`git "com"mit`）、git の alias（`git -c alias.ci=commit ci`）、
+`cd` 以外の手段（pushd など）で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や
+`GIT_DIR` などの環境変数で別のリポジトリを指した commit（基準のディレクトリのブランチで判定する）、
 `git merge` / `cherry-pick` など commit 以外で main に履歴を積む操作。
 サブシェルの中の `cd` は外にも効くものとして扱う（止める側に倒れる）。
 クォートの対応が取れないコマンドは shlex が失敗するので通す（fail-open）。
@@ -44,16 +47,37 @@ PROTECTED = ("main", "master")
 PUNCT = ";&|()\n"
 OPERATORS = set(PUNCT)
 ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-# セグメントの先頭で読み飛ばすシェルの予約語
-LEADING_WORDS = {"then", "do", "else", "!", "{", "time"}
+# セグメントの先頭で読み飛ばすシェルの予約語と前置コマンド
+LEADING_WORDS = {"if", "elif", "while", "until", "then", "do", "else", "!", "{", "time", "command"}
+# env のオプションのうち値を別トークンで取るもの
+ENV_VALUE_OPTS = {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"}
+HEREDOC_RE = re.compile(r"(?<!<)<<(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+VIA_RE = re.compile(r"#\s*via:main-commit-ok\s*:\s*\S")
 # 値を別トークンで取る git のグローバルオプション（-C は別に扱う）
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 
 
-def _strip_comments(cmd: str) -> str:
-    """クォートの外で単語の先頭にある `#` から行末までを除く（改行は残す）。
+def _strip_heredocs(cmd: str) -> str:
+    """heredoc（`<<WORD` / `<<'WORD'` / `<<-WORD`）の本文の行を除く。本文はシェルのコマンドではないので、
+    shlex に通すとアポストロフィなどで分割に失敗し、コメントや via の判定も誤る。"""
+    out = []
+    pending: list[tuple[str, bool]] = []  # (終端語, <<- か)
+    for line in cmd.split("\n"):
+        if pending:
+            word, dash = pending[0]
+            if (line.lstrip("\t") if dash else line) == word:
+                pending.pop(0)
+            continue
+        out.append(line)
+        pending = [(m.group(3), m.group(1) == "-") for m in HEREDOC_RE.finditer(line)]
+    return "\n".join(out)
+
+
+def _strip_comments(cmd: str) -> tuple[str, list[str]]:
+    """クォートの外で単語の先頭にある `#` から行末までを除き（改行は残す）、除いたコメントも返す。
     shlex のコメント処理は改行まで読み捨てて次の行と 1 つのセグメントにつなげてしまうため、自前で除く。"""
     out = []
+    comments = []
     quote = None
     i = 0
     while i < len(cmd):
@@ -74,18 +98,20 @@ def _strip_comments(cmd: str) -> str:
             quote = c
             out.append(c)
         elif c == "#" and (not out or out[-1] in " \t\n" + PUNCT):
-            while i < len(cmd) and cmd[i] != "\n":
-                i += 1
+            j = cmd.find("\n", i)
+            j = len(cmd) if j < 0 else j
+            comments.append(cmd[i:j])
+            i = j
             continue
         else:
             out.append(c)
         i += 1
-    return "".join(out)
+    return "".join(out), comments
 
 
-def _segments(cmd: str) -> list[list[str]]:
-    """コマンドを演算子・括弧・改行で区切ったトークン列のリストにする。コメントは除く。"""
-    cmd = _strip_comments(re.sub(r"\\\n", " ", cmd))
+def _parse(cmd: str) -> tuple[list[list[str]], list[str]]:
+    """コマンドを演算子・括弧・改行で区切ったトークン列のリストと、コメントのリストにする。"""
+    cmd, comments = _strip_comments(_strip_heredocs(re.sub(r"\\\n", " ", cmd)))
     lex = shlex.shlex(cmd, posix=True, punctuation_chars=PUNCT)
     lex.whitespace = " \t\r"
     lex.whitespace_split = True
@@ -96,14 +122,23 @@ def _segments(cmd: str) -> list[list[str]]:
             segs.append([])
         else:
             segs[-1].append(tok)
-    return [s for s in segs if s]
+    return [s for s in segs if s], comments
 
 
 def _commit_dir(seg: list[str], base: str) -> str | None:
     """seg が git commit なら判定するディレクトリを、そうでなければ None を返す。"""
     i = 0
-    while i < len(seg) and (seg[i] in LEADING_WORDS or ASSIGN_RE.match(seg[i])):
-        i += 1
+    while i < len(seg):
+        t = seg[i]
+        if t in LEADING_WORDS or ASSIGN_RE.match(t):
+            i += 1
+            continue
+        if t == "env":
+            i += 1
+            while i < len(seg) and seg[i].startswith("-"):
+                i += 2 if seg[i] in ENV_VALUE_OPTS else 1
+            continue
+        break
     if i >= len(seg) or seg[i] != "git":
         return None
     i += 1
@@ -141,12 +176,14 @@ def _branch(d: str) -> str | None:
     return r.stdout.strip() or None
 
 
-def _blocked(cmd: str, cwd: str) -> tuple[str, str] | None:
+def _blocked(segs: list[list[str]], cwd: str) -> tuple[str, str] | None:
     """止めるなら (ディレクトリ, ブランチ) を返す。"""
     base = cwd
-    for seg in _segments(cmd):
-        if seg[0] == "cd" and len(seg) == 2:
-            base = os.path.join(base, os.path.expanduser(seg[1]))
+    for seg in segs:
+        if seg[0] == "cd":
+            args = [a for a in seg[1:] if not a.startswith("-")]
+            if len(args) == 1:
+                base = os.path.join(base, os.path.expanduser(args[0]))
             continue
         d = _commit_dir(seg, base)
         if d is None:
@@ -175,13 +212,13 @@ def main() -> int:
         if not isinstance(cwd, str) or not cwd:
             cwd = os.getcwd()
 
-        hit = _blocked(cmd, cwd)
+        segs, comments = _parse(cmd)
+        hit = _blocked(segs, cwd)
         if hit is None:
             return 0
 
-        # bypass: クォートを除いてから、本物のコメント位置の via を探す（destructive-guard と同じ方式）
-        stripped = re.sub(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"", "", cmd)
-        if re.search(r"(?:^|\s)#\s*via:main-commit-ok\s*:\s*\S", stripped):
+        # bypass: 分割のときに除いた本物のコメントの中だけで via を探す
+        if any(VIA_RE.match(c) for c in comments):
             return 0
 
         d, b = hit
@@ -190,7 +227,7 @@ def main() -> int:
             f"reason: `{b}` ブランチ上での git commit（{d}）。main / master へは直接 commit しない。\n"
             "`git switch -c <type>/<short-kebab-description>` で作業ブランチへ退避してから commit する"
             "（未コミットの変更はそのまま持ち越せる）。\n"
-            "ユーザーが main への commit を明示的に指示した場合のみ、コマンド末尾に "
+            "ユーザーが main への commit を明示的に指示した場合のみ、コマンドの末尾にコメントで "
             "`# via:main-commit-ok: <理由>` を付ける（理由は非空必須）。",
             file=sys.stderr,
         )
