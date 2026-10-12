@@ -99,15 +99,16 @@ AskUserQuestion({
    (`knowledge/` は利用リポ側の資産。無ければ手順 1 と永続化を skip する。
    ナレッジファイルの形式は resolve-issue skill Step 2 [feature] に定義):
    1. `knowledge/<domain>/` を検索（利用リポにある場合。domain は Issue の業務領域から判定）。
-      既知の Q&A で回答できる質問は質問票から除外する。
+      既知の Q&A で回答できる質問は質問票から除外する（`source: gmail` の Q&A は除外に使わず、既定値候補として質問票に含める。resolve-issue skill Step 2 と同一）。
       `last_verified` が 6 ヶ月以上前のナレッジは「要再確認」として除外せず質問票に含める
       （resolve-issue skill Step 2 と同一の陳腐化チェック規約）
    2. Gmail MCP で未解決の質問を検索（スコープ制限・PII 除去は resolve-issue skill Step 2 と同一規約）。
-      発見した回答は `knowledge/<domain>/` に永続化する
-      （HVE 導入先では qa ディレクトリに置く。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義）
-   3. 残った未解決の質問のみ `/questionnaire` スキルで PO に質問する
+      発見した回答は保存せず（Q&A 書式の回答として `knowledge/<domain>/` にも qa にも書かない）、手順 3 の質問票の既定値候補にする
+      （扱いは resolve-issue skill Step 2 [feature] 項目 1 の手順 2 に定義）
+   3. 残った未解決の質問と、手順 2 で回答候補が見つかった質問を、件数に関わらず `/questionnaire` スキルで PO に質問する（resolve-issue skill Step 2 と同一）
    4. PO 回答を `knowledge/<domain>/` に永続化する
-      （HVE 導入先では書かず、questionnaire skill の `qa/*.md` を正とする。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義）
+      （HVE 導入先では書かず、questionnaire skill の `qa/*.md` を正とする。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義）。
+      同じ質問の `source: gmail` の Q&A は、resolve-issue skill Step 2 [feature] 項目 1 の手順 4 のとおり置き換える
    回答を受領後、回答内容をもとに Step 1 の要件・背景セクションを具体化して Step 2 へ
 4. 「スキップ」→ そのまま Step 2 へ
 

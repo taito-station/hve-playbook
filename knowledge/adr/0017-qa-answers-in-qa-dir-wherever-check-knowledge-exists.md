@@ -2,7 +2,10 @@
 
 ## ステータス
 
-Accepted — 2026-10-07
+Partially superseded by 0019-gmail-answers-as-questionnaire-defaults — 2026-10-12
+
+- 有効な部分: HVE 導入先の判定（検査スクリプトの有無）、PO の回答は questionnaire skill の `qa/*.md` を正とすること、`qa/` を回答の探索対象に加えないこと
+- 失効した部分: Gmail で見つけた回答を qa ディレクトリ（HVE が無いリポジトリでは `knowledge/<domain>/`）に Q&A 書式で置くこと。0019 で、保存せず質問票の既定値候補にすると決めた
 
 ## 背景と課題
 
