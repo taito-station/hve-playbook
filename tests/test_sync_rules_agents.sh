@@ -115,6 +115,17 @@ check "setup.sh: global の agent は配らない" [ ! -e "$T/.claude/agents/$AG
 check "setup.sh: global skill は配らない" [ ! -e "$T/.claude/skills/learn" ]
 check "setup.sh: hve-implement skill を配る" [ -f "$T/.claude/skills/hve-implement/SKILL.md" ]
 
+# 5b) 言語に依存しないクリーンアーキテクチャ規約（Issue #34、ADR 0018）
+CA="$T/.claude/rules/hve/clean-architecture.md"
+check "setup.sh: clean-architecture 規約を配る" [ -f "$CA" ]
+# frontmatter（1 行目の --- から次の --- まで）の paths: に並ぶ glob を 1 行ずつ出す（クォートは外す）
+# 閉じの --- が無い（frontmatter として読まれない）ときは何も出さない
+ca_paths() { awk 'NR==1&&$0!="---"{exit} NR>1&&$0=="---"{closed=1; exit} /^paths:/{on=1;next} on&&/^[^ ]/{on=0} on&&/^ *- /{sub(/^ *- */,""); gsub(/["\047]/,""); buf=buf $0 "\n"} END{if(closed) printf "%s", buf}' "$CA" 2>/dev/null; }
+# paths: が対象の 16 種の拡張子と過不足なく一致する（.md・**/*・.sh などの混入や欠けを検出する）
+CA_EXPECTED="$(for e in rs go py rb php java kt cs ts tsx js jsx vue svelte swift dart; do printf '**/*.%s\n' "$e"; done | sort)"
+ca_paths_exact() { [ "$(ca_paths | sort)" = "$CA_EXPECTED" ]; }
+check "clean-architecture: paths: が対象の 16 種の拡張子と過不足なく一致する" ca_paths_exact
+
 # 6) workflow が Read させる SKILL.md は、導入先でも hve-playbook 自身でもルートから解決できる
 read_paths() { grep -ohE 'Read [^ ]+/SKILL\.md' "$1"/hve-*.js | sed 's/^Read //' | sort -u; }
 all_exist() {

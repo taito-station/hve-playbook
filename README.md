@@ -171,6 +171,8 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 6. **成果物管理** — ファイル配置・更新ポリシー
 7. **ツール利用ポリシー** — cq/mdq/LSP/grep の優先順位
 
+このほか、コードを読んだときに `rules/hve/clean-architecture.md`（言語を問わないクリーンアーキテクチャ規約）を読み込む（[ADR-0018](knowledge/adr/0018-language-agnostic-clean-architecture-rule.md)）。
+
 ## 使い方の詳細
 
 プロジェクトへの組み込み方やワークフロー実行のプロンプト例は [docs/usage-prompts.md](docs/usage-prompts.md) を参照。
