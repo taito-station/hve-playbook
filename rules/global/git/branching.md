@@ -22,6 +22,8 @@ git switch -c <type>/<short-kebab-description>
 
 すでに `main` で変更を作ってしまった場合は、`git switch -c <branch>` で作業ブランチへ退避してから commit する（`main` には残さない）。
 
+`main` / `master` 上の `git commit` は hook（main-commit-guard）が止める。ユーザーが `main` への commit を明示的に指示したときだけ、コマンド末尾に `# via:main-commit-ok: <理由>` を付ける。
+
 ## ブランチ命名規則
 
 `<type>/<short-kebab-description>` の形式。`<type>` は Conventional Commits の type と揃える。
