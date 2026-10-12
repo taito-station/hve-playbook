@@ -24,3 +24,4 @@
 | [0016](0016-hve-implement-skill-and-two-phase-call-from-resolve-issue.md) | implement-flow の実行手順を hve-implement skill として配り、resolve-issue からは 2 段で呼ぶ | Accepted | 2026-10-05 |
 | [0017](0017-qa-answers-in-qa-dir-wherever-check-knowledge-exists.md) | HVE 導入先では、質問の回答を経路を問わず qa/ に残す | Accepted | 2026-10-07 |
 | [0018](0018-language-agnostic-clean-architecture-rule.md) | 言語を問わないクリーンアーキテクチャ規約を rules/hve に置き、コードを読んだときに読み込む | Accepted | 2026-10-12 |
+| [0018](0018-gmail-qa-answers-tentative-below-knowledge.md) | Gmail 由来の qa の回答は、SoT で knowledge より下に置き、それだけでは Confirmed にしない | Accepted | 2026-10-12 |

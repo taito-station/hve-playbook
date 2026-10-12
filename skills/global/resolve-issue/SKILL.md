@@ -129,7 +129,7 @@ if ERRORS is not empty:
 Skill ツールで呼び、Knowledge 検索・棄却済み案チェック・質問票（implement-flow の Step 2〜4）を済ませる。
 質問票の回答探索は項目 1 の探索順とガードレールに従う（hve-implement が参照する）。ただし回答は `knowledge/<domain>/` に保存せず（HVE の check-knowledge.py は項目 1 の書式を knowledge 文書として扱えない）、次のとおり `qa/` に残す。knowledge には AKM の蒸留で入れる:
 - PO の回答: questionnaire skill が書く `qa/*.md`（`docs/qa/` があればそこ）を正とする。項目 4 は Issue コメントへの反映だけにする
-- Gmail で見つけた回答: questionnaire と同じ qa ディレクトリに、項目 1 の書式と PII の規則（本文とメタデータの全フィールドで PII を書かない、メールを引用しない、`source` に送信者名を書かない）のまま保存する
+- Gmail で見つけた回答: questionnaire と同じ qa ディレクトリに、項目 1 の書式と PII の規則（本文とメタデータの全フィールドで PII を書かない、メールを引用しない、`source` に送信者名を書かない）のまま保存する。Gmail の回答は PO の回答ではない（未確定の回答）。AKM での扱い（SoT・`Confirmed` への昇格）は `.claude/rules/hve/knowledge-maturity.md` に従う
 結果は項目 2 の Plan の「前提」「設計方針」に書く。
 STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 ではなく hve-implement の Step 7 で書く。
 

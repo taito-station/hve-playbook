@@ -67,6 +67,7 @@ stale な各ファイルについて、source の変更を knowledge 本文に�
 2. 変更内容を knowledge 本文に差分マージする
    - **全書き換え禁止**。変更箇所のみ更新する
    - source にない情報（既存の蒸留結果）は維持する
+   - Gmail 由来の qa（`source: gmail (…)`）は、`rules/hve/knowledge-maturity.md` の「SoT 優先順位」と「status の 3 段階」に従う（knowledge より下位。それだけを根拠にした記述を含む文書は `Tentative` に留める）
 3. 決定を伴う変更がある場合は、決定ログ（既定は `knowledge/adr/`。インライン方式を宣言したプロジェクトは各 knowledge の `## 決定ログ` 節）に新エントリを追加する
 4. 本文の変更をコミットしたあと、`python3 .claude/scripts/hve/bump-distilled-sha.py <文書>` で `distilled_from_sha` をそのコミットへ進め、追従のコミットを積む（コミットは自分の sha を含められないので 2 コミットになる。squash・rebase の後の扱いは knowledge-maturity の「sha の追従」）
 5. frontmatter の `updated` は、本文または status が実質的に変わった場合だけ当日日付に更新する（`distilled_from_sha` だけの追従では触らない。判断は `rules/hve/knowledge-maturity.md` の「`updated` の規則」に従う）
@@ -97,6 +98,8 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 | 重大（事実の矛盾、SoT 違反） | 該当文書の status を `Conflict` に変更し、ユーザーに報告して STOP。`distilled_from_sha` と `updated` の扱いは `rules/hve/knowledge-maturity.md` の「status の 3 段階」に従う（※）。すでに status が `Conflict` の文書は対象外（宣言し直さず、機械検査の解消待ち一覧に載せるだけ）。STOP するのは、この回に新しく Conflict を宣言したときだけ |
 
 ※ Step 2 で差分マージしていたら、本文と sha をどちらも蒸留前に戻す。その差分のために手順 3 で足した、まだコミットしていない決定ログのエントリも取り消す
+
+Gmail 由来の qa（`source: gmail (…)`）と、他の source・knowledge との食い違いは Conflict にしない。上位を採り、報告に含める（`rules/hve/knowledge-maturity.md` の「SoT 優先順位」）
 
 ### Step 4: カバレッジ分析
 

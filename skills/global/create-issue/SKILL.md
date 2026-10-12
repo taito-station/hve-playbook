@@ -104,7 +104,7 @@ AskUserQuestion({
       （resolve-issue skill Step 2 と同一の陳腐化チェック規約）
    2. Gmail MCP で未解決の質問を検索（スコープ制限・PII 除去は resolve-issue skill Step 2 と同一規約）。
       発見した回答は `knowledge/<domain>/` に永続化する
-      （HVE 導入先では qa ディレクトリに置く。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義）
+      （HVE 導入先では qa ディレクトリに置く。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義。PO の回答ではない未確定の回答としての扱いも同じ定義に従う）
    3. 残った未解決の質問のみ `/questionnaire` スキルで PO に質問する
    4. PO 回答を `knowledge/<domain>/` に永続化する
       （HVE 導入先では書かず、questionnaire skill の `qa/*.md` を正とする。判定と保存先は resolve-issue skill Step 2 [feature] 項目 1 に定義）

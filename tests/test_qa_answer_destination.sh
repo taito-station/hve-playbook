@@ -10,11 +10,16 @@
 #   - HVE が無いリポジトリの保存先（knowledge/<domain>/）は残る
 #   - qa/ を回答の探索対象に加えない
 #   - ADR 0017 と一覧の行がある
+#   - Gmail 由来の回答（source: gmail）は PO の回答と区別し、SoT で knowledge より下に置き、
+#     それだけを根拠に Confirmed にしない（Issue #56）。resolve-issue が定義し、create-issue・hve-implement が指す
 
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RI="$ROOT/skills/global/resolve-issue/SKILL.md"
 CI="$ROOT/skills/global/create-issue/SKILL.md"
+HI="$ROOT/skills/hve-implement/SKILL.md"
+KM="$ROOT/rules/hve/knowledge-maturity.md"
+AKM="$ROOT/skills/hve-akm/SKILL.md"
 pass=0
 fail=0
 check() {
@@ -65,6 +70,22 @@ check "create-issue: knowledge 検索の手順に qa/ を加えない" range_lac
 ADR="$(ls "$ROOT"/knowledge/adr/0017-*.md 2>/dev/null | head -1)"
 check "ADR 0017 がある" [ -n "$ADR" ]
 check "ADR 一覧に 0017 の行がある" grep -qF "0017" "$ROOT/knowledge/adr/README.md"
+
+# 7) Gmail 由来の回答の扱い（Issue #56）
+check "knowledge-maturity: SoT で Gmail 由来の qa を knowledge より下に置く" section_has "$KM" "## SoT" "## Stale" "> knowledge（蒸留済み確定知）> qa（Gmail 由来の回答）"
+check "knowledge-maturity: SoT で Gmail 由来を source: gmail で判定する" section_has "$KM" "## SoT" "## Stale" "\`source: gmail (YYYY-MM-DD)\`"
+check "knowledge-maturity: Gmail 由来の qa との食い違いでは Conflict を宣言しない" section_has "$KM" "## SoT" "## Stale" "\`Conflict\` を宣言せず、上位を採って報告する"
+check "knowledge-maturity: Gmail 由来の qa だけを根拠にした記述を含む文書は Tentative に留める" section_has "$KM" "## status の 3 段階" "## SoT" "文書全体を \`Tentative\` に留める"
+check "knowledge-maturity: PO が確認したら Confirmed にしてよい" section_has "$KM" "## status の 3 段階" "## SoT" "その記述を PO が確認したら"
+check "hve-akm: 蒸留で Gmail 由来の qa の扱いを knowledge-maturity に従わせる" section_has "$AKM" "### Step 2" "### Step 3" "\`source: gmail (…)\`"
+check "hve-akm: 整合性レビューで Gmail 由来の qa との食い違いを Conflict にしない" section_has "$AKM" "### Step 3" "### Step 4" "Conflict にしない"
+check "resolve-issue: Gmail の回答は PO の回答ではないと定義する" section_has "$RI" "$FEATURE_START" "$FEATURE_END" "Gmail の回答は PO の回答ではない（未確定の回答）"
+check "resolve-issue: Gmail の回答の AKM での扱いは knowledge-maturity に従う" section_has "$RI" "$FEATURE_START" "$FEATURE_END" "AKM での扱い（SoT・\`Confirmed\` への昇格）は"
+check "create-issue: Gmail の回答の扱いは resolve-issue の定義に従う" item_has "$CI" "発見した回答は" "未確定の回答としての扱いも同じ定義に従う"
+check "hve-implement: Gmail の回答の扱いは resolve-issue の定義に従う" line_has "$HI" "resolve-issue の前段（feature）" "未確定の回答。扱いは resolve-issue の定義に従う"
+ADR56="$(ls "$ROOT"/knowledge/adr/[0-9][0-9][0-9][0-9]-gmail-qa-*.md 2>/dev/null | head -1)"
+check "Issue #56 の ADR がある（番号でなく slug で探す）" [ -n "$ADR56" ]
+check "ADR 一覧に Issue #56 の ADR の行がある" grep -qF -- "-gmail-qa-" "$ROOT/knowledge/adr/README.md"
 
 echo
 echo "passed: $pass, failed: $fail"
