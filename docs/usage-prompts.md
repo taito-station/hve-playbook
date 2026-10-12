@@ -198,6 +198,8 @@ rules/hve/ 配下のルールは Claude Code が自動読み込みし、該当�
 5. **出力品質基準** — 日本語、見出し+箇条書き、出典付き
 6. **成果物管理** — `docs/` に恒久成果物、`work/` に一時ファイル
 
+この優先順位とは別に、ソースコードのファイルを読んだときは `rules/hve/clean-architecture.md`（言語を問わないクリーンアーキテクチャ規約）が読み込まれる。新しいリポジトリやこの規約の構成のコードはこの規約に従い、既存コードがこの規約の構成でなければ、既存コードの構成と命名、原則の適用の度合いに合わせる（移行は各リポジトリの Issue で決める）。
+
 ### 実装フロー（implement-flow）
 
 実装タスク（feat / fix / refactor / 改修）に自動適用される 9 段ゲートフロー。
@@ -280,5 +282,5 @@ Plan（Step 1）で特定した影響領域ごとに知識ベースを網羅的�
 
 - **段階的に導入可**: 全ルールを一度に適用する必要はない。implement-flow だけ先に導入し、Knowledge 管理は決定ログが溜まってから本格化する運用でもよい
 - **cq/mdq なしでも動作する**: 未インストール時は grep/find にフォールバックする。検索精度は下がるが動作はする
-- **rules/hve/ は自動適用**: `setup.sh` で `.claude/rules/hve/` に配置すれば、Claude Code が自動で読み込む。プロンプトで明示的に指示する必要はない
+- **rules/hve/ は自動適用**: `setup.sh` で `.claude/rules/hve/` に配置すれば、Claude Code が自動で読み込む。プロンプトで明示的に指示する必要はない。ただし `clean-architecture.md` は `paths:` 付きで、対象のコードを Read したときだけ載る。既存コードを読まずに書き始める新しいリポジトリでは明示的に読ませる（user-level の Rust 規約が入っている環境では、新しい Rust リポジトリで `Cargo.toml` だけを読むと言語別規約だけが載る）
 - **プロジェクト固有のカスタマイズ**: rules/hve/ や skills/hve-* の写しは編集しない（`setup.sh` を再実行すると上書きされる）。補足・上書きは `.claude/rules/hve-local/` に書く。書式と優先順位は `.claude/rules/hve/local-overrides.md` を参照
