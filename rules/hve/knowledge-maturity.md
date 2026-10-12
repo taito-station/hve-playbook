@@ -65,20 +65,18 @@ tags: [分類コード]
 - `Conflict` の文書は解消するまで蒸留しない。ユーザーが矛盾を判断して status を戻したら、次回の蒸留で通常どおり差分マージし、sha を進める
 - すでに `Conflict` の文書は、整合性レビューで矛盾が見つかっても宣言し直さない（status・本文・`distilled_from_sha`・`updated` を変えない）。解消待ちとして報告するだけにする
 - `Tentative` → `Confirmed` への昇格は、QA 回答の確認またはユーザーのレビュー承認による
-- Gmail 由来の qa（下記「SoT 優先順位」）だけを根拠にした記述を含む文書は、文書全体を `Tentative` に留める。その記述を PO が確認したら（questionnaire の qa に回答として記録する、またはユーザーのレビュー承認でその記述を確認する）`Confirmed` にしてよい
 
 ## SoT（Single Source of Truth）優先順位
 
 情報が矛盾する場合、上位が勝つ:
 
 ```
-docs-original（一次資料）> qa（Confirmed 回答）> knowledge（蒸留済み確定知）> qa（Gmail 由来の回答）
+docs-original（一次資料）> qa（Confirmed 回答）> knowledge（蒸留済み確定知）
 ```
 
 - `docs-original/`: ユーザー提供の原本。最も信頼度が高い
 - `qa/`: 質問票に対するユーザーの回答。Confirmed ステータスのもの
 - `knowledge/`: 上記を蒸留・統合した文書。派生物であり、source に従う
-- qa の Gmail 由来の回答: Q&A 書式で `source: gmail (YYYY-MM-DD)` のファイル（resolve-issue・create-issue が Gmail で見つけた回答）。PO が確認していないので「qa（Confirmed 回答）」に含めず、knowledge より下に置く。蒸留の source にしてよいが、他の source・knowledge と食い違っても `Conflict` を宣言せず、上位を採って報告する
 
 ## Stale 検出の仕組み
 
