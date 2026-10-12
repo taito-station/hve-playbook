@@ -218,7 +218,7 @@ STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 では�
    g. **ゲートの確認結果** — Knowledge 検索・棄却済み案チェック・ギャップ分析（implement-flow の
       Step 2〜4）の結果。implement-flow の対象外の変更は「対象外: <理由>」と書く
 
-   h. **ルール準拠表** — 関係する rules・skill ごとの準拠状況（ルール｜状態｜対応 の表）
+   h. **ルール準拠表** — 関係する rules・skill ごとの準拠状況（`| ルール | 状態 | 対応 |` の Markdown の表）
 
    **Plan のフォーマット** (Issue コメント):
 

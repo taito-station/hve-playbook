@@ -77,6 +77,12 @@ run "B38: command の後の commit" blocked 'command git commit -m x' "$TMP/main
 run "B39: env の後の commit" blocked 'env -u X FOO=1 git commit -m x' "$TMP/main"
 run "B40: cd -P で main のリポジトリに移ってから commit" blocked "cd -P $TMP/main && git commit -m x" "$TMP/norepo"
 run "B41: cd -- で main のリポジトリに移ってから commit" blocked "cd -- $TMP/main && git commit -m x" "$TMP/norepo"
+run "B43: クォート内の <<EOF の次の行の commit" blocked $'echo "<<EOF"\ngit commit -m x' "$TMP/main"
+run "B44: 算術展開の << の次の行の commit" blocked $'echo $((1<<n))\ngit commit -m x' "$TMP/main"
+run "B45: <<\\EOF の heredoc の本文にアポストロフィ" blocked $'git commit -F - <<\\EOF\nfix: don\'t break\nEOF' "$TMP/main"
+run "B48: 作業ブランチから git switch main して commit" blocked 'git switch main && git commit -m x' "$TMP/feature"
+run "B49: env -C で main のリポジトリを指す" blocked "env -C $TMP/main git commit -m x" "$TMP/feature"
+run "B51: time -p の後の commit" blocked 'time -p git commit -m x' "$TMP/main"
 run "B13: 理由の無い via は通さない" blocked 'git commit -m x # via:main-commit-ok:' "$TMP/main"
 run "B14: クォート内の via は通さない" blocked "git commit -m '# via:main-commit-ok: x'" "$TMP/main"
 
@@ -92,7 +98,11 @@ run "B31: 同じ行のコメントの中の commit" allowed 'git status # ok; gi
 run "B15: commit 以外の git" allowed 'git status' "$TMP/main"
 run "B16: commit が subcommand でない" allowed 'git log --grep commit' "$TMP/main"
 run "B17: git が先頭でないコマンドの引数" allowed 'echo git commit' "$TMP/main"
-run "B18: メッセージ内の ; や &&" allowed 'git -C feature commit -m "a; git commit && b"' "$TMP"
+# cwd は main。クォート内の ; や && で誤って分割すると `git commit` のセグメントが main で判定されて止まる
+run "B18: メッセージ内の ; や &&" allowed 'git -C ../feature commit -m "a; git commit && b"' "$TMP/main"
+run "B46: git switch -c で作業ブランチへ退避してから commit" allowed 'git switch -c feat/y && git commit -m x' "$TMP/main"
+run "B47: git checkout -b で作業ブランチへ退避してから commit" allowed 'git checkout -b feat/y && git add . && git commit -m x' "$TMP/main"
+run "B50: env -C で作業ブランチのリポジトリを指す" allowed "env -C $TMP/feature git commit -m x" "$TMP/main"
 run "B20: 存在しない cwd (git が失敗) は通す" allowed 'git commit -m x' "$TMP/nonexistent"
 
 non_bash_allowed() {

@@ -7,7 +7,7 @@ Claude Code PermissionRequest (matcher: ExitPlanMode) hook。
 ExitPlanMode で計画の承認を求める前に、計画本文に次の 2 つの見出しが揃っているかを検査する
 （ADR 0020）。揃っていなければ承認画面に進ませず、足りない見出しと書き方を返す。
 - 「ゲートの確認結果」: implement-flow の Step 2〜4 の結果。対象外の計画は「対象外: <理由>」と書く
-- 「ルール準拠表」: ルール｜状態｜対応 の表。節の中に `|` を含む行が 1 行以上必要
+- 「ルール準拠表」: `| ルール | 状態 | 対応 |` の Markdown の表。節の中に `|` を含む行が 1 行以上必要
 
 判定:
 - 見出しは `#`〜`####`（行頭の空白は 3 つまで）。見出しの文字列が上の語を含めばよい（前後の語・括弧書きは許容）
@@ -36,7 +36,7 @@ import sys
 GATE = "ゲートの確認結果"
 TABLE = "ルール準拠表"
 
-MAX_PLAN_BYTES = 1_000_000
+MAX_PLAN_CHARS = 1_000_000
 HEADING_RE = re.compile(r"^ {0,3}(#{1,4})[ \t]+(.*)$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 # 計画ファイルの Write / Edit と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容
@@ -55,8 +55,8 @@ def _plan_text(ti: dict) -> str:
     # 通常のファイルに限り、読む量に上限を付ける（FIFO や巨大なファイルで待たない）
     if isinstance(path, str) and path and os.path.isfile(path):
         try:
-            with open(path, encoding="utf-8") as f:
-                return f.read(MAX_PLAN_BYTES)
+            with open(path, encoding="utf-8", errors="replace") as f:
+                return f.read(MAX_PLAN_CHARS)
         except OSError:
             return ""
     return ""
@@ -110,9 +110,9 @@ def _missing(text: str) -> list[str]:
             "Step 4（ギャップ分析）の結果を書く。implement-flow の対象外の計画は「対象外: <理由>」と書く"
         )
     if not table_found:
-        missing.append(f"「{TABLE}」の見出し: ルール｜状態｜対応 の表で、関係する rules・skill ごとの準拠状況を書く")
+        missing.append(f"「{TABLE}」の見出し: `| ルール | 状態 | 対応 |` の Markdown の表で、関係する rules・skill ごとの準拠状況を書く")
     elif not table_has_row:
-        missing.append(f"「{TABLE}」の節の表: ルール｜状態｜対応 の表の行（`|` を含む行）が 1 行も無い")
+        missing.append(f"「{TABLE}」の節の表: `| ルール | 状態 | 対応 |` の Markdown の表の行（半角の `|` を含む行）が 1 行も無い")
     return missing
 
 

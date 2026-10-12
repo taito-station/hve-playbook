@@ -64,7 +64,7 @@ if __name__ == "__main__":
   (`# via:<name>-ok: <非空の理由>`) を設けると、誤検知時の escape hatch になる
   (destructive-guard と同じ流儀)。
 - `PermissionRequest` で拒否するときは、exit 2 ではなく `hookSpecificOutput.decision.behavior = "deny"`
-  と `message` の JSON を stdout に出して exit 0 にする（plan-gate-check と同じ流儀。ADR 0019）。
+  と `message` の JSON を stdout に出して exit 0 にする（plan-gate-check と同じ流儀。ADR 0020）。
 - 個人パス・プロジェクト名をハードコードしない (public 共有のため。`~` を使う)。
 
 `chmod +x hooks/<name>.py` は任意 (settings は `python3 ~/.claude/hooks/<name>.py` で

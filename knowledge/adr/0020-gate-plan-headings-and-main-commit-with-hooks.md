@@ -8,7 +8,7 @@ Accepted — 2026-10-12
 
 開発ルール（Plan モード必須、implement-flow の Step 2〜4、ブランチ必須、ルール準拠表）は rules・skill の文面とメモリに頼っており、計画の段階で「ルール遵守の確認」による差し戻しが続いた（2026-09-27、10-03、10-04 に 2 件）。ADR 0016 も、hve-implement の順序を実行時に守らせる仕組みは同梱していないと書いている。
 
-既存の hook は、破壊的なコマンドの停止（destructive-guard）、skill への誘導（skill-enforcer）、SQL のスキーマ確認（sql-schema-check）に限られ、ルールの順守を止めるものは無かった。これまでの判断は「止めるより注意に留める」方向だった（ADR 0003 は create-pr の AKM チェックを STOP ゲートにせず、ADR 0010 は LSP を強制する hook を廃止した）。
+既存の hook は、破壊的なコマンドや誤った push などの安全ガード（destructive-guard・git-push-merged-pr-check・sail-env-inline-block・sql-schema-check）と、skill への誘導（skill-enforcer）に限られ、ルールの順守を止めるものは無かった。これまでの判断は「止めるより注意に留める」方向だった（ADR 0003 は create-pr の AKM チェックを STOP ゲートにせず、ADR 0010 は LSP を強制する hook を廃止した）。
 
 ## 意思決定の要因
 
@@ -37,7 +37,7 @@ Accepted — 2026-10-12
   - 全計画に適用する。implement-flow の対象外の計画は「ゲートの確認結果」に「対象外: <理由>」と書く。専用の逃げ道は設けない
   - 欠けていれば `hookSpecificOutput.decision.behavior = "deny"` の JSON で止め、足りない見出しと書き方を message で返す。計画本文が無い（`tool_input` が `{}`）ときも止める。Claude Code は計画ファイルの中身を `tool_input.plan` に入れて渡すが、計画ファイルの Write と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容（初回はファイルが無いので `{}`）で判定される（2026-10-12 の E2E で、transcript の message id と debug ログの入力から確認した）。deny の message でこの並列呼び出しも案内する。過去の差し戻し 3 件も `{}` だった
 - **B: `hooks/main-commit-guard.py`**（PreToolUse、matcher `Bash`）
-  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd`、payload の `cwd`）の `git symbolic-ref --short -q HEAD` が `main` / `master` なら exit 2 で止める（unborn のブランチも含む）
+  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd` と `env -C`、payload の `cwd`）のブランチが `main` / `master` なら exit 2 で止める（unborn のブランチも含む）。ブランチは、同じコマンド内で先に `git switch [-c]` / `git checkout -b` していればその先、無ければ `git symbolic-ref --short -q HEAD` で決める。案内どおりの `git switch -c <branch> && git commit` を止めないため
   - Edit・Write は止めない。main 上で作った変更は `git switch -c` で退避してから commit する（branching.md）
   - 逃げ道は `# via:main-commit-ok: <理由>`（理由必須、クォート内は無効）
 - 規則の正本: 見出しの規則は CLAUDE.md・hve-implement（単独モードの承認）・resolve-issue（Plan のフォーマット）に、main への commit の停止は branching.md に書く。hve-implement は導入先に配るが hook は配らないので、hve-implement には hook のことを書かない
@@ -51,8 +51,9 @@ Accepted — 2026-10-12
   - Plan モードに入らずに実装を始めた場合、A は発動しない（Plan モードの開始は CLAUDE.md の規則に頼る）
   - Claude Code の将来の版で ExitPlanMode が常に `{}` で呼ばれるようになると、A がすべての計画を止める（deny の message で気づける。Plan モードは手動で抜けられる）
   - deny のあと、同じ event の他の hook（応答待ちの表示（この環境では Orca の agent hook）や通知音）も発火するので、人の入力が要らない自動の差し戻しでも応答待ちのように見える
-  - B は静的判定なので、変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、`sudo` / `exec` / `nohup` などの前置コマンドや絶対パスで呼んだ git、クォートやエスケープで分けた subcommand、git の alias、`pushd` など `cd` 以外で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や `GIT_DIR` などの環境変数で別のリポジトリを指した commit、`git merge` や `cherry-pick` など commit 以外で main に履歴を積む操作は止めない。クォートの対応が取れないコマンドは分割に失敗するので通す
-  - add-hook skill の規約（block は exit 2、PermissionRequest の matcher は `""` など）から A は外れる。PermissionRequest で拒否する公式の方式は JSON の decision で、matcher は tool_name に当たるため
+  - B は静的判定なので、変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、`sudo` / `exec` / `nohup` などの前置コマンドや絶対パスで呼んだ git、クォートやエスケープで分けた subcommand、git の alias、`pushd` など `cd` 以外で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や `GIT_DIR` などの環境変数で別のリポジトリを指した commit、`git checkout <branch>`（パスと区別できないので追わない）で切り替えたあとの commit、`git merge` や `cherry-pick` など commit 以外で main に履歴を積む操作は止めない。クォートの対応が取れないコマンドは分割に失敗するので通す。逆に `git commit --dry-run` / `-h` のように履歴を積まない呼び出しも main 上では止める
+  - add-hook skill の規約は「block は exit 2」「PermissionRequest の matcher は `""` など」だったので、PermissionRequest で拒否するときは JSON の decision で exit 0、matcher は tool 名、という流儀を同じ PR で add-hook に追記した（PermissionRequest で拒否する公式の方式が JSON の decision で、matcher が tool_name に当たるため）
+  - リポ版の hook は `settings.machine.json` で外せない（ADR 0006）。user-level 基盤は作者の個人設定という位置付け（ADR 0007）なので、この 2 つのゲートも外す手段を設けない。main だけで運用するリポジトリでは、ユーザーの明示指示のもとで via を付ける
   - A・B の目的は善意の誤操作（規則の見落とし）の防止で、意図的な迂回への防御ではない。via は自己申告の逃げ道で、上の限界のとおり迂回の手段もある。main の保護は branch protection に任せる（knowledge-maturity の検査スクリプトと同じ位置付け。ADR 0014）
   - ADR 0003・0010 の「止めるより注意に留める」方向を、この 2 点に限って覆す
 
@@ -132,6 +133,7 @@ ExitPlanMode が PermissionRequest を発火し、計画本文が `tool_input.pl
 
 ## 関連リンク
 
+- Related: [0005-default-model-opus-alias](0005-default-model-opus-alias.md)（「意思決定の要因」の hook の分類で、PreToolUse の安全ガードを 4 本と列挙している。main-commit-guard が加わったので、その記述は現状を表さない。0005 の決定内容（既定モデル・権限モード）は変わらない）
 - Related: [0003-add-session-cost-and-akm-to-create-pr](0003-add-session-cost-and-akm-to-create-pr.md)
 - Related: [0004-audit-prompts-for-opus-5-5](0004-audit-prompts-for-opus-5-5.md)
 - Related: [0010-drop-serena-for-builtin-lsp](0010-drop-serena-for-builtin-lsp.md)

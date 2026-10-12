@@ -159,6 +159,10 @@ run "A9: plan も planFilePath も無い ({}) なら deny" \
 run "A11: planFilePath のファイルが無ければ deny" \
     denied "" "計画本文" "$TMP/missing.md"
 
+printf '## 計画\n\xff\xfe 不正なバイト\n' > "$TMP/bad-utf8.md"
+run "A22: planFilePath が不正な UTF-8 でも読んで見出しを検査する" \
+    denied "" "ゲートの確認結果" "$TMP/bad-utf8.md"
+
 mkfifo "$TMP/fifo"
 run "A21: planFilePath が通常のファイルでなければ読まずに deny (FIFO で待たない)" \
     denied "" "計画本文" "$TMP/fifo"
