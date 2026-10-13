@@ -78,6 +78,11 @@ cp -r "$SCRIPT_DIR/hve-scripts" "$TARGET_CLAUDE/scripts/hve"
 find "$TARGET_CLAUDE/scripts/hve" -name '__pycache__' -type d -prune -exec rm -rf {} +
 echo "[INFO] scripts/hve/ を配置しました"
 
+# LICENSE → LICENSE-hve-playbook（配った資産の著作権表示と許諾表示）
+rm -f "$TARGET_CLAUDE/LICENSE-hve-playbook"
+cp "$SCRIPT_DIR/LICENSE" "$TARGET_CLAUDE/LICENSE-hve-playbook"
+echo "[INFO] LICENSE-hve-playbook を配置しました"
+
 # CLAUDE.hve.md（HVE 方法論の説明）
 if [ ! -f "$TARGET_CLAUDE/CLAUDE.md" ]; then
     cp "$SCRIPT_DIR/CLAUDE.hve.md" "$TARGET_CLAUDE/CLAUDE.md"

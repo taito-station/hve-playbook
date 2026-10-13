@@ -4,6 +4,8 @@
 
 Accepted — 2026-10-05
 
+結果の節で範囲外とした「setup.sh が導入先にコピーする HVE 由来の資産の LICENSE」は、[ADR-0021](0021-ship-license-copy-with-hve-assets.md) で同梱する側に決めた（本 ADR は置き換えない）。
+
 ## 背景と課題
 
 リポジトリを公開した（[hve-playbook#33](https://github.com/taito-station/hve-playbook/issues/33)）が、GitHub のライセンス判定が `other`（`spdx_id: NOASSERTION`）になり、MIT と表示されなかった（[hve-playbook#39](https://github.com/taito-station/hve-playbook/issues/39)）。

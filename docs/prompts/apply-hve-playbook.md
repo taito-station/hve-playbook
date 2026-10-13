@@ -22,6 +22,7 @@
 - 配置は hve-playbook の `setup.sh` が行う。手作業でファイルをコピーしない（再実行で hve-playbook の版に揃えられるようにするため）。
 - `setup.sh` が変更するのは次のとおり。
   - `<target>/.claude/rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`・`scripts/hve/` を**削除してから**置き直す。
+  - `<target>/.claude/LICENSE-hve-playbook`（配った資産の著作権表示と許諾表示。hve-playbook の `LICENSE` の写し）を作る・上書きする。
   - `<target>/.claude/rules/hve-local/`（プロジェクト固有の補足）には触れない。書式は `.claude/rules/hve/local-overrides.md`。
   - `<target>/.claude/CLAUDE.md` が無ければ、HVE 方法論をそのまま `.claude/CLAUDE.md` として作る。あれば `.claude/CLAUDE.md` は変えず、`.claude/CLAUDE.hve.md` を作る・上書きする。
   - `<target>/docs/` を作る（空のディレクトリ）。
@@ -51,7 +52,7 @@
   - `.claude/CLAUDE.md`・`.claude/CLAUDE.hve.md`・ルートの `CLAUDE.md`
 - **symlink を確かめる**: `find <target>/.claude -maxdepth 2 -type l`（`<target>/.claude` 自体が symlink かも `test -L` で確かめる）。symlink があれば、setup.sh はリンク先（リポジトリの外や `~/.claude` の場合もある）で削除・上書きを行い、git の検出もすり抜ける。リンク先を示してここで止め、ユーザーに確認する。
 - **git 管理外の HVE 資産を守る**: 未追跡のファイル（ignore されているものも、単に未コミットのものも）は、`setup.sh` が削除・上書きすると git で復元できない。`git -C <target> ls-files --others -- .claude` で未追跡のファイルをすべて列挙する（除外指定を付けないので ignore されたものも出る）。
-  - 前提に挙げた削除対象（`rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`・`scripts/hve/`）か `.claude/CLAUDE.hve.md` が含まれていれば、`setup.sh` の前に `<target>/work/hve-backup-<日時>/` へ同じ相対パスでコピーして退避する。
+  - 前提に挙げた削除対象（`rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`・`scripts/hve/`）か `.claude/CLAUDE.hve.md`・`.claude/LICENSE-hve-playbook` が含まれていれば、`setup.sh` の前に `<target>/work/hve-backup-<日時>/` へ同じ相対パスでコピーして退避する。
 - cq/mdq が導入済みかを確かめる（`python3 -m cq --help` と `python3 -m mdq --help` が両方とも成功するか）。
   - 未導入なら、`setup.sh` が `pip install -e`（既存の clone が無ければ外部リポジトリの `git clone` も）を行うことをユーザーに伝え、了承を得てから進める。
   - 了承が得られなければ、ここで止めて報告する（`setup.sh` には導入を省く方法が無い）。
@@ -75,6 +76,7 @@ bash <hve-playbook>/setup.sh <target>
   - `[INFO] CLAUDE.hve.md を最新版で更新しました`: `.claude/CLAUDE.hve.md` を上書きした
 - 再適用で、git 管理下の HVE 資産に独自の変更があった場合は、`git -C <target> diff` で上書きされた差分を示す。写しには戻さず、`.claude/rules/hve-local/` に移すかどうかをユーザーに確認する（標準に取り込まれた内容なら移さず捨てる）。
 - 手順 2 で退避したファイルがあれば、置き直された版と `diff -r` で比べ、独自の変更を同じく hve-local に移すかどうかをユーザーに確認する。
+- `LICENSE-hve-playbook` は上の 2 つの確認の対象外で、独自の変更があっても hve-local に移さず、setup.sh が置いた版のままにする（hve-playbook の `LICENSE` の写しなので）。
 - `.claude/rules/hve-local/` があれば、標準の変更（`git -C <target> diff -- .claude/rules/hve .claude/skills`）と見比べ、hve-local の見出しが指す節が標準に実在し、「上書き」節が追従しているかを確かめる。
 - cq/mdq の導入に失敗しても `grep`/`find` にフォールバックして動く。失敗した場合は、その旨を報告に書く。
 
@@ -92,7 +94,7 @@ bash <hve-playbook>/setup.sh <target>
 
 ### 6. git 管理の方針
 
-- `.claude/` の HVE 資産（`CLAUDE.hve.md` を含む）は git 管理する。プロジェクト固有の調整と、適用した hve-playbook の版を履歴に残すため。
+- `.claude/` の HVE 資産（`CLAUDE.hve.md`・`LICENSE-hve-playbook` を含む）は git 管理する。プロジェクト固有の調整と、適用した hve-playbook の版を履歴に残すため。
 - `.claude/` が ignore されている場合は、HVE 資産を ignore の例外にするかをユーザーに確認する。
   - 例外にすると、既存の `.claude/CLAUDE.md` も中身ごと git 管理に入り、リモートに push される。意図して非公開にしていた可能性があるので、確認のときにそのことを伝える。コミット前に、秘密情報・内部 URL・個人情報が含まれていないかを確かめる。含まれていれば、`.claude/CLAUDE.md` は例外から外し、HVE の節の置き場所（ルートの `CLAUDE.md` など）を質問票で確認する。
   - 除外がリポジトリの `.gitignore` ではなく `.git/info/exclude` や global の excludes にある場合は、その場所をユーザーに伝えて扱いを確認する。
@@ -103,6 +105,7 @@ bash <hve-playbook>/setup.sh <target>
   /.claude/*
   !/.claude/CLAUDE.md
   !/.claude/CLAUDE.hve.md
+  !/.claude/LICENSE-hve-playbook
   !/.claude/rules/
   /.claude/rules/*
   !/.claude/rules/hve/
@@ -120,6 +123,8 @@ bash <hve-playbook>/setup.sh <target>
   /.claude/scripts/*
   !/.claude/scripts/hve/
   ```
+
+  再適用などで例外の行がすでにある場合は、上の例と比べて足りない行（`!/.claude/LICENSE-hve-playbook` など）だけを足す。
 - `.gitignore` に次が無ければ足す。
   - `work/`（HVE の一時作業ファイル。手順 2 の退避先もここ）
   - `**/.claude/settings.local.json`
@@ -130,7 +135,7 @@ bash <hve-playbook>/setup.sh <target>
 
 - 配置されたファイルを一覧で確認する（`find <target>/.claude -maxdepth 2 | sort`）。
 - `.claude/rules/hve/implement-flow.md` などの規則ファイルが揃っているか確認する。
-- `git -C <target> status --short -uall` で、HVE 資産（`CLAUDE.hve.md` を含む）・`.claude/rules/hve-local/`（あれば）・CLAUDE.md・`.gitignore` が変更または untracked として見えることを確認する。見えなければ ignore の例外が効いていない。 逆に、それ以外のファイル（下層の `.claude/` や独自の設定）が新しく見えるようになっていれば、例外が広すぎるので直す。
+- `git -C <target> status --short -uall` で、HVE 資産（`CLAUDE.hve.md`・`LICENSE-hve-playbook` を含む）・`.claude/rules/hve-local/`（あれば）・CLAUDE.md・`.gitignore` が変更または untracked として見えることを確認する。見えなければ ignore の例外が効いていない。 逆に、それ以外のファイル（下層の `.claude/` や独自の設定）が新しく見えるようになっていれば、例外が広すぎるので直す。
 - `git -C <target> check-ignore -v --no-index .mdq/usage.jsonl` が `.gitignore` の行を返し、`git -C <target> check-ignore --no-index .mdq/config.toml` が何も返さない（exit 1）ことを確認する。返らなければ、索引の除外か `config.toml` の例外が効いていない。
 - コミットにはこれらだけを含める。無関係な変更はステージしない（破棄はしない。破棄が必要ならユーザーに確認する）。
 
