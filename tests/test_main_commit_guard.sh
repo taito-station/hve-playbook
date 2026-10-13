@@ -42,8 +42,7 @@ _repo "$TMP/with space" main
 _repo "$TMP/tagged" main && git -C "$TMP/tagged" tag main
 mkdir -p "$TMP/norepo"
 
-# Bash payload (cwd 付き) を hook に流し、exit code を返す
-# exit code を返す。hook の stderr は $TMP/stderr に残す
+# Bash payload (cwd 付き) を hook に流し、exit code を返す。hook の stderr は $TMP/stderr に残す
 _rc() {
     local cmd="$1" cwd="$2"
     python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":sys.argv[1]},"cwd":sys.argv[2]}))' "$cmd" "$cwd" \
@@ -95,6 +94,9 @@ run "B52: 同名のタグ main があっても main 上の commit を止める" 
 run "B53: 識別子でない終端語の heredoc の本文の via は通さない" blocked $'git commit -F - <<\'END-MSG\'\nfeat: x\n# via:main-commit-ok: x\nEND-MSG' "$TMP/main"
 run "B54: ドットを含む終端語の heredoc の本文にアポストロフィ" blocked $'git commit -F - <<EOF.MSG\nfeat: don\'t\nEOF.MSG' "$TMP/main"
 run "B55: Claude Code がふだん出す -m \"\$(cat <<'EOF' ...)\" の形（本文に \" を含む）" blocked $'git commit -m "$(cat <<\'EOF\'\nfeat: say "hi\nEOF\n)"' "$TMP/main"
+# 分割に失敗した (shlex の例外) ときは、外側の except で traceback を stderr に出して通す (fail-open)
+failopen() { [ "$(_rc "$1" "$2")" = "0" ] && grep -q "Traceback" "$TMP/stderr"; }
+run "B57: 閉じていないクォートは例外で fail-open（exit 0 と traceback）" failopen 'git commit -m "unterminated' "$TMP/main"
 run "B13: 理由の無い via は通さない" blocked 'git commit -m x # via:main-commit-ok:' "$TMP/main"
 run "B14: クォート内の via は通さない" blocked "git commit -m '# via:main-commit-ok: x'" "$TMP/main"
 

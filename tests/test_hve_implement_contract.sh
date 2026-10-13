@@ -57,6 +57,7 @@ check "skill: 決定ログの置き場所は artifact-management に従う" has 
 # 4) モードと承認
 check "skill: 単独モードは ExitPlanMode で承認を得る" has "$SKILL" "ExitPlanMode"
 check "skill: Plan モードを使えない環境でも承認前に Step 5 へ進まない" has "$SKILL" "承認を得るまで Step 5 へ進まない"
+check "skill: Plan モードで始めたときは Step 0 を承認の後に行う" has "$SKILL" "Step 0 のブランチ作成を承認の後（Step 5 の前）に行う"
 # ファイル $1 の、$2 を含む行に $3 があるか
 row_has() { grep -F -- "$2" "$1" 2>/dev/null | grep -qF -- "$3"; }
 check "skill: モード表で --phase pre は Step 2〜4" row_has "$SKILL" "--phase pre" "Step 2〜4"
