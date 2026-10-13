@@ -10,6 +10,9 @@
 # 各テストは run で包み、PASS / FAIL を数えて最後に終了コードを決める。
 
 HOOK="$(cd "$(dirname "$0")/.." && pwd)/hooks/main-commit-guard.py"
+# 利用者の global / system の git 設定（commit.gpgsign・core.hooksPath 等）とフック環境変数から切り離す（hook の git にも効く）
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 FAIL=0
@@ -30,7 +33,7 @@ _repo() {
     local dir="$1" branch="$2"
     git init -q -b "$branch" "$dir"
     git -C "$dir" remote add origin https://example.invalid/x.git
-    git -C "$dir" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m init
+    git -C "$dir" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q --allow-empty -m init
 }
 _repo "$TMP/main" main
 _repo "$TMP/master" master
