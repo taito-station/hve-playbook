@@ -68,6 +68,10 @@
           {
             "type": "command",
             "command": "python3 ~/.claude/hooks/destructive-guard.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/main-commit-guard.py"
           }
         ]
       },
@@ -128,6 +132,15 @@
       }
     ],
     "PermissionRequest": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/plan-gate-check.py"
+          }
+        ]
+      },
       {
         "matcher": "",
         "hooks": [
