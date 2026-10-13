@@ -708,8 +708,10 @@ bug パス・ops パスは軽量フローのため対象外。
 **記録タイミング**: セッションクリアの直前。セッションクリアしない場合でも
 ステップ完了時に記録する（振り返り・分析用）。
 
-**git ライフサイクル**: `session_logs/` は `.gitignore` に追加し、ローカルに保持する。
-PR の差分には含めない。
+**git ライフサイクル**: `session_logs/` はローカルに保持し、ログ自体は PR の差分に含めない。ログを記録する前に
+`git check-ignore -v session_logs/issue-<N>/x.md` で出所を確かめ、利用リポの `.gitignore` の行で無視されていなければ
+（無視されていない、または `.git/info/exclude`・global の excludes で無視されているだけなら）`.gitignore` に
+`session_logs/` を追記し、その追記はその Issue の PR に含める（PR がマージされれば、どのクローン・worktree でも無視される）。
 
 ### セッションクリアの判断
 
