@@ -22,7 +22,7 @@ git switch -c <type>/<short-kebab-description>
 
 すでに `main` で変更を作ってしまった場合は、`git switch -c <branch>` で作業ブランチへ退避してから commit する（`main` には残さない）。
 
-`main` / `master` 上の `git commit` は hook（main-commit-guard）が止める。ユーザーが `main` への commit を明示的に指示したときだけ、コマンド中のコメントで `# via:main-commit-ok: <理由>` を付ける。作業ブランチへの退避と commit は、`git switch -c <branch> && git commit ...` のように 1 つのコマンドにつないでもよい（hook は同じコマンド内のブランチの切り替えを追う）。
+`main` / `master` 上の `git commit` は hook（main-commit-guard）が止める。ユーザーが `main` への commit を明示的に指示したときだけ、コマンド中のコメントで `# via:main-commit-ok: <理由>` を付ける。作業ブランチへの退避（`git switch -c <branch>`）と commit は別の Bash 呼び出しで実行する（hook は実行前の HEAD で判定するので、1 つのコマンドにつなぐと止まる）。
 
 ## ブランチ命名規則
 

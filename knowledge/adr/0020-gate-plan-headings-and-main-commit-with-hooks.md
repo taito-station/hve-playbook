@@ -24,6 +24,7 @@ Accepted — 2026-10-12
 - A の適用範囲: 全計画／HVE のリポジトリだけ／専用のマーカーで検査を省ける
 - A の判定: 見出しの語を含めば可＋準拠表に表の行／完全一致／見出しの有無だけ
 - B の対象: `git commit` だけ／Edit・Write も（追跡済みファイルに限り除外パスを持つ）／Edit・Write も（resolve-issue のブランチ作成を早める）
+- B で同じコマンド内のブランチの切り替え（`git switch -c x && git commit`）を追う／追わない
 - 計画の承認前に Edit・Write を止める
 - UserPromptSubmit で毎回チェックシートを注入する
 
@@ -37,9 +38,9 @@ Accepted — 2026-10-12
   - 全計画に適用する。implement-flow の対象外の計画は「ゲートの確認結果」に「対象外: <理由>」と書く。専用の逃げ道は設けない
   - 欠けていれば `hookSpecificOutput.decision.behavior = "deny"` の JSON で止め、足りない見出しと書き方を message で返す。計画本文が無い（`tool_input` が `{}`）ときも止める。Claude Code は計画ファイルの中身を `tool_input.plan` に入れて渡すが、計画ファイルの Write と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容（初回はファイルが無いので `{}`）で判定される（2026-10-12 の E2E で、transcript の message id と debug ログの入力から確認した）。deny の message でこの並列呼び出しも案内する。過去の差し戻し 3 件も `{}` だった
 - **B: `hooks/main-commit-guard.py`**（PreToolUse、matcher `Bash`）
-  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd` と `env -C`、payload の `cwd`）のブランチが `main` / `master` なら exit 2 で止める（unborn のブランチも含む）。ブランチは、同じコマンド内で先に `git switch [-c]` / `git checkout -b` していればその先、無ければ `git symbolic-ref --short -q HEAD` で決める。案内どおりの `git switch -c <branch> && git commit` を止めないため
+  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd` と `env -C`、payload の `cwd`）の実行前の `git symbolic-ref --short -q HEAD` が `main` / `master` なら exit 2 で止める（unborn のブランチも含む）。同じコマンド内のブランチの切り替えは追わないので、作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する（deny の message と branching.md で案内する）
   - Edit・Write は止めない。main 上で作った変更は `git switch -c` で退避してから commit する（branching.md）
-  - 逃げ道は `# via:main-commit-ok: <理由>`（理由必須、クォート内は無効）
+  - 逃げ道は `# via:main-commit-ok: <理由>`（理由必須、クォート内・heredoc の本文・単語の途中は無効）。via はコマンド中のどのコメントにあっても、そのコマンドのすべての commit を通す
 - 規則の正本: 見出しの規則は CLAUDE.md・hve-implement（単独モードの承認）・resolve-issue（Plan のフォーマット）に、main への commit の停止は branching.md に書く。hve-implement は導入先に配るが hook は配らないので、hve-implement には hook のことを書かない
 - 契約は `tests/test_plan_gate_check.sh` と `tests/test_main_commit_guard.sh` で固定する
 
@@ -51,9 +52,11 @@ Accepted — 2026-10-12
   - Plan モードに入らずに実装を始めた場合、A は発動しない（Plan モードの開始は CLAUDE.md の規則に頼る）
   - Claude Code の将来の版で ExitPlanMode が常に `{}` で呼ばれるようになると、A がすべての計画を止める（deny の message で気づける。Plan モードは手動で抜けられる）
   - deny のあと、同じ event の他の hook（応答待ちの表示（この環境では Orca の agent hook）や通知音）も発火するので、人の入力が要らない自動の差し戻しでも応答待ちのように見える
-  - B は静的判定なので、変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、`sudo` / `exec` / `nohup` などの前置コマンドや絶対パスで呼んだ git、クォートやエスケープで分けた subcommand、git の alias、`pushd` など `cd` 以外で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や `GIT_DIR` などの環境変数で別のリポジトリを指した commit、`git checkout <branch>`（パスと区別できないので追わない）で切り替えたあとの commit、`git merge` や `cherry-pick` など commit 以外で main に履歴を積む操作は止めない。クォートの対応が取れないコマンドは分割に失敗するので通す。逆に `git commit --dry-run` / `-h` のように履歴を積まない呼び出しも main 上では止める
+  - B は静的判定なので、変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、`sudo` / `exec` / `nohup` などの前置コマンドや絶対パスで呼んだ git、クォートやエスケープで分けた subcommand、git の alias、`pushd` など `cd` 以外で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や `GIT_DIR` などの環境変数で別のリポジトリを指した commit、同じコマンド内で main に切り替えたあとの commit（`git switch main && git commit`）、`git merge` や `cherry-pick` など commit 以外で main に履歴を積む操作は止めない。クォートの対応が取れないコマンドと、ANSI-C クォート（`$'...'`）の中に `\'` を含むコマンドは分割に失敗するので通す。逆に、同じコマンド内で作業ブランチに退避してからの commit（`git switch -c x && git commit`）と、`git commit --dry-run` / `-h` のように履歴を積まない呼び出しも main 上では止める（message の案内どおり別の Bash 呼び出しにすれば回復できる）
   - add-hook skill の規約は「block は exit 2」「PermissionRequest の matcher は `""` など」だったので、PermissionRequest で拒否するときは JSON の decision で exit 0、matcher は tool 名、という流儀を同じ PR で add-hook に追記した（PermissionRequest で拒否する公式の方式が JSON の decision で、matcher が tool_name に当たるため）
   - リポ版の hook は `settings.machine.json` で外せない（ADR 0006）。user-level 基盤は作者の個人設定という位置付け（ADR 0007）なので、この 2 つのゲートも外す手段を設けない。main だけで運用するリポジトリでは、ユーザーの明示指示のもとで via を付ける
+  - hook の実体は clone の作業ツリーへの symlink なので、マージして sync したあと、symlink 先の clone で hook のファイルを持たないブランチ（マージ前に切ったもの）を checkout すると、実体が消えて `python3 <無いファイル>` が exit 2 を返し、Bash と ExitPlanMode が全面的に止まる。symlink 先の clone は main のまま使い（作業は worktree で行う）、マージ前のブランチは先に main へ rebase してから checkout する。欠落時に通すラッパーは、add-hook の「欠落は sync で検出して fail-loud にする」方針と衝突するので採らない
+  - PreToolUse の Bash の python hook が 5 本目になり、Bash の呼び出しごとに python の起動が 1 回増える（main-commit-guard は `commit` を含まないコマンドではすぐ終わる）。これ以上増やすときは 1 プロセスへの統合を検討する
   - A・B の目的は善意の誤操作（規則の見落とし）の防止で、意図的な迂回への防御ではない。via は自己申告の逃げ道で、上の限界のとおり迂回の手段もある。main の保護は branch protection に任せる（knowledge-maturity の検査スクリプトと同じ位置付け。ADR 0014）
   - ADR 0003・0010 の「止めるより注意に留める」方向を、この 2 点に限って覆す
 
@@ -110,6 +113,16 @@ ExitPlanMode が PermissionRequest を発火し、計画本文が `tool_input.pl
 #### デメリット
 
 - resolve-issue・create-issue・edit-issue の正規の書き込み、`~/.claude` 配下の symlink 先（hve-playbook の main）、main 上で作業するリポジトリを止める。除外リストの保守か、skill 3 本の改修が要る
+
+### B で同じコマンド内のブランチの切り替えを追う
+
+#### メリット
+
+- deny の message が案内する `git switch -c <branch>` と commit を 1 つのコマンドにつないでも止まらない
+
+#### デメリット
+
+- 区切りの演算子（`;` / `||` では switch が失敗しても commit が走る）、`git switch -`、`--track origin/main`、`--create=<name>`、サブディレクトリでの commit など、追う形が次々に増え、PR #61 のレビューでは追跡そのものが main への commit を見逃す経路になった。誤操作の防止という目的に対して、静的解析への投資が過剰になる
 
 ### 計画の承認前に Edit・Write を止める
 

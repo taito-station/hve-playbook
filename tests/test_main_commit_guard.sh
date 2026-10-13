@@ -80,9 +80,11 @@ run "B41: cd -- で main のリポジトリに移ってから commit" blocked "c
 run "B43: クォート内の <<EOF の次の行の commit" blocked $'echo "<<EOF"\ngit commit -m x' "$TMP/main"
 run "B44: 算術展開の << の次の行の commit" blocked $'echo $((1<<n))\ngit commit -m x' "$TMP/main"
 run "B45: <<\\EOF の heredoc の本文にアポストロフィ" blocked $'git commit -F - <<\\EOF\nfix: don\'t break\nEOF' "$TMP/main"
-run "B48: 作業ブランチから git switch main して commit" blocked 'git switch main && git commit -m x' "$TMP/feature"
 run "B49: env -C で main のリポジトリを指す" blocked "env -C $TMP/main git commit -m x" "$TMP/feature"
 run "B51: time -p の後の commit" blocked 'time -p git commit -m x' "$TMP/main"
+# 同じコマンド内のブランチの切り替えは追わず、実行前の HEAD で判定する（退避と commit は別の Bash 呼び出しで）
+run "B46: git switch -c とつないだ commit も実行前の HEAD (main) で止める" blocked 'git switch -c feat/y && git commit -m x' "$TMP/main"
+run "B47: git checkout -b とつないだ commit も実行前の HEAD (main) で止める" blocked 'git checkout -b feat/y && git add . && git commit -m x' "$TMP/main"
 run "B13: 理由の無い via は通さない" blocked 'git commit -m x # via:main-commit-ok:' "$TMP/main"
 run "B14: クォート内の via は通さない" blocked "git commit -m '# via:main-commit-ok: x'" "$TMP/main"
 
@@ -100,8 +102,6 @@ run "B16: commit が subcommand でない" allowed 'git log --grep commit' "$TMP
 run "B17: git が先頭でないコマンドの引数" allowed 'echo git commit' "$TMP/main"
 # cwd は main。クォート内の ; や && で誤って分割すると `git commit` のセグメントが main で判定されて止まる
 run "B18: メッセージ内の ; や &&" allowed 'git -C ../feature commit -m "a; git commit && b"' "$TMP/main"
-run "B46: git switch -c で作業ブランチへ退避してから commit" allowed 'git switch -c feat/y && git commit -m x' "$TMP/main"
-run "B47: git checkout -b で作業ブランチへ退避してから commit" allowed 'git checkout -b feat/y && git add . && git commit -m x' "$TMP/main"
 run "B50: env -C で作業ブランチのリポジトリを指す" allowed "env -C $TMP/feature git commit -m x" "$TMP/main"
 run "B20: 存在しない cwd (git が失敗) は通す" allowed 'git commit -m x' "$TMP/nonexistent"
 

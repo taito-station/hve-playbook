@@ -16,23 +16,26 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   （`-C <path>` / `-c <x=y>` / `--git-dir <path>` など / `--opt[=val]`）の後の subcommand が `commit` なら対象
 - 判定するリポジトリ: `git -C <path>`（複数なら順に連結。相対パスは基準のディレクトリから）。
   基準のディレクトリは payload の `cwd` で、同じコマンド内の `cd [オプション] <path>` と `env -C <path>` に追従する
-- ブランチ: 同じコマンド内で先に `git switch [-c] <branch>` / `git checkout -b <branch>` していればそのブランチ、
-  無ければ `git symbolic-ref --short -q HEAD`。`main` / `master` なら止める（unborn のブランチも含む）。
-  detached HEAD・リポジトリ外・git の失敗は通す
+- 実行前の `git symbolic-ref --short -q HEAD` が `main` / `master` なら止める（unborn のブランチも含む）。
+  detached HEAD・リポジトリ外・git の失敗は通す。同じコマンド内のブランチの切り替えは追わないので、
+  作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する
 
 bypass: コマンド中の本物のシェルコメント（クォートと heredoc の本文の外で、単語の先頭の `#`）が
-`# via:main-commit-ok: <理由>` のとき（理由必須）。
+`# via:main-commit-ok: <理由>` のとき（理由必須）。via はコマンド中のどのコメントにあっても、
+そのコマンドのすべての commit を通す。
 
 静的判定の限界（止めない）: 変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、
 `sudo` / `exec` / `nohup` などの前置コマンドや絶対パス（`/usr/bin/git`）で呼んだ git、
 クォートやエスケープで分けた subcommand（`git "com"mit`）、git の alias（`git -c alias.ci=commit ci`）、
 `cd` 以外の手段（pushd など）で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や
 `GIT_DIR` などの環境変数で別のリポジトリを指した commit（基準のディレクトリのブランチで判定する）、
-`git checkout <branch>`（パスとの区別が付かないので追わない）で切り替えたあとの commit、
+同じコマンド内で main に切り替えたあとの commit（`git switch main && git commit`。切り替えは追わない）、
 `git merge` / `cherry-pick` など commit 以外で main に履歴を積む操作。
-逆に `git commit --dry-run` / `-h` のように履歴を積まない呼び出しも main 上では止める。
+逆に、同じコマンド内で作業ブランチに退避してからの commit（`git switch -c x && git commit`）や、
+`git commit --dry-run` / `-h` のように履歴を積まない呼び出しも、main 上では止める。
 サブシェルの中の `cd` は外にも効くものとして扱う（止める側に倒れる）。
-クォートの対応が取れないコマンドは shlex が失敗するので通す（fail-open）。
+クォートの対応が取れないコマンドと、ANSI-C クォート（`$'...'`）の中に `\'` を含むコマンドは、
+shlex が分割に失敗するので通す（fail-open）。
 
 例外は飲み込み、hook 失敗で Claude Code を止めない（exit 0）。
 """
@@ -58,9 +61,6 @@ LEADING_OPTS = {"-p"}
 ENV_VALUE_OPTS = {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"}
 HEREDOC_RE = re.compile(r"(?<!<)<<(-?)\s*\\?(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
 VIA_RE = re.compile(r"#\s*via:main-commit-ok\s*:\s*\S")
-# ブランチを作って切り替える git switch / checkout のオプション
-SWITCH_CREATE_OPTS = {"-c", "-C", "--create", "--force-create"}
-CHECKOUT_CREATE_OPTS = {"-b", "-B"}
 # 値を別トークンで取る git のグローバルオプション（-C は別に扱う）
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 
@@ -141,8 +141,8 @@ def _parse(cmd: str) -> tuple[list[list[str]], list[str]]:
     return [s for s in segs if s], comments
 
 
-def _git_call(seg: list[str], base: str) -> tuple[str, str, list[str]] | None:
-    """seg が git の呼び出しなら (判定するディレクトリ, subcommand, 残りの引数) を、そうでなければ None を返す。"""
+def _git_call(seg: list[str], base: str) -> tuple[str, str] | None:
+    """seg が git の呼び出しなら (判定するディレクトリ, subcommand) を、そうでなければ None を返す。"""
     i = 0
     d = base
     while i < len(seg):
@@ -178,22 +178,7 @@ def _git_call(seg: list[str], base: str) -> tuple[str, str, list[str]] | None:
         break
     if i >= len(seg):
         return None
-    return d, seg[i], seg[i + 1 :]
-
-
-def _switched_branch(sub: str, args: list[str]) -> str | None:
-    """git switch / checkout -b で切り替えた先のブランチ名を返す。追えない形は None。
-    `git checkout <名前>` はブランチかパスかを見分けられないので追わない。"""
-    create = SWITCH_CREATE_OPTS if sub == "switch" else CHECKOUT_CREATE_OPTS
-    for k, a in enumerate(args):
-        if a in create:
-            return args[k + 1] if k + 1 < len(args) else None
-    if sub == "switch":
-        if "--detach" in args or "-d" in args:
-            return ""  # detached HEAD
-        names = [a for a in args if not a.startswith("-")]
-        return names[0] if len(names) == 1 else None
-    return None
+    return d, seg[i]
 
 
 def _branch(d: str) -> str | None:
@@ -214,7 +199,6 @@ def _branch(d: str) -> str | None:
 def _blocked(segs: list[list[str]], cwd: str) -> tuple[str, str] | None:
     """止めるなら (ディレクトリ, ブランチ) を返す。"""
     base = cwd
-    switched: dict[str, str] = {}  # 同じコマンド内で切り替えたブランチ（ディレクトリ → ブランチ名）
     for seg in segs:
         if seg[0] == "cd":
             args = [a for a in seg[1:] if not a.startswith("-")]
@@ -224,16 +208,10 @@ def _blocked(segs: list[list[str]], cwd: str) -> tuple[str, str] | None:
         call = _git_call(seg, base)
         if call is None:
             continue
-        d, sub, args = call
-        key = os.path.realpath(d)
-        if sub in ("switch", "checkout"):
-            b = _switched_branch(sub, args)
-            if b is not None:
-                switched[key] = b
-            continue
+        d, sub = call
         if sub != "commit":
             continue
-        b = switched[key] if key in switched else _branch(d)
+        b = _branch(d)
         if b in PROTECTED:
             return d, b
     return None
@@ -271,7 +249,8 @@ def main() -> int:
             "BLOCKED by main-commit-guard hook.\n"
             f"reason: `{b}` ブランチ上での git commit（{d}）。main / master へは直接 commit しない。\n"
             "`git switch -c <type>/<short-kebab-description>` で作業ブランチへ退避してから commit する"
-            "（未コミットの変更はそのまま持ち越せる）。\n"
+            "（未コミットの変更はそのまま持ち越せる）。退避と commit は別の Bash 呼び出しで実行する"
+            "（この hook は実行前の HEAD で判定するので、1 つのコマンドにつなぐと止まる）。\n"
             "ユーザーが main への commit を明示的に指示した場合のみ、コマンド中のコメントで "
             "`# via:main-commit-ok: <理由>` を付ける（理由は非空必須）。",
             file=sys.stderr,
