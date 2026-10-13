@@ -16,7 +16,7 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   （`-C <path>` / `-c <x=y>` / `--git-dir <path>` など / `--opt[=val]`）の後の subcommand が `commit` なら対象
 - 判定するリポジトリ: `git -C <path>`（複数なら順に連結。相対パスは基準のディレクトリから）。
   基準のディレクトリは payload の `cwd` で、同じコマンド内の `cd [オプション] <path>` と `env -C <path>` に追従する
-- 実行前の `git symbolic-ref --short -q HEAD` が `main` / `master` なら止める（unborn のブランチも含む）。
+- 実行前の `git symbolic-ref -q HEAD` が `refs/heads/main` / `refs/heads/master` なら止める（unborn のブランチも含む）。
   detached HEAD・リポジトリ外・git の失敗は通す。同じコマンド内のブランチの切り替えは追わないので、
   作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する
 
@@ -24,18 +24,12 @@ bypass: コマンド中の本物のシェルコメント（クォートと hered
 `# via:main-commit-ok: <理由>` のとき（理由必須）。via はコマンド中のどのコメントにあっても、
 そのコマンドのすべての commit を通す。
 
-静的判定の限界（止めない）: 変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、
-`sudo` / `exec` / `nohup` などの前置コマンドや絶対パス（`/usr/bin/git`）で呼んだ git、
-クォートやエスケープで分けた subcommand（`git "com"mit`）、git の alias（`git -c alias.ci=commit ci`）、
-`cd` 以外の手段（pushd など）で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や
-`GIT_DIR` などの環境変数で別のリポジトリを指した commit（基準のディレクトリのブランチで判定する）、
-同じコマンド内で main に切り替えたあとの commit（`git switch main && git commit`。切り替えは追わない）、
-`git merge` / `cherry-pick` など commit 以外で main に履歴を積む操作。
-逆に、同じコマンド内で作業ブランチに退避してからの commit（`git switch -c x && git commit`）や、
-`git commit --dry-run` / `-h` のように履歴を積まない呼び出しも、main 上では止める。
-サブシェルの中の `cd` は外にも効くものとして扱う（止める側に倒れる）。
-クォートの対応が取れないコマンドと、ANSI-C クォート（`$'...'`）の中に `\'` を含むコマンドは、
-shlex が分割に失敗するので通す（fail-open）。
+限界: シェルの構文を完全には解釈しない best-effort の静的判定で、Claude Code がふだん出す形
+（`git commit` / `git -C <リテラルのパス>` / `&&`・`;`・改行での連結 / `<<'EOF'` の heredoc）を対象にする。
+変数・コマンド置換・前置コマンド・予約語の中の `cd` など、それ以外の形は見逃すことがあり、
+分割に失敗したコマンドは通す（fail-open）。逆に、同じコマンド内で作業ブランチへ退避してからの commit
+（`git switch -c x && git commit`。切り替えは追わない）と、`git commit --dry-run` / `-h` は main 上では止める
+（別の Bash 呼び出しにすれば回復できる）。
 
 例外は飲み込み、hook 失敗で Claude Code を止めない（exit 0）。
 """
@@ -48,8 +42,9 @@ import re
 import shlex
 import subprocess
 import sys
+import traceback
 
-PROTECTED = ("main", "master")
+PROTECTED = ("refs/heads/main", "refs/heads/master")
 PUNCT = ";&|()\n"
 OPERATORS = set(PUNCT)
 ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -59,7 +54,7 @@ LEADING_WORDS = {"if", "elif", "while", "until", "then", "do", "else", "!", "{",
 LEADING_OPTS = {"-p"}
 # env のオプションのうち値を別トークンで取るもの
 ENV_VALUE_OPTS = {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"}
-HEREDOC_RE = re.compile(r"(?<!<)<<(-?)\s*\\?(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+HEREDOC_RE = re.compile(r"""(?<!<)<<(-?)\s*\\?(?:'([^']+)'|"([^"]+)"|([^\s;&|<>()'"]+))""")
 VIA_RE = re.compile(r"#\s*via:main-commit-ok\s*:\s*\S")
 # 値を別トークンで取る git のグローバルオプション（-C は別に扱う）
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
@@ -75,7 +70,7 @@ def _strip_heredocs(cmd: str) -> str:
     i = 0
     while i < len(lines):
         out.append(lines[i])
-        pending = [(m.group(3), m.group(1) == "-") for m in HEREDOC_RE.finditer(lines[i])]
+        pending = [(m.group(2) or m.group(3) or m.group(4), m.group(1) == "-") for m in HEREDOC_RE.finditer(lines[i])]
         j = i + 1
         while pending and j < len(lines):
             word, dash = pending[0]
@@ -184,7 +179,7 @@ def _git_call(seg: list[str], base: str) -> tuple[str, str] | None:
 def _branch(d: str) -> str | None:
     try:
         r = subprocess.run(
-            ["git", "-C", d, "symbolic-ref", "--short", "-q", "HEAD"],
+            ["git", "-C", d, "symbolic-ref", "-q", "HEAD"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -245,6 +240,7 @@ def main() -> int:
             return 0
 
         d, b = hit
+        b = b[len("refs/heads/") :]
         print(
             "BLOCKED by main-commit-guard hook.\n"
             f"reason: `{b}` ブランチ上での git commit（{d}）。main / master へは直接 commit しない。\n"
@@ -257,7 +253,8 @@ def main() -> int:
         )
         return 2
     except BaseException:
-        # hook 失敗で Claude Code を止めない
+        # hook 失敗で Claude Code を止めない。exit 0 の stderr は動作に影響しないので、原因を追えるよう残す
+        traceback.print_exc()
         return 0
 
 

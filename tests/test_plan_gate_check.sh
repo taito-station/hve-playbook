@@ -37,7 +37,7 @@ if sys.argv[2]:
     ti["planFilePath"] = sys.argv[2]
 print(json.dumps({"hook_event_name": "PermissionRequest", "tool_name": "ExitPlanMode",
                   "permission_mode": "plan", "tool_input": ti}))
-' "$1" "${2:-}" | python3 "$HOOK" 2>/dev/null
+' "$1" "${2:-}" | python3 "$HOOK" 2>"$TMP/stderr"
 }
 
 # deny の JSON が出ていて、message に $2 (省略可) を含み、exit 0
@@ -56,11 +56,12 @@ assert sys.argv[2] in h["decision"]["message"]
 ' "$out" "${2:-}" 2>/dev/null
 }
 
-# 何も出さない (= 承認画面へ進む) かつ exit 0
+# 何も出さない (= 承認画面へ進む) かつ exit 0。stderr も空
+# （hook が例外で落ちて fail-open した場合は traceback が出るので区別できる）
 allowed() {
     local out rc
     out="$(_out "$1" "${2:-}")"; rc=$?
-    [ "$rc" = "0" ] && [ -z "$out" ]
+    [ "$rc" = "0" ] && [ -z "$out" ] && [ ! -s "$TMP/stderr" ]
 }
 
 GATE='## ゲートの確認結果
@@ -113,6 +114,11 @@ run "A20: 行頭に 3 つまでの空白がある見出しも数える" \
 - 済み
   ## ルール準拠表
 | a | b | c |"
+
+run "A23: 行頭の \`\`\`bash\`\`\` のような行はフェンスとみなさない" \
+    allowed "\`\`\`bash\`\`\` を使う
+$GATE
+$TABLE"
 
 PLANFILE="$TMP/plan.md"
 printf '%s\n\n%s\n' "$GATE" "$TABLE" > "$PLANFILE"

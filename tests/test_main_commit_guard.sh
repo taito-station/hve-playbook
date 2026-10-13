@@ -36,18 +36,21 @@ _repo "$TMP/feature" main && git -C "$TMP/feature" switch -q -c feat/x
 _repo "$TMP/detached" main && git -C "$TMP/detached" switch -q --detach
 git init -q -b main "$TMP/unborn"
 _repo "$TMP/with space" main
+_repo "$TMP/tagged" main && git -C "$TMP/tagged" tag main
 mkdir -p "$TMP/norepo"
 
 # Bash payload (cwd 付き) を hook に流し、exit code を返す
+# exit code を返す。hook の stderr は $TMP/stderr に残す
 _rc() {
     local cmd="$1" cwd="$2"
     python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":sys.argv[1]},"cwd":sys.argv[2]}))' "$cmd" "$cwd" \
-        | python3 "$HOOK" >/dev/null 2>&1
+        | python3 "$HOOK" >/dev/null 2>"$TMP/stderr"
     echo $?
 }
 
 blocked() { [ "$(_rc "$1" "$2")" = "2" ]; }
-allowed() { [ "$(_rc "$1" "$2")" = "0" ]; }
+# 通すときは stderr も空（hook が例外で落ちて fail-open した場合は traceback が出るので区別できる）
+allowed() { [ "$(_rc "$1" "$2")" = "0" ] && [ ! -s "$TMP/stderr" ]; }
 
 # ---------- 止める ----------
 run "B1: main 上の git commit" blocked 'git commit -m x' "$TMP/main"
@@ -85,6 +88,9 @@ run "B51: time -p の後の commit" blocked 'time -p git commit -m x' "$TMP/main
 # 同じコマンド内のブランチの切り替えは追わず、実行前の HEAD で判定する（退避と commit は別の Bash 呼び出しで）
 run "B46: git switch -c とつないだ commit も実行前の HEAD (main) で止める" blocked 'git switch -c feat/y && git commit -m x' "$TMP/main"
 run "B47: git checkout -b とつないだ commit も実行前の HEAD (main) で止める" blocked 'git checkout -b feat/y && git add . && git commit -m x' "$TMP/main"
+run "B52: 同名のタグ main があっても main 上の commit を止める" blocked 'git commit -m x' "$TMP/tagged"
+run "B53: 識別子でない終端語の heredoc の本文の via は通さない" blocked $'git commit -F - <<\'END-MSG\'\nfeat: x\n# via:main-commit-ok: x\nEND-MSG' "$TMP/main"
+run "B54: ドットを含む終端語の heredoc の本文にアポストロフィ" blocked $'git commit -F - <<EOF.MSG\nfeat: don\'t\nEOF.MSG' "$TMP/main"
 run "B13: 理由の無い via は通さない" blocked 'git commit -m x # via:main-commit-ok:' "$TMP/main"
 run "B14: クォート内の via は通さない" blocked "git commit -m '# via:main-commit-ok: x'" "$TMP/main"
 

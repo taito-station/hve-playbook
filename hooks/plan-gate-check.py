@@ -32,13 +32,15 @@ import json
 import os
 import re
 import sys
+import traceback
 
 GATE = "ゲートの確認結果"
 TABLE = "ルール準拠表"
 
 MAX_PLAN_CHARS = 1_000_000
 HEADING_RE = re.compile(r"^ {0,3}(#{1,4})[ \t]+(.*)$")
-FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
+# バッククォートのフェンスは、開きの行のフェンスの後にバッククォートを含まない（CommonMark）
+FENCE_RE = re.compile(r"^\s*(`{3,})[^`]*$|^\s*(~{3,})")
 # 計画ファイルの Write / Edit と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容
 # （初回はファイルが無いので空）で判定される（2026-10-12 の E2E で確認）
 PARALLEL_NOTE = (
@@ -69,7 +71,7 @@ def _lines_outside_fences(text: str) -> list[str]:
     for line in text.splitlines():
         m = FENCE_RE.match(line)
         if m:
-            f = m.group(1)
+            f = m.group(1) or m.group(2)
             if fence is None:
                 fence = f
                 continue
@@ -169,7 +171,8 @@ def main() -> int:
         )
         return 0
     except BaseException:
-        # hook 失敗で Claude Code を止めない
+        # hook 失敗で Claude Code を止めない。exit 0 の stderr は動作に影響しないので、原因を追えるよう残す
+        traceback.print_exc()
         return 0
 
 

@@ -38,7 +38,7 @@ Accepted — 2026-10-12
   - 全計画に適用する。implement-flow の対象外の計画は「ゲートの確認結果」に「対象外: <理由>」と書く。専用の逃げ道は設けない
   - 欠けていれば `hookSpecificOutput.decision.behavior = "deny"` の JSON で止め、足りない見出しと書き方を message で返す。計画本文が無い（`tool_input` が `{}`）ときも止める。Claude Code は計画ファイルの中身を `tool_input.plan` に入れて渡すが、計画ファイルの Write と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容（初回はファイルが無いので `{}`）で判定される（2026-10-12 の E2E で、transcript の message id と debug ログの入力から確認した）。deny の message でこの並列呼び出しも案内する。過去の差し戻し 3 件も `{}` だった
 - **B: `hooks/main-commit-guard.py`**（PreToolUse、matcher `Bash`）
-  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd` と `env -C`、payload の `cwd`）の実行前の `git symbolic-ref --short -q HEAD` が `main` / `master` なら exit 2 で止める（unborn のブランチも含む）。同じコマンド内のブランチの切り替えは追わないので、作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する（deny の message と branching.md で案内する）
+  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd` と `env -C`、payload の `cwd`）の実行前の `git symbolic-ref -q HEAD` が `refs/heads/main` / `refs/heads/master` なら exit 2 で止める（unborn のブランチも含む）。同じコマンド内のブランチの切り替えは追わないので、作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する（deny の message と branching.md で案内する）
   - Edit・Write は止めない。main 上で作った変更は `git switch -c` で退避してから commit する（branching.md）
   - 逃げ道は `# via:main-commit-ok: <理由>`（理由必須、クォート内・heredoc の本文・単語の途中は無効）。via はコマンド中のどのコメントにあっても、そのコマンドのすべての commit を通す
 - 規則の正本: 見出しの規則は CLAUDE.md・hve-implement（単独モードの承認）・resolve-issue（Plan のフォーマット）に、main への commit の停止は branching.md に書く。hve-implement は導入先に配るが hook は配らないので、hve-implement には hook のことを書かない
@@ -50,9 +50,10 @@ Accepted — 2026-10-12
 - 悪い結果・既知の限界:
   - A は見出しがあるかを検査するだけで、中身が検討されたかは検査できない。Plan モードを経ない承認（resolve-issue の AskUserQuestion）は A の対象外で、テンプレートの見出しで補う
   - Plan モードに入らずに実装を始めた場合、A は発動しない（Plan モードの開始は CLAUDE.md の規則に頼る）
+  - A は ExitPlanMode の承認画面（PermissionRequest）で動くので、ExitPlanMode を事前に許可する（settings の allow に入れる）など承認画面を出さない設定・モードでは発動しない。ExitPlanMode は allow に入れない。auto モードで発動するかは未確認（マージ後に確かめる）
   - Claude Code の将来の版で ExitPlanMode が常に `{}` で呼ばれるようになると、A がすべての計画を止める（deny の message で気づける。Plan モードは手動で抜けられる）
   - deny のあと、同じ event の他の hook（応答待ちの表示（この環境では Orca の agent hook）や通知音）も発火するので、人の入力が要らない自動の差し戻しでも応答待ちのように見える
-  - B は静的判定なので、変数展開・コマンド置換・eval・`bash -c` で組み立てた commit、`sudo` / `exec` / `nohup` などの前置コマンドや絶対パスで呼んだ git、クォートやエスケープで分けた subcommand、git の alias、`pushd` など `cd` 以外で移ったディレクトリでの commit、`--git-dir` / `--work-tree` や `GIT_DIR` などの環境変数で別のリポジトリを指した commit、同じコマンド内で main に切り替えたあとの commit（`git switch main && git commit`）、`git merge` や `cherry-pick` など commit 以外で main に履歴を積む操作は止めない。クォートの対応が取れないコマンドと、ANSI-C クォート（`$'...'`）の中に `\'` を含むコマンドは分割に失敗するので通す。逆に、同じコマンド内で作業ブランチに退避してからの commit（`git switch -c x && git commit`）と、`git commit --dry-run` / `-h` のように履歴を積まない呼び出しも main 上では止める（message の案内どおり別の Bash 呼び出しにすれば回復できる）
+  - B はシェルの構文を完全には解釈しない best-effort の静的判定で、Claude Code がふだん出す形（`git commit` / `git -C <リテラルのパス>` / `&&`・`;`・改行での連結 / `<<'EOF'` の heredoc）を対象にする。変数・コマンド置換・前置コマンド・予約語の中の `cd` など、それ以外の形は見逃すことがあり、分割に失敗したコマンドは通す（fail-open）。限界を個別に列挙すると「列挙に無いものは対応済み」と読めて境界ケースの追加を誘うので、一般的に書く（PR #61 のレビューで、個別の列挙が巡ごとに新しい指摘を呼んだ）。直すのは、Claude Code がふだん出す形での見逃し、正規の手順を止める誤検知、判定を単純にする修正に限る。逆に、同じコマンド内で作業ブランチへ退避してからの commit（`git switch -c x && git commit`）と、`git commit --dry-run` / `-h` は main 上では止める（message の案内どおり別の Bash 呼び出しにすれば回復できる）
   - add-hook skill の規約は「block は exit 2」「PermissionRequest の matcher は `""` など」だったので、PermissionRequest で拒否するときは JSON の decision で exit 0、matcher は tool 名、という流儀を同じ PR で add-hook に追記した（PermissionRequest で拒否する公式の方式が JSON の decision で、matcher が tool_name に当たるため）
   - リポ版の hook は `settings.machine.json` で外せない（ADR 0006）。user-level 基盤は作者の個人設定という位置付け（ADR 0007）なので、この 2 つのゲートも外す手段を設けない。main だけで運用するリポジトリでは、ユーザーの明示指示のもとで via を付ける
   - hook の実体は clone の作業ツリーへの symlink なので、マージして sync したあと、symlink 先の clone で hook のファイルを持たないブランチ（マージ前に切ったもの）を checkout すると、実体が消えて `python3 <無いファイル>` が exit 2 を返し、Bash と ExitPlanMode が全面的に止まる。symlink 先の clone は main のまま使い（作業は worktree で行う）、マージ前のブランチは先に main へ rebase してから checkout する。欠落時に通すラッパーは、add-hook の「欠落は sync で検出して fail-loud にする」方針と衝突するので採らない
