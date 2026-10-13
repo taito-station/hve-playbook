@@ -197,6 +197,30 @@ broken_json_allowed() {
 }
 run "A13: 壊れた JSON は通す (fail-open)" broken_json_allowed
 
+# ---------- 見出しの語の契約 (Issue #62) ----------
+# hook の定数 GATE / TABLE と、規則の正本の語がずれると、規則どおりの計画が deny される。
+# 語は hook から読み、テスト側に重複させない。
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+_word() {
+    python3 - "$HOOK" "$1" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("plan_gate_check", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+print(getattr(m, sys.argv[2]))
+PY
+}
+GATE_WORD="$(_word GATE)"
+TABLE_WORD="$(_word TABLE)"
+doc_has() { [ -n "$2" ] && grep -qF -- "$2" "$ROOT/$1"; }
+for f in CLAUDE.md skills/hve-implement/SKILL.md skills/global/resolve-issue/SKILL.md; do
+    run "C1: $f が「${GATE_WORD}」を含む" doc_has "$f" "$GATE_WORD"
+    run "C2: $f が「${TABLE_WORD}」を含む" doc_has "$f" "$TABLE_WORD"
+done
+for f in rules/hve/implement-flow.md rules/global/workflow/implement-flow.md; do
+    run "C3: $f が「${GATE_WORD}」を含む" doc_has "$f" "$GATE_WORD"
+done
+
 if [ "$FAIL" -gt 0 ]; then
     echo "=== $FAIL test(s) FAILED ==="
     exit 1

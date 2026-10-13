@@ -62,11 +62,19 @@ def main() -> int:
     # Add a comment like `# via:run-drawio-export` at the end of the bash command
     # to confirm you went through that route (skill or wrapper script) first.
     # This forces a conscious confirmation rather than silent rule-evasion.
-    if re.search(r"#\s*via:[a-z0-9_-]+", command):
-        return 0
-
+    # The via must name the matched rule's route exactly, so another hook's via
+    # (e.g. `# via:main-commit-ok: ...`) or another route's via does not bypass it.
+    # Escaped characters and quoted strings (within one line) are replaced with a
+    # non-space placeholder first, and `#` counts only at line start or after
+    # whitespace, so a via embedded in data (`--title "x # via:create-pr"`,
+    # `'x'# via:...`, `x\ # via:...`) does not bypass. Quotes do not span lines, so an
+    # unpaired `'` (e.g. "It's" in a heredoc body) does not swallow a real via.
+    # A reason may follow as `# via:<route>: <reason>`, like the other hooks' via.
+    stripped = re.sub(r"\\.|'[^'\n]*'|\"(?:[^\"\\\n]|\\.)*\"", "_", command)
     for pattern, skill, reason in RULES:
-        if pattern.search(command):
+        if pattern.search(command) and not re.search(
+            rf"(?:^|\s)#\s*via:{re.escape(skill)}(?=\s|$|:\s)", stripped
+        ):
             print(
                 "BLOCKED by skill-enforcer hook.\n"
                 f"reason: {reason}\n"
