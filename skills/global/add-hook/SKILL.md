@@ -87,7 +87,7 @@ ADR-0006）。Event と matcher を正しく選ぶ:
 
 ### 3. 検証 (必須)
 
-以下を**すべて**通す:
+以下を**すべて**通す（(d-2) だけはマージ後に行う）:
 
 ```bash
 # (a) JSON 妥当性
@@ -97,9 +97,24 @@ python3 -m py_compile hooks/<name>.py && echo "compile OK"
 # (c) スモークテスト (benign payload → exit 0、対象形 → 期待の exit)。
 #     コマンド文字列にトリガー語を「データとして」埋め込むと destructive-guard 等に
 #     誤反応されるので、payload は python で組み立てて渡す
-# (d) settings 参照 hook が全解決するか (★最重要: 欠落 = 全 tool block の致命傷を検出)
-#     先に sync で ~/.claude/settings.json を再生成する。sync 自身も参照 hook を検査し、
-#     欠落があれば FATAL (exit 1) で配置を止める。exit 1 なら以下に進まず原因を直す
+```
+
+(d) settings 参照 hook が全解決するか (★最重要: 欠落 = 全 tool block の致命傷を検出)。
+sync 自身も参照 hook を検査し、欠落があれば FATAL (exit 1) で配置を止める。exit 1 なら先に進まず原因を直す。
+作業ブランチ／worktree と、マージ後の main で手順が違う。
+
+(d-1) 作業ブランチ／worktree: `~/.claude` に sync しない (main に戻すと hook の実体が消え、
+その hook が発火する tool が全面的に止まる)。HOME と CLAUDE_HOME を一時ディレクトリに向けて sync し、
+その FATAL 判定で確かめる。overlay (`settings.machine.json`) が参照する hook はこの判定の対象外なので、
+(d-2) をマージ後に行う:
+
+```bash
+T=$(mktemp -d) && { HOME="$T" CLAUDE_HOME="$T/.claude" bash sync-dotclaude.sh; echo "exit=$?"; rm -rf "$T"; }
+```
+
+(d-2) マージ後、symlink 先の clone (main) で `~/.claude/settings.json` を再生成して確かめる:
+
+```bash
 bash sync-dotclaude.sh
 python3 - <<'PY'
 import json, os, re
