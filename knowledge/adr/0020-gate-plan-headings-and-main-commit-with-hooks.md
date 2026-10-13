@@ -38,7 +38,7 @@ Accepted — 2026-10-12
   - 全計画に適用する。implement-flow の対象外の計画は「ゲートの確認結果」に「対象外: <理由>」と書く。専用の逃げ道は設けない
   - 欠けていれば `hookSpecificOutput.decision.behavior = "deny"` の JSON で止め、足りない見出しと書き方を message で返す。計画本文が無い（`tool_input` が `{}`）ときも止める。Claude Code は計画ファイルの中身を `tool_input.plan` に入れて渡すが、計画ファイルの Write と ExitPlanMode を同じ応答で並列に呼ぶと、書き込む前の内容（初回はファイルが無いので `{}`）で判定される（2026-10-12 の E2E で、transcript の message id と debug ログの入力から確認した）。deny の message でこの並列呼び出しも案内する。過去の差し戻し 3 件も `{}` だった
 - **B: `hooks/main-commit-guard.py`**（PreToolUse、matcher `Bash`）
-  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd` と `env -C`、payload の `cwd`）の実行前の `git symbolic-ref -q HEAD` が `refs/heads/main` / `refs/heads/master` なら exit 2 で止める（unborn のブランチも含む）。同じコマンド内のブランチの切り替えは追わないので、作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する（deny の message と branching.md で案内する）
+  - セグメントの先頭が `git` で subcommand が `commit` のとき、判定するリポジトリ（`git -C`、同じコマンド内の `cd` と `env -C`、payload の `cwd`）の実行前の `git symbolic-ref -q HEAD` が `refs/heads/main` / `refs/heads/master` で、そのリポジトリが remote を持つなら exit 2 で止める（unborn のブランチも含む）。remote の無いリポジトリ（`git init` 直後、検証用の一時リポジトリ）は通す。PR を作れないので、main を PR で守る branching の目的が当てはまらず、止めると HVE の適用プロンプト（`docs/prompts/apply-hve-playbook.md` の、コミットが無ければデフォルトブランチ上で初回 commit する手順）や一時リポジトリでの検証が止まるため。同じコマンド内のブランチの切り替えは追わないので、作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する（deny の message と branching.md で案内する）
   - Edit・Write は止めない。main 上で作った変更は `git switch -c` で退避してから commit する（branching.md）
   - 逃げ道は `# via:main-commit-ok: <理由>`（理由必須、クォート内・heredoc の本文・単語の途中は無効）。via はコマンド中のどのコメントにあっても、そのコマンドのすべての commit を通す
 - 規則の正本: 見出しの規則は CLAUDE.md・hve-implement（単独モードの承認）・resolve-issue（Plan のフォーマット）に、main への commit の停止は branching.md に書く。hve-implement は導入先に配るが hook は配らないので、hve-implement には hook のことを書かない
@@ -49,6 +49,7 @@ Accepted — 2026-10-12
 - 良い結果: ゲートの結果と準拠表の無い計画は、承認画面に出る前に足りない見出しを示して差し戻される。main 上でうっかり commit することを、正規の手順を止めずに防げる。どちらも ADR 0004 の範囲（ExitPlanMode を呼ぶのは Plan モードの計画だけ、commit は作業ブランチ上で行う）に収まり、サブエージェントや自動フローの正規の動きを止めない
 - 悪い結果・既知の限界:
   - A は見出しがあるかを検査するだけで、中身が検討されたかは検査できない。Plan モードを経ない承認（resolve-issue の AskUserQuestion）は A の対象外で、テンプレートの見出しで補う
+  - remote のある空のリポジトリ（`gh repo create --clone` の直後など）での初回 commit は止まる（作業ブランチを切ってから commit する）
   - Plan モードに入らずに実装を始めた場合、A は発動しない（Plan モードの開始は CLAUDE.md の規則に頼る）
   - A は ExitPlanMode の承認画面（PermissionRequest）で動くので、ExitPlanMode を事前に許可する（settings の allow に入れる）など承認画面を出さない設定・モードでは発動しない。ExitPlanMode は allow に入れない。auto モードで発動するかは未確認（マージ後に確かめる）
   - Claude Code の将来の版で ExitPlanMode が常に `{}` で呼ばれるようになると、A がすべての計画を止める（deny の message で気づける。Plan モードは手動で抜けられる）

@@ -16,7 +16,9 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   （`-C <path>` / `-c <x=y>` / `--git-dir <path>` など / `--opt[=val]`）の後の subcommand が `commit` なら対象
 - 判定するリポジトリ: `git -C <path>`（複数なら順に連結。相対パスは基準のディレクトリから）。
   基準のディレクトリは payload の `cwd` で、同じコマンド内の `cd [オプション] <path>` と `env -C <path>` に追従する
-- 実行前の `git symbolic-ref -q HEAD` が `refs/heads/main` / `refs/heads/master` なら止める（unborn のブランチも含む）。
+- 実行前の `git symbolic-ref -q HEAD` が `refs/heads/main` / `refs/heads/master` で、remote を持つリポジトリなら止める
+  （unborn のブランチも含む）。remote の無いリポジトリ（`git init` 直後や検証用の一時リポジトリ）は PR を作れず、
+  main を PR で守る branching の目的が当てはまらないので通す。
   detached HEAD・リポジトリ外・git の失敗は通す。同じコマンド内のブランチの切り替えは追わないので、
   作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する
 
@@ -191,6 +193,15 @@ def _branch(d: str) -> str | None:
     return r.stdout.strip() or None
 
 
+def _has_remote(d: str) -> bool:
+    """remote を 1 つ以上持つか。git が失敗したときは False（通す側）。"""
+    try:
+        r = subprocess.run(["git", "-C", d, "remote"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0 and bool(r.stdout.strip())
+
+
 def _blocked(segs: list[list[str]], cwd: str) -> tuple[str, str] | None:
     """止めるなら (ディレクトリ, ブランチ) を返す。"""
     base = cwd
@@ -207,7 +218,7 @@ def _blocked(segs: list[list[str]], cwd: str) -> tuple[str, str] | None:
         if sub != "commit":
             continue
         b = _branch(d)
-        if b in PROTECTED:
+        if b in PROTECTED and _has_remote(d):
             return d, b
     return None
 

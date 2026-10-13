@@ -24,17 +24,20 @@ run() {
     fi
 }
 
-# 一時リポジトリ。user 設定や init.defaultBranch に左右されないよう -b と -c で固定する
+# 一時リポジトリ。user 設定や init.defaultBranch に左右されないよう -b と -c で固定する。
+# remote の無いリポジトリは判定の対象外なので、origin を設定する（`git remote` は設定を読むだけで通信しない）
 _repo() {
     local dir="$1" branch="$2"
     git init -q -b "$branch" "$dir"
+    git -C "$dir" remote add origin https://example.invalid/x.git
     git -C "$dir" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m init
 }
 _repo "$TMP/main" main
 _repo "$TMP/master" master
 _repo "$TMP/feature" main && git -C "$TMP/feature" switch -q -c feat/x
 _repo "$TMP/detached" main && git -C "$TMP/detached" switch -q --detach
-git init -q -b main "$TMP/unborn"
+git init -q -b main "$TMP/unborn" && git -C "$TMP/unborn" remote add origin https://example.invalid/x.git
+git init -q -b main "$TMP/noremote"
 _repo "$TMP/with space" main
 _repo "$TMP/tagged" main && git -C "$TMP/tagged" tag main
 mkdir -p "$TMP/norepo"
@@ -91,11 +94,13 @@ run "B47: git checkout -b とつないだ commit も実行前の HEAD (main) で
 run "B52: 同名のタグ main があっても main 上の commit を止める" blocked 'git commit -m x' "$TMP/tagged"
 run "B53: 識別子でない終端語の heredoc の本文の via は通さない" blocked $'git commit -F - <<\'END-MSG\'\nfeat: x\n# via:main-commit-ok: x\nEND-MSG' "$TMP/main"
 run "B54: ドットを含む終端語の heredoc の本文にアポストロフィ" blocked $'git commit -F - <<EOF.MSG\nfeat: don\'t\nEOF.MSG' "$TMP/main"
+run "B55: Claude Code がふだん出す -m \"\$(cat <<'EOF' ...)\" の形（本文に \" を含む）" blocked $'git commit -m "$(cat <<\'EOF\'\nfeat: say "hi\nEOF\n)"' "$TMP/main"
 run "B13: 理由の無い via は通さない" blocked 'git commit -m x # via:main-commit-ok:' "$TMP/main"
 run "B14: クォート内の via は通さない" blocked "git commit -m '# via:main-commit-ok: x'" "$TMP/main"
 
 # ---------- 通す ----------
 run "B42: heredoc の commit も作業ブランチ上なら通す" allowed $'git commit -F - <<\'EOF\'\nfix: don\'t break\nEOF' "$TMP/feature"
+run "B56: remote の無いリポジトリ（一時リポジトリ・git init 直後）の main は通す" allowed 'git commit -m init' "$TMP/noremote"
 run "B4: 作業ブランチ上の commit" allowed 'git commit -m x' "$TMP/feature"
 run "B5: detached HEAD の commit" allowed 'git commit -m x' "$TMP/detached"
 run "B6: リポジトリ外" allowed 'git commit -m x' "$TMP/norepo"
