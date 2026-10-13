@@ -12,13 +12,13 @@ Includes [youhei-ushio/dotclaude-public](https://github.com/youhei-ushio/dotclau
 | 役割 | デプロイ方法 | デプロイ先 | 内容 |
 |---|---|---|---|
 | **user-level 基盤** | `sync-dotclaude.sh` (symlink) | `~/.claude/` | hooks, global skills, scripts, rules/global, agents/global, settings |
-| **project-level HVE** | `setup.sh` (copy) | target/.claude/ | rules/hve, HVE skills/agents/workflows, knowledge の検査スクリプト（hve-scripts → scripts/hve） |
+| **project-level HVE** | `setup.sh` (copy) | target/.claude/ | rules/hve, HVE skills/agents/workflows, knowledge の検査スクリプト（hve-scripts → scripts/hve）, LICENSE の写し（LICENSE-hve-playbook） |
 
 ## 使う前に
 
 ### 位置づけ
 
-- **project-level HVE（`setup.sh`）**: 導入先プロジェクトに HVE の rules・skills・agents・workflows を配る。導入先の `.claude/` 配下に symlink が無ければ、`~/.claude` は変えない。導入先の `.claude/` の HVE 資産（`rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`・`scripts/hve/`）は削除してから置き直す。`.claude/CLAUDE.md` が無ければ HVE 方法論を `.claude/CLAUDE.md` として作り、あれば `.claude/CLAUDE.hve.md` を作る（上書きする）。ほかに `docs/` を作り、cq/mdq が無ければ HypervelocityEngineering を使用中の Python 環境に `pip install -e` する。HypervelocityEngineering は、既存の clone（hve-playbook の隣のディレクトリか `HVE_REPO_PATH`）があればそれを使い、無ければ隣に clone する。版は固定しない。使用中の Python 環境を汚したくなければ、venv を有効にしてから実行するか、cq/mdq を先に入れておく（詳細は[適用プロンプトの前提](docs/prompts/apply-hve-playbook.md)）
+- **project-level HVE（`setup.sh`）**: 導入先プロジェクトに HVE の rules・skills・agents・workflows を配る。導入先の `.claude/` 配下に symlink が無ければ、`~/.claude` は変えない。導入先の `.claude/` の HVE 資産（`rules/hve/`・`skills/hve-*`・`agents/hve-*.md`・`workflows/hve-*.js`・`scripts/hve/`）は削除してから置き直す。本リポの `LICENSE`（配った資産の著作権表示と許諾表示）を導入先の `.claude/LICENSE-hve-playbook` にコピーする（上書きする）。`.claude/CLAUDE.md` が無ければ HVE 方法論を `.claude/CLAUDE.md` として作り、あれば `.claude/CLAUDE.hve.md` を作る（上書きする）。ほかに `docs/` を作り、cq/mdq が無ければ HypervelocityEngineering を使用中の Python 環境に `pip install -e` する。HypervelocityEngineering は、既存の clone（hve-playbook の隣のディレクトリか `HVE_REPO_PATH`）があればそれを使い、無ければ隣に clone する。版は固定しない。使用中の Python 環境を汚したくなければ、venv を有効にしてから実行するか、cq/mdq を先に入れておく（詳細は[適用プロンプトの前提](docs/prompts/apply-hve-playbook.md)）
 - **user-level 基盤（`sync-dotclaude.sh`）**: 作者の個人設定（[ADR-0007](knowledge/adr/0007-consolidate-user-level-rules-and-agents.md)）。`~/.claude/` を書き換える。Laravel・Livewire・sail 前提の skill と hook、Obsidian 前提の `learn` skill、Homebrew 前提の `brew-update-all` skill のほか、`settings.json` に作者の好み（`permissions.defaultMode: acceptEdits`（ファイルの編集を確認なしで通す）、`language: japanese`、`model: opus`、`env.DISABLE_AUTOUPDATER`、allow の `Bash(gh pr merge *)` など）を含む。hook も既定で有効になる。許可を求めた操作の内容（コマンドなど）を `~/.claude/logs/` に平文で追記する hook や、すべての Bash 呼び出しの前に検査する hook がある
 
 第三者には project-level だけを勧める。下の「1. user-level 基盤の同期」は実行せず、clone して「2. プロジェクトへの HVE 導入」だけを行う。

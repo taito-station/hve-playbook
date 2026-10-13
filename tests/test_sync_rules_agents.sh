@@ -15,6 +15,7 @@
 #   - workflows/hve-*.js が Read させる SKILL.md は、導入先でも自リポでもルートから解決できる
 #   - setup.sh は rules/hve/local-overrides.md を配り、完了メッセージで .claude/rules/hve-local/ を案内する
 #   - setup.sh を再実行しても .claude/rules/hve-local/ には触れない（既存の挙動を固定する回帰テスト）
+#   - setup.sh は LICENSE を .claude/LICENSE-hve-playbook に配り、再実行で最新の LICENSE に戻す
 
 set -u
 command -v python3 >/dev/null 2>&1 || { echo "[FAIL] 前提: python3 が必要"; exit 1; }
@@ -164,6 +165,13 @@ echo own >"$T/.claude/scripts/own.py"
 PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup4.log" 2>&1
 check "setup.sh 再実行: scripts/hve は置き直す（配布元に無いファイルは残らない）" [ ! -e "$S/removed-upstream.py" ]
 check "setup.sh 再実行: scripts/hve の外の自作スクリプトには触れない" [ "$(cat "$T/.claude/scripts/own.py" 2>/dev/null)" = "own" ]
+
+# 9) 著作権表示と許諾表示（LICENSE → .claude/LICENSE-hve-playbook）
+L="$T/.claude/LICENSE-hve-playbook"
+check "setup.sh: LICENSE の写しを配る（中身は LICENSE と同一）" cmp -s "$REPO_DIR/LICENSE" "$L"
+echo tampered >"$L"
+PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup5.log" 2>&1
+check "setup.sh 再実行: LICENSE の写しを最新の LICENSE に戻す" cmp -s "$REPO_DIR/LICENSE" "$L"
 
 echo
 echo "結果: PASS=$pass FAIL=$fail"
