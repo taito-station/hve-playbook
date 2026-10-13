@@ -79,6 +79,7 @@ find "$TARGET_CLAUDE/scripts/hve" -name '__pycache__' -type d -prune -exec rm -r
 echo "[INFO] scripts/hve/ を配置しました"
 
 # LICENSE → LICENSE-hve-playbook（配った資産の著作権表示と許諾表示）
+rm -f "$TARGET_CLAUDE/LICENSE-hve-playbook"
 cp "$SCRIPT_DIR/LICENSE" "$TARGET_CLAUDE/LICENSE-hve-playbook"
 echo "[INFO] LICENSE-hve-playbook を配置しました"
 

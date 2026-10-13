@@ -16,6 +16,7 @@
 #   - setup.sh は rules/hve/local-overrides.md を配り、完了メッセージで .claude/rules/hve-local/ を案内する
 #   - setup.sh を再実行しても .claude/rules/hve-local/ には触れない（既存の挙動を固定する回帰テスト）
 #   - setup.sh は LICENSE を .claude/LICENSE-hve-playbook に配り、再実行で最新の LICENSE に戻す
+#     （写しの位置が symlink でも、リンク先は書き換えずに実ファイルの写しに置き換える）
 
 set -u
 command -v python3 >/dev/null 2>&1 || { echo "[FAIL] 前提: python3 が必要"; exit 1; }
@@ -171,7 +172,13 @@ L="$T/.claude/LICENSE-hve-playbook"
 check "setup.sh: LICENSE の写しを配る（中身は LICENSE と同一）" cmp -s "$REPO_DIR/LICENSE" "$L"
 echo tampered >"$L"
 PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup5.log" 2>&1
+check "setup.sh 再実行（LICENSE）: exit 0" [ $? -eq 0 ]
 check "setup.sh 再実行: LICENSE の写しを最新の LICENSE に戻す" cmp -s "$REPO_DIR/LICENSE" "$L"
+echo outside >"$TMP/outside.txt"
+rm -f "$L" && ln -s "$TMP/outside.txt" "$L"
+PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup6.log" 2>&1
+check "setup.sh 再実行: 写しの位置の symlink のリンク先を書き換えない" [ "$(cat "$TMP/outside.txt")" = "outside" ]
+check "setup.sh 再実行: 写しの位置の symlink を実ファイルの写しに置き換える" sh -c '[ ! -L "$1" ] && cmp -s "$2" "$1"' _ "$L" "$REPO_DIR/LICENSE"
 
 echo
 echo "結果: PASS=$pass FAIL=$fail"
