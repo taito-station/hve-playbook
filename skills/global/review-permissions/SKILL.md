@@ -78,7 +78,7 @@ tool_name.startswith("mcp__"):
 - 関連 transcript から前後 tool_use を 3 件抜粋 (= 「その時 Claude が何をしようとしていたか」)。
   ログエントリ自体に `transcript_path` が埋まっているので、そのファイルを Read して直近の tool_use を集める。session_id からの逆引きは不要。
 - 候補アクション (4 つまでが UI 上限なので、上位 3 つ + その他 で組む):
-  - (a) **allow パターン追加** — 具体 glob 案を提示 (例: `Bash(./vendor/bin/sail artisan:*)`)
+  - (a) **allow パターン追加** — 具体 glob 案を提示 (例: `Bash(./vendor/bin/sail artisan:*)`)。キーに `<redacted>`（hook が伏せた秘密値）を含むときは、`<redacted>` を含む案を出さない（どのコマンドにも一致しない）。先頭の環境変数の代入が `<redacted>` なら (a) を出さず、秘密値を settings の `env` や認証ヘルパーで渡す運用か、都度確認を候補にする（代入付きのコマンドは allow の glob に一致しない。parallel-setup skill の「COMPOSE_PROJECT_NAME を機械式に固定」参照）。URL など代入以外の位置なら、`<redacted>` より前で切った glob 案を作る
   - (b) **skill 化** — 多段手順なら skill 雛形を生成
   - (c) **その他 (hook/script/都度確認/次回送り/離脱)** — 自由入力で詳細聞く
 
@@ -198,9 +198,10 @@ tool_name.startswith("mcp__"):
 1. 処理済みエントリ (次回送り以外) を `~/.claude/logs/permission-requests-reviewed.jsonl` に append
 2. `~/.claude/logs/permission-requests.jsonl` を未処理分のみで上書き
 3. atomic 化のため `.new` で書いてから `mv -f`
+4. どのファイルも 0600 で書く（伏せきれなかった秘密値を含みうるため。既存の reviewed が 0644 でも 0600 に揃える）
 
 ```python
-import json, shutil
+import json, os, shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -210,14 +211,21 @@ REVIEWED = Path.home() / ".claude" / "logs" / "permission-requests-reviewed.json
 # processed_entries は (entry_dict, action_label) のリスト
 # pending_entries は次回送りの entry_dict のリスト
 
-with REVIEWED.open("a", encoding="utf-8") as f:
+def open_private(path, mode):
+    """0600 で開く。既存ファイルの mode も fchmod で 0600 に揃える。symlink は開かない (hook と同じ)。"""
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | (os.O_APPEND if mode == "a" else os.O_TRUNC)
+    fd = os.open(path, flags, 0o600)
+    os.fchmod(fd, 0o600)
+    return os.fdopen(fd, mode, encoding="utf-8")
+
+with open_private(REVIEWED, "a") as f:
     for entry, action in processed_entries:
         entry["_reviewed_at"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
         entry["_action"] = action
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 tmp = LOG.with_suffix(".jsonl.new")
-with tmp.open("w", encoding="utf-8") as f:
+with open_private(tmp, "w") as f:
     for entry in pending_entries:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 shutil.move(str(tmp), str(LOG))
