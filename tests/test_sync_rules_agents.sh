@@ -177,6 +177,7 @@ check "setup.sh 再実行: LICENSE の写しを最新の LICENSE に戻す" cmp 
 echo outside >"$TMP/outside.txt"
 rm -f "$L" && ln -s "$TMP/outside.txt" "$L"
 PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup6.log" 2>&1
+check "setup.sh 再実行（LICENSE の symlink）: exit 0" [ $? -eq 0 ]
 check "setup.sh 再実行: 写しの位置の symlink のリンク先を書き換えない" [ "$(cat "$TMP/outside.txt")" = "outside" ]
 check "setup.sh 再実行: 写しの位置の symlink を実ファイルの写しに置き換える" sh -c '[ ! -L "$1" ] && cmp -s "$2" "$1"' _ "$L" "$REPO_DIR/LICENSE"
 

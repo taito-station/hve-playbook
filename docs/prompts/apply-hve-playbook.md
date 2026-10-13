@@ -76,7 +76,7 @@ bash <hve-playbook>/setup.sh <target>
   - `[INFO] CLAUDE.hve.md を最新版で更新しました`: `.claude/CLAUDE.hve.md` を上書きした
 - 再適用で、git 管理下の HVE 資産に独自の変更があった場合は、`git -C <target> diff` で上書きされた差分を示す。写しには戻さず、`.claude/rules/hve-local/` に移すかどうかをユーザーに確認する（標準に取り込まれた内容なら移さず捨てる）。
 - 手順 2 で退避したファイルがあれば、置き直された版と `diff -r` で比べ、独自の変更を同じく hve-local に移すかどうかをユーザーに確認する。
-- `LICENSE-hve-playbook` は上の 2 つの確認の対象外で、hve-local に移さない。差分があっても捨てる（hve-playbook の `LICENSE` の写しなので）。
+- `LICENSE-hve-playbook` は上の 2 つの確認の対象外で、独自の変更があっても hve-local に移さず、setup.sh が置いた版のままにする（hve-playbook の `LICENSE` の写しなので）。
 - `.claude/rules/hve-local/` があれば、標準の変更（`git -C <target> diff -- .claude/rules/hve .claude/skills`）と見比べ、hve-local の見出しが指す節が標準に実在し、「上書き」節が追従しているかを確かめる。
 - cq/mdq の導入に失敗しても `grep`/`find` にフォールバックして動く。失敗した場合は、その旨を報告に書く。
 
