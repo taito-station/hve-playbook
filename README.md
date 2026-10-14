@@ -46,8 +46,8 @@ user-level から一部の skill などだけを使いたいときは、sync は
 `sync-dotclaude.sh` は、既存の `~/.claude/` を次のように扱う。
 
 - 実体のファイル・ディレクトリが同じ名前で置いてあれば、触らずにスキップして WARN を出す（終了コード 2）。リポ版はそこに張られない
-- 別の場所を指す symlink（自分の dotfiles を指す `CLAUDE.md` など）は、退避せずにリポへの symlink に張り替える。リンク先の中身は残る
-- `settings.json` は、リポ版と `settings.machine.json` をマージした生成物に置き換える。実体なら、前回配置したものとも今回の生成版とも JSON として違うとき（初回を含む）に `settings.json.bak-<日時>-XXXX` へ退避する。symlink なら退避しない
+- リポの外を指す symlink（自分の dotfiles を指す `CLAUDE.md` など）は、退避せずにリポへの symlink に張り替える。リンク先の中身は残る。張り替えた回は、元のリンク先と戻すコマンド（`ln -sfn -- '<元のリンク先>' '<リンク>'`）を WARN に出す（終了コード 2）。このリポを指す symlink（別の綴りのパスを含む）は、黙って張り直す。相対パスのリンクは、このリポを指していてもリポの外として扱う
+- `settings.json` は、リポ版と `settings.machine.json` をマージした生成物に置き換える。実体なら、前回配置したものとも今回の生成版とも JSON として違うとき（初回を含む）に `settings.json.bak-<日時>-XXXX` へ退避する。symlink なら退避しない。リポの外を指す symlink だったときは、元のリンク先と戻すコマンドを WARN に出す（終了コード 2）
 - `settings.machine.json` では `model`・`language`・`permissions.defaultMode`・`env` の値などを上書きでき、hook や allow を追加できる（編集のたびに確認したいなら `permissions.defaultMode` を `default` にする）。リポ版の hook や allow は外せない（[ADR-0006](knowledge/adr/0006-generate-settings-json-with-machine-overlay.md)）
 
 そのため、初めて sync する前に `~/.claude/` の中身を丸ごと退避する（`~/.claude` がまだ無ければ退避は要らない）。
@@ -90,7 +90,7 @@ bash hve-playbook/sync-dotclaude.sh
 
 `sync-dotclaude.sh` は `~/.claude/` に symlink を張る（冪等・何度実行しても安全）。以降は `git -C hve-playbook pull --ff-only && bash hve-playbook/sync-dotclaude.sh --prune` を **1 回のコマンドで** 実行して最新化する。この clone で switch / checkout / rebase / merge をするときも、同じく `&& bash hve-playbook/sync-dotclaude.sh --prune` と続ける。git 操作と sync を別々に実行すると、hook を削除した更新を取り込んだとき、その間は `~/.claude/settings.json` に残った hook 行が消えたファイルを呼ぶ。その結果、Bash が全面ブロックされる。そうなったら、Claude Code の外のターミナルで `bash hve-playbook/sync-dotclaude.sh --prune` を実行して復旧する（[ADR-0010](knowledge/adr/0010-drop-serena-for-builtin-lsp.md)）。
 
-`~/.claude/settings.json` だけは symlink ではなく、リポの `settings.json` と `~/.claude/settings.machine.json`（マシン固有の hook・permissions 等。任意）をマージした生成物になる。`~/.claude/settings.json` を直接編集しても次の同期で上書きされるため、マシン固有の設定は `settings.machine.json` に書く（user レベルの `~/.claude/settings.local.json` は Claude Code に読まれない。[ADR-0006](knowledge/adr/0006-generate-settings-json-with-machine-overlay.md)）。既存の `~/.claude/settings.json` が前回配置したものとも今回の生成版とも JSON として違えば（初回を含む）、`settings.json.bak-<日時>-XXXX` に退避してから置き換える。symlink だった場合は退避しない。生成には `python3` が必要。
+`~/.claude/settings.json` だけは symlink ではなく、リポの `settings.json` と `~/.claude/settings.machine.json`（マシン固有の hook・permissions 等。任意）をマージした生成物になる。`~/.claude/settings.json` を直接編集しても次の同期で上書きされるため、マシン固有の設定は `settings.machine.json` に書く（user レベルの `~/.claude/settings.local.json` は Claude Code に読まれない。[ADR-0006](knowledge/adr/0006-generate-settings-json-with-machine-overlay.md)）。既存の `~/.claude/settings.json` が前回配置したものとも今回の生成版とも JSON として違えば（初回を含む）、`settings.json.bak-<日時>-XXXX` に退避してから置き換える。symlink だった場合は退避しない（リポの外を指していれば、元のリンク先と戻すコマンドを WARN に出し、終了コード 2 にする。[ADR-0024](knowledge/adr/0024-warn-when-sync-replaces-foreign-symlinks.md)）。生成には `python3` が必要。
 
 `rules/global/`・`agents/global/` も同じく `~/.claude/rules/<category>`・`~/.claude/agents/<name>.md` に symlink する。これらを `~/.claude` に実体で置いていた環境は、sync が WARN でスキップする（exit 2）ので、一度だけ実体を退避して sync をやり直す（[ADR-0007](knowledge/adr/0007-consolidate-user-level-rules-and-agents.md)）。次の手順は、作者の旧環境にあった固定のファイル名を mv するもので、第三者は実行しない（存在しないファイルでエラーになる。同じ名前の実体があっても sync は WARN でスキップするだけで、自分のファイルは残り、リポ版はそこに張られない）:
 
