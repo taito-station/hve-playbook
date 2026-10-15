@@ -16,6 +16,7 @@
 #   - overlay が不正（JSON 不正 / トップレベルが object でない / dict・list を別の型で上書き）
 #     → FATAL (exit 1)、settings.json は変えない
 #   - 旧方式の symlink → 生成ファイルへ移行
+#   - リポの外を指す symlink → 生成ファイルに置き換え、WARN に元のリンク先と戻すコマンド (exit 2)
 #   - 読まれない settings.local.json に hooks / permissions → WARN (exit 2)
 
 set -u
@@ -260,6 +261,20 @@ run_sync "$H"
 check "symlink 移行: exit 0" [ "$(rc "$H")" = 0 ]
 check "symlink 移行: 実ファイルになる" [ ! -L "$H/settings.json" ]
 check "symlink 移行: リポ版と同内容" jq_eq "$H/settings.json" "$REPO_DIR/settings.json"
+
+# 11b) リポの外を指す symlink → 生成ファイルに置き換え、WARN に元のリンク先と戻すコマンド (exit 2)
+H="$TMP/h11b"; mkdir -p "$H"
+echo '{ "mine": 1 }' >"$TMP/my settings.json"
+ln -s "$TMP/my settings.json" "$H/settings.json"
+run_sync "$H"
+check "リポの外の symlink: exit 2" [ "$(rc "$H")" = 2 ]
+check "リポの外の symlink: WARN に元のリンク先を出す" sh -c 'grep "WARN" "$1" | grep -qF "$2"' _ "$H.log" "$TMP/my settings.json"
+check "リポの外の symlink: settings.machine.json への移し方を案内する" grep -q 'settings.machine.json に書くこと' "$H.log"
+check "リポの外の symlink: 生成ファイルになる" sh -c '[ ! -L "$1" ] && [ -f "$1" ]' _ "$H/settings.json"
+check "リポの外の symlink: リンク先の中身は変えない" [ "$(cat "$TMP/my settings.json")" = '{ "mine": 1 }' ]
+restore="$(grep -o 'ln -sfn .*' "$H.log" | head -1)"
+check "リポの外の symlink: WARN の戻すコマンドで元のリンクに戻る" \
+    sh -c '[ -n "$1" ] && bash -c "$1" && [ "$(readlink "$2")" = "$3" ]' _ "$restore" "$H/settings.json" "$TMP/my settings.json"
 
 # 12) 前回配置の記録が無い既存 settings.json（PR #14 のコピー方式から移行）→ 退避してから生成版を配置
 H="$TMP/h12"; mkdir -p "$H"

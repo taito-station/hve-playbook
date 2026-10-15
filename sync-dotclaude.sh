@@ -32,6 +32,7 @@
 #   1   FATAL: settings.json の "command" が参照する hook が実在しない、または settings.json の生成失敗
 #       （要即対応。いずれも配置済みの settings.json は変更しない。symlink の同期と検査は行う）
 #   2   要手動確認: dangling symlink 残置、同名実体の居座りスキップ、settings.json 直接編集の退避、
+#       リポの外を指す symlink の置き換え（WARN に元のリンク先と戻すコマンドを出す）、
 #       または読まれない ~/.claude/settings.local.json に hooks / permissions が残っている
 #   64  引数エラー（未知フラグ）
 set -euo pipefail
@@ -51,17 +52,65 @@ linked=0; okcnt=0; fixed=0; warncnt=0; pruned=0
 
 mkdir -p "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/rules" "$CLAUDE_DIR/agents"
 
+REPO_DIR_P="$(cd "$REPO_DIR" && pwd -P)"
+
+# in_repo <readlink の値>: このリポ配下を指すか。同じリポを別の綴り（symlink 経由のパス）で
+# 指すものも含める。相対パスはリンクの位置に依存するのでリポの外として扱う。
+# . / .. を含む綴りは前方一致ではリポの外を指しうるので、物理パスで判定する。
+# 物理パスは、ディレクトリとして存在すればパスそのもの、そうでなければ親ディレクトリを
+# cd -P で解決する（dirname は末尾の . / .. を落とし、cd は .. を字面で処理するため）
+in_repo() {
+  local d
+  case "$1" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  case "$1" in
+    */./*|*/../*|*/.|*/..) ;;
+    "$REPO_DIR"/*) return 0 ;;
+  esac
+  if [ -d "$1" ]; then
+    d="$(cd -P "$1" 2>/dev/null && pwd -P)" || return 1
+  else
+    d="$(cd -P "$(dirname "$1")" 2>/dev/null && pwd -P)" || return 1
+  fi
+  case "$d/" in
+    "$REPO_DIR_P"/*) return 0 ;;
+  esac
+  return 1
+}
+
+# shq <文字列>: シングルクォートで囲む（' は '\'' にする）。printf %q は bash 3.2 で
+# 非 ASCII を不正な UTF-8 で出し、端末からコピーすると戻らないため使わない
+shq() {
+  local q="'\\''"
+  printf "'%s'" "${1//\'/$q}"
+}
+
+# warn_replaced <link> <元のリンク先> <説明>: リポの外を指していたリンクを置き換えたことと、戻すコマンドを出す
+warn_replaced() {
+  echo "  WARN   : $1 はリポの外（$2）を指していた。$3"
+  echo "           戻すには: ln -sfn -- $(shq "$2") $(shq "$1")"
+  warncnt=$((warncnt + 1))
+}
+
 # link_one <target-symlink> <source-in-repo>
-# 既存が正しい symlink なら何もしない。別 symlink なら張り直す。
+# 既存が正しい symlink なら何もしない。リポ配下を指す別 symlink なら静かに張り直す。
+# リポの外を指す symlink は張り直したうえで、元のリンク先と戻すコマンドを WARN で出す。
 # 実ディレクトリ/実ファイルが居座っている場合はネスト事故を避けてスキップ＋警告。
 link_one() {
-  local link="$1" src="$2"
+  local link="$1" src="$2" old
   if [ -L "$link" ]; then
-    if [ "$(readlink "$link")" = "$src" ]; then
+    old="$(readlink "$link")"
+    if [ "$old" = "$src" ]; then
       okcnt=$((okcnt + 1)); return
     fi
     ln -sfn "$src" "$link"
-    echo "  fix    : $(basename "$link")  (別リンクから張り直し)"
+    if in_repo "$old"; then
+      echo "  fix    : $(basename "$link")  (別リンクから張り直し)"
+    else
+      warn_replaced "$link" "$old" "リポへのリンクに張り替えた（リンク先の中身は変えていない）"
+    fi
     fixed=$((fixed + 1)); return
   fi
   if [ -e "$link" ]; then
@@ -288,8 +337,14 @@ elif [ ! -L "$SETTINGS" ] && [ -f "$SETTINGS" ] && cmp -s "$generated" "$SETTING
   okcnt=$((okcnt + 1))
 else
   if [ -L "$SETTINGS" ]; then
+    old="$(readlink "$SETTINGS")"
     rm "$SETTINGS"
-    echo "  migrate: settings.json  (symlink → 生成ファイルに移行)"
+    if in_repo "$old"; then
+      echo "  migrate: settings.json  (symlink → 生成ファイルに移行)"
+    else
+      warn_replaced "$SETTINGS" "$old" "生成ファイルに置き換えた（リンク先の中身は変えていない）"
+      echo "           残す設定は settings.machine.json に書くこと（settings.json は同期のたびに再生成される）"
+    fi
   elif [ -f "$SETTINGS" ] && ! settings_py same "$SNAPSHOT" "$SETTINGS" \
     && ! settings_py same "$generated" "$SETTINGS"; then
     # 前回配置した生成版と JSON として違う = 外部ツールや UI による直接編集。上書き前に退避する

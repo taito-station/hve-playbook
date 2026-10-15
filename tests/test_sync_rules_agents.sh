@@ -8,6 +8,9 @@
 #   - 同名の実体が居座る場合はスキップ + WARN (exit 2)
 #   - このリポジトリ由来で実体が消えた rules / agents の symlink を dangling として検出（--prune で除去）
 #   - 実体を退避したあと再同期すると symlink になり exit 0（既存環境の一度きりの移行）
+#   - リポの外を指す symlink は張り替え、WARN に元のリンク先と戻すコマンドを出す (exit 2)。
+#     同じリポを別の綴り（symlink 経由のパス・末尾 / の有無）で指すリンクは今までどおり静かに張り直す。
+#     .. を含む綴りでリポの外を指すリンクは見逃さない。戻すコマンドは非 ASCII のパスでも正しい UTF-8
 #   - このリポジトリ自身の .claude/rules は rules/hve だけ、.claude/agents は agents/hve-*.md だけを指す
 #     （global 配下を project-level で重ねて読ませない。サブディレクトリの agent も読み込まれるため）
 #   - setup.sh は rules/global・agents/global・global skill を導入先にコピーしない
@@ -74,6 +77,61 @@ run_sync "$H"
 check "移行後: exit 0" [ "$(rc "$H")" = 0 ]
 check "移行後: rules が symlink" links_to "$H/rules/$CATEGORY" "$REPO_DIR/rules/global/$CATEGORY/"
 check "移行後: agent が symlink" links_to "$H/agents/$AGENT" "$REPO_DIR/agents/global/$AGENT"
+
+# 3c) リポの外を指す symlink → 張り替え + WARN（元のリンク先と戻すコマンド）+ exit 2
+H="$TMP/h3c"; OUT="$TMP/my dotfiles 日本語's/$CATEGORY"; mkdir -p "$H/rules" "$OUT"
+echo mine >"$OUT/mine.md"
+ln -s "$OUT" "$H/rules/$CATEGORY"
+run_sync "$H"
+check "リポの外: exit 2" [ "$(rc "$H")" = 2 ]
+check "リポの外: WARN に元のリンク先を出す" sh -c 'grep "WARN" "$1" | grep -qF "$2"' _ "$H.log" "$OUT"
+check "リポの外: リポへのリンクに張り替える" links_to "$H/rules/$CATEGORY" "$REPO_DIR/rules/global/$CATEGORY/"
+check "リポの外: 元のリンク先の中身は変えない" [ "$(ls -A "$OUT")" = "mine.md" ]
+cp "$H.log" "$H.first.log"
+run_sync "$H"
+check "リポの外（張り替え後の再実行）: exit 0" [ "$(rc "$H")" = 0 ]
+check "リポの外（張り替え後の再実行）: WARN なし" sh -c '! grep -q WARN "$1"' _ "$H.log"
+restore="$(grep -o 'ln -sfn .*' "$H.first.log" | grep -F "rules/$CATEGORY" | head -1)"
+check "リポの外: WARN の戻すコマンドで元のリンクに戻る（空白・日本語・' を含むパス）" \
+    sh -c '[ -n "$1" ] && bash -c "$1" && [ "$(readlink "$2")" = "$3" ]' _ "$restore" "$H/rules/$CATEGORY" "$OUT"
+# 端末からコピーして貼れるよう、出力は正しい UTF-8 で、パスは文字のまま出す（bash 3.2 の %q は壊す）
+check "リポの外: WARN の出力は正しい UTF-8" sh -c 'iconv -f UTF-8 -t UTF-8 "$1" >/dev/null 2>&1' _ "$H.first.log"
+check "リポの外: 戻すコマンドにパスが文字のまま出る" grep -qF "日本語" "$H.first.log"
+
+# 3c-2) . / .. を含む綴りでリポの外を指すリンク → 前方一致で見逃さず WARN (exit 2)
+H="$TMP/h3c2"; mkdir -p "$H/rules"
+ln -s "$REPO_DIR/../outside-dotdot" "$H/rules/$CATEGORY"
+run_sync "$H"
+check "..: リポの外を指す綴りは exit 2" [ "$(rc "$H")" = 2 ]
+check "..: WARN を出す" grep -q "WARN.*rules/$CATEGORY" "$H.log"
+# 最後の要素が .. の綴り（リポの親ディレクトリ）も見逃さない
+for tgt in "$REPO_DIR/.." "$REPO_DIR/../" "$REPO_DIR/rules/../.." "$REPO_DIR/..//"; do
+    H="$TMP/h3c2-tail"; rm -rf "$H"; mkdir -p "$H/rules"
+    ln -s "$tgt" "$H/rules/$CATEGORY"
+    run_sync "$H"
+    check "..（末尾 ${tgt#"$REPO_DIR"}）: exit 2・WARN" sh -c '[ "$(cat "$1.rc")" = 2 ] && grep -q WARN "$1.log"' _ "$H"
+done
+
+# 3c-3) リポ配下を同じ前置きのパスで指し、末尾 / だけ違うリンク → 今までどおり fix 行だけで exit 0
+H="$TMP/h3c3"; mkdir -p "$H/rules"
+ln -s "$REPO_DIR/rules/global/$CATEGORY" "$H/rules/$CATEGORY"
+run_sync "$H"
+check "リポ配下の表記ゆれ: exit 0" [ "$(rc "$H")" = 0 ]
+check "リポ配下の表記ゆれ: fix 行を出す" grep -q "fix *: $CATEGORY" "$H.log"
+check "リポ配下の表記ゆれ: WARN なし" sh -c '! grep -q WARN "$1"' _ "$H.log"
+check "リポ配下の表記ゆれ: 張り直す" links_to "$H/rules/$CATEGORY" "$REPO_DIR/rules/global/$CATEGORY/"
+
+# 3d) 同じリポを別の綴り（symlink 経由のパス）で指すリンク → 今までどおり静かに張り直す（exit 0）
+ALIAS="$TMP/repo-alias"; ln -s "$REPO_DIR" "$ALIAS"
+H="$TMP/h3d"; mkdir -p "$H"
+CLAUDE_HOME="$H" bash "$ALIAS/sync-dotclaude.sh" >"$H.log" 2>&1; echo $? >"$H.rc"
+check "別の綴り: symlink 経由のパスで sync → exit 0" [ "$(rc "$H")" = 0 ]
+run_sync "$H"
+check "別の綴り: 実パスで再実行 → exit 0" [ "$(rc "$H")" = 0 ]
+check "別の綴り: 実パスで再実行 → 張り直す" links_to "$H/rules/$CATEGORY" "$REPO_DIR/rules/global/$CATEGORY/"
+check "別の綴り: 実パスで再実行 → WARN なし" sh -c '! grep -q WARN "$1"' _ "$H.log"
+CLAUDE_HOME="$H" bash "$ALIAS/sync-dotclaude.sh" >"$H.log" 2>&1; echo $? >"$H.rc"
+check "別の綴り: symlink 経由のパスで再実行 → exit 0・WARN なし" sh -c '[ "$(cat "$1.rc")" = 0 ] && ! grep -q WARN "$1.log"' _ "$H"
 
 # 4) dangling 検出と --prune
 H="$TMP/h4"; mkdir -p "$H/rules" "$H/agents"

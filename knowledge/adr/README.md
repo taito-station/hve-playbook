@@ -29,3 +29,4 @@
 | [0021](0021-ship-license-copy-with-hve-assets.md) | setup.sh は導入先に LICENSE の写しを .claude/LICENSE-hve-playbook として配る | Accepted | 2026-10-13 |
 | [0022](0022-permission-log-masks-secrets-and-debug-opt-in.md) | 許可要求ログの hook は既知の形の秘密値を伏せて書き、debug ログは opt-in、本体は環境変数で止められるようにする | Accepted | 2026-10-13 |
 | [0023](0023-via-scope-for-commit-instruction-and-skill-enforcer.md) | 「コミットして」は main への commit の指示に当たらず、skill-enforcer の via はルート名の完全一致に限る | Accepted | 2026-10-13 |
+| [0024](0024-warn-when-sync-replaces-foreign-symlinks.md) | sync はリポの外を指す symlink を張り替え、元のリンク先と戻すコマンドを WARN に出す | Accepted | 2026-10-14 |
