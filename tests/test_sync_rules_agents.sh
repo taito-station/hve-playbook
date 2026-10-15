@@ -11,7 +11,8 @@
 #   - リポの外を指す symlink は張り替え、WARN に元のリンク先と戻すコマンドを出す (exit 2)。
 #     同じリポを別の綴り（symlink 経由のパス・末尾 / の有無）で指すリンクは今までどおり静かに張り直す。
 #     .. を含む綴りでリポの外を指すリンクは見逃さない。戻すコマンドは非 ASCII のパスでも正しい UTF-8
-#   - このリポジトリ自身の .claude/rules は rules/hve だけ、.claude/agents は agents/hve-*.md だけを指す
+#   - このリポジトリ自身の .claude/rules は rules/hve とリポジトリ専用の testing.md だけ、
+#     .claude/agents は agents/hve-*.md だけを指す
 #     （global 配下を project-level で重ねて読ませない。サブディレクトリの agent も読み込まれるため）
 #   - setup.sh は rules/global・agents/global・global skill を導入先にコピーしない
 #     （cq/mdq の導入分岐に入らないよう、python3 をスタブにして実行する）
@@ -148,7 +149,7 @@ check "--prune: agents を除去" [ ! -L "$H/agents/no-such-agent.md" ]
 # 4b) このリポジトリ自身の .claude/rules・.claude/agents
 check "自リポ: .claude/rules は symlink でない" [ ! -L "$REPO_DIR/.claude/rules" ]
 check "自リポ: .claude/rules/hve は rules/hve を指す" [ "$(readlink "$REPO_DIR/.claude/rules/hve")" = "../../rules/hve" ]
-check "自リポ: .claude/rules 直下は hve だけ" [ "$(ls -A "$REPO_DIR/.claude/rules")" = "hve" ]
+check "自リポ: .claude/rules 直下は hve と testing.md だけ" [ "$(ls -A "$REPO_DIR/.claude/rules" | tr '\n' ' ')" = "hve testing.md " ]
 check "自リポ: .claude/agents は symlink でない" [ ! -L "$REPO_DIR/.claude/agents" ]
 check "自リポ: .claude/agents は agents/hve-*.md だけを指す（global を project-level で重ねて読ませない）" \
     [ "$(cd "$REPO_DIR/.claude/agents" && for f in *; do printf '%s->%s\n' "$f" "$(readlink "$f")"; done)" \
