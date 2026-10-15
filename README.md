@@ -150,6 +150,16 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 
 このリポジトリ自身にも pre-push で適用している。clone したら一度だけ `git -C hve-playbook config core.hooksPath .githooks` を実行して有効にする。
 
+## テスト
+
+`tests/`（hook・skill・規則の契約テストなど）は、CI でも git hook でも自動実行しない。PR を作る前に、ローカルで全件を流す（[ADR-0025](knowledge/adr/0025-run-tests-locally-by-discipline.md)）。
+
+```bash
+bash tests/run-all.sh
+```
+
+HOME を一時ディレクトリに向けて `tests/test_*.sh` を 1 本ずつ実行し、本ごとの PASS / FAIL と SKIP の有無を出す（全件で約 7 分）。流す時点と結果の扱いは [.claude/rules/testing.md](.claude/rules/testing.md) に書いてある。
+
 ## 推奨ツール
 
 | ツール | 用途 |
