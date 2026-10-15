@@ -145,6 +145,8 @@ PR 本文に `##` などの `#` で始まる行が含まれると、Claude Code 
 
 一時ファイルの配置先: `$REPO_ROOT/docs/temp/pr-body.md`
 
+本文の作成・編集（以降の Step での追記を含む）は Write / Edit ツールで行う。Bash の heredoc やスクリプトに本文を入れると、本文中の PR 作成コマンドの文字列で skill-enforcer に止められることがある（hook は heredoc の本文を解釈しない。ADR 0023）。
+
 **この時点で `gh pr create` は実行しない。** PR 本文をローカルに作成し、レビュー完了後の
 Step 7 で `gh pr create --body-file` に渡す。
 
@@ -523,18 +525,12 @@ if [ "$REMOTE_BRANCH_EXISTS" -eq 0 ]; then
     git log "origin/$BASE"..HEAD --oneline
 
     git reset --soft "origin/$BASE"
-    # コミットメッセージを組み立てて commit
+    # コミットメッセージを Write ツールで $REPO_ROOT/docs/temp/squash-msg.txt に書いて commit する
+    # (Bash のコマンドに本文を入れると、本文中の PR 作成コマンドの文字列で skill-enforcer に止められうる。Step 3 と同じ)
     # - commit-workflow skill の規約に従う
     # - Closes #<issue番号> トレーラーを含める (Issue 対応時)
-    # - 🤖 Generated with [Claude Code] トレーラーを含める
-    git commit -m "<タイトル>
-
-<本文>
-
-Closes #<issue番号>
-
-Co-Authored-By: ...
-🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+    # - Co-Authored-By と 🤖 Generated with [Claude Code] トレーラーを含める
+    git commit -F "$REPO_ROOT/docs/temp/squash-msg.txt" && rm -f "$REPO_ROOT/docs/temp/squash-msg.txt"
 else
     # 既に remote にある → squash しない (force-push を避けるため)
     :
@@ -644,7 +640,7 @@ fi
 # upstream の有無ではなく PR の存在で分岐する
 EXISTING_PR=$(gh pr view --json number -q .number 2>/dev/null || echo "")
 if [ -z "$EXISTING_PR" ]; then
-    gh pr create --title "<タイトル>" --body-file "$REPO_ROOT/docs/temp/pr-body.md"
+    gh pr create --title "<タイトル>" --body-file "$REPO_ROOT/docs/temp/pr-body.md" # via:create-pr
 else
     gh pr edit "$EXISTING_PR" --body-file "$REPO_ROOT/docs/temp/pr-body.md"
 fi
@@ -674,7 +670,7 @@ fi
 ### Step 9: クリーンアップ
 
 ```bash
-rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/review-"*.diff "$REPO_ROOT/docs/temp/.cost-snapshot" "$REPO_ROOT/docs/temp/.follow.log"
+rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/review-"*.diff "$REPO_ROOT/docs/temp/.cost-snapshot" "$REPO_ROOT/docs/temp/.follow.log" "$REPO_ROOT/docs/temp/squash-msg.txt"
 # -f で冪等性確保 (review-pr 経路 B 起動時など別 skill が先に消すケースに
 # 耐える)。sidecar (.pr-body.owner) も同時に消すことで、次回 PR 作成時の
 # 所有権判定が確実に「経路 A の新規作成」として始まる。
