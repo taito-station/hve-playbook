@@ -88,7 +88,7 @@ kind 名前空間付き (`"defect:" + key` / `"judgment:" + key`) で
 呼び出し元が用意 / 経路 B: 本 skill が現本文から生成)、両経路で以降の
 処理は共通:
 
-`$REPO_ROOT/docs/temp/pr-body.md` を編集:
+`$REPO_ROOT/docs/temp/pr-body.md` を Edit ツールで編集する（Bash の heredoc やスクリプトに本文を入れると、本文中の PR 作成コマンドの文字列で skill-enforcer に止められることがある。create-pr Step 3 と同じ）:
 
 - 既存の Summary / 設計判断 / 維持されたノウハウは保持
 - 「対応履歴」セクションの位置は `## Test plan` の直前 (`## ブラウザテスト` が

@@ -45,6 +45,9 @@ DRAWIO="drawio --export -f svg -o a.svg a.drawio"
 run "E1: gh pr create は止める" blocked "$PR"
 run "E2: drawio --export は止める" blocked "$DRAWIO"
 run "E3: ルールに当たらないコマンドは通す" allowed "git status"
+run "E4: gh pr new (create のエイリアス) も止める" blocked "gh pr new --title x --body-file b.md"
+run "E5: gh pr new も # via:create-pr で通す" allowed "gh pr new --title x --body-file b.md # via:create-pr"
+run "E6: gh pr newer のような別の語には当たらない" allowed "gh pr newer"
 
 # ---------- bypass: ルート名の完全一致 ----------
 run "E10: # via:create-pr で gh pr create を通す" allowed "$PR # via:create-pr"
@@ -85,7 +88,27 @@ run "M1: gh pr create は # via:create-pr を案内する" blocked_with "$PR" cr
 run "M2: drawio は # via:run-drawio-export を案内する" blocked_with "$DRAWIO" run-drawio-export
 run "M3: 別の hook の via が付いていても # via:create-pr を案内する" blocked_with "$PR # via:main-commit-ok: x" create-pr
 run "M4: 2 ルールで片方の via だけなら、足りない側の via を案内する" blocked_with "$DRAWIO && $PR # via:create-pr" run-drawio-export
+run "M5: gh pr new も # via:create-pr を案内する" blocked_with "gh pr new --title x" create-pr
 
+# ---------- create-pr の手順との契約 (Issue #71) ----------
+# 正規の経路である create-pr の PR 作成コマンドが、skill-enforcer に止められないこと
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CREATE_PR="$ROOT/skills/global/create-pr/SKILL.md"
+create_pr_lines_allowed() {
+    local line n=0
+    while IFS= read -r line; do
+        n=$((n + 1))
+        allowed "$line" || return 1
+    done < <(grep -E '^[[:space:]]*gh pr (create|new) ' "$CREATE_PR")
+    [ "$n" -gt 0 ]
+}
+run "C1: create-pr の PR 作成コマンドは 1 行ずつ skill-enforcer を通る" create_pr_lines_allowed
+# Step 6 の squash は、本文をコマンドに入れず -F でファイルから渡す (本文中の PR 作成コマンドの文字列で止められないため)
+squash_uses_file() {
+    grep -qE '^[[:space:]]*git commit -F "\$REPO_ROOT/docs/temp/squash-msg\.txt"' "$CREATE_PR" \
+        && ! grep -qE '^[[:space:]]*git commit -m "<タイトル>' "$CREATE_PR"
+}
+run "C2: create-pr Step 6 の squash は git commit -F でメッセージを渡す" squash_uses_file
 # ---------- 対象外・fail-open ----------
 other_tool_allowed() {
     echo '{"tool_name":"Read","tool_input":{"file_path":"x"}}' | python3 "$HOOK" >/dev/null 2>&1

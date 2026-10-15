@@ -27,15 +27,15 @@ RULES = [
         "drawio --export を直接呼ばないこと。~/.claude/hooks/run-drawio-export.sh 経由で実行する（Xvfb 起動と後始末をまとめてやる）。",
     ),
     (
-        re.compile(r"\bgh\s+pr\s+create\b"),
+        re.compile(r"\bgh\s+pr\s+(?:create|new)\b"),
         "create-pr",
-        "gh pr create を直接呼ばないこと。/create-pr スキル経由で実行する。",
+        "gh pr create / gh pr new を直接呼ばないこと。/create-pr スキル経由で実行する。",
     ),
     # NOTE: md-to-pdf rule removed.
     # /pdf skill's instructions internally call `npx md-to-pdf`, so this rule
     # would block the skill's own execution. Detecting "md-to-pdf without
     # prior SVG embedding" is too fragile, so we rely on memory/skill discipline
-    # for /pdf invocation. drawio and gh pr create are still enforced because
+    # for /pdf invocation. drawio and gh pr create / gh pr new are still enforced because
     # those commands have meaningful pre/post setup that the skill orchestrates.
 ]
 
