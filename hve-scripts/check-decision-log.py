@@ -20,7 +20,8 @@
   検査し、食い違えば警告する。`--adr-dir` 配下にサブディレクトリや `.md` 以外のファイル
   （`README.md` を除く）があれば、独立ファイル方式の前提（フラット配置）から外れるため
   検査対象外になる旨を警告する（base にあったそれらの削除も同様に警告）。
-  ファイル名の先頭の 4 桁の番号（`NNNN-`）が同じ ADR が複数あれば error にする。
+  ファイル名の番号（ステータスの突き合わせと同じ、最初の 3 桁以上の数字）が同じ ADR が
+  複数あれば error にする（base に `--adr-dir` が無く、この変更で作ったときも検査する）。
   並行ブランチがどちらも main の最大値 +1 を取ると起き、ブランチ単体では検出できない
   ので、CI では main との merge commit を `--head` に渡して検査する。その番号の
   ファイルがすべて base にあった（base の時点から重複していた）なら警告にとどめる。
@@ -116,7 +117,6 @@ RE_FENCE = re.compile(r"^(`{3,}|~{3,})")
 RE_TABLE_ROW = re.compile(r"^\s*\|(.+)\|\s*$")
 RE_TABLE_SEP_CELL = re.compile(r"^:?-{1,}:?$")
 RE_NUMBER = re.compile(r"(\d{3,})")
-RE_ADR_FILE_NUMBER = re.compile(r"^(\d{4})-")
 
 
 # --- git ヘルパー -------------------------------------------------------------
@@ -928,7 +928,7 @@ def check_adr_numbers(root, base_sha, head, adr_dir):
         for name, kind in entries:
             if name == "README.md" or kind != "blob" or not name.endswith(".md"):
                 continue
-            m = RE_ADR_FILE_NUMBER.match(name)
+            m = RE_NUMBER.search(name)  # adr_number() と同じ取り出し方（ステータスの突き合わせのキー）
             if m:
                 groups.setdefault(m.group(1), []).append(name)
         return groups
@@ -942,12 +942,17 @@ def check_adr_numbers(root, base_sha, head, adr_dir):
         if len(names) < 2:
             continue
         listed = ", ".join(f"{adr_dir}/{n}" for n in sorted(names))
-        if set(names) <= set(base_groups.get(number, [])):
-            warnings.append(f"同じ番号 {number} の ADR が複数ある（base の時点から）: {listed}")
+        added = sorted(set(names) - set(base_groups.get(number, [])))
+        if not added:
+            warnings.append(
+                f"同じ番号 {number} の ADR が複数ある（base の時点から）: {listed}。"
+                "base の ADR は改名・削除できないので、このまま残す"
+            )
         else:
             errors.append(
                 f"同じ番号 {number} の ADR が複数ある: {listed}。"
-                "後から足した方の番号を、main の最大値 +1 に振り直す"
+                f"この変更で足した ADR（{', '.join(added)}）を、base の最大値 +1 以降の空き番号に"
+                "振り直す（足した ADR だけで重複しているなら、1 本を残して振り直す）"
             )
     return errors, warnings
 
@@ -1031,9 +1036,11 @@ def main(argv):
         errors.extend(readme_errors)
         warnings.extend(readme_warnings)
         warnings.extend(check_adr_dir_layout(root, base_sha, head, adr_dir))
-        number_errors, number_warnings = check_adr_numbers(root, base_sha, head, adr_dir)
-        errors.extend(number_errors)
-        warnings.extend(number_warnings)
+
+    # 番号の重複は、base に ADR ディレクトリが無い（この変更で作った）ときも検査する
+    number_errors, number_warnings = check_adr_numbers(root, base_sha, head, adr_dir)
+    errors.extend(number_errors)
+    warnings.extend(number_warnings)
 
     for w in warnings:
         print(f"⚠ {w}", file=sys.stderr)

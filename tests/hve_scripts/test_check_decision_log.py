@@ -1228,6 +1228,67 @@ def test_adr_third_file_on_number_duplicated_in_base_is_error():
         shutil.rmtree(repo)
 
 
+def test_adr_number_collision_of_parallel_branches_is_caught_only_on_merge_commit():
+    """CI の経路: 並行ブランチの重複は、ブランチ単体では出ず、main と合わせた
+    merge commit を `--head` に渡したときだけ error になる。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_all(repo, "baseline")
+        run_git(repo, "switch", "-q", "-c", "theirs")
+        write_doc(repo, "knowledge/adr/0002-theirs.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "相手のブランチで 0002 を取る")
+        run_git(repo, "switch", "-q", "main")
+        run_git(repo, "switch", "-q", "-c", "mine")
+        write_doc(repo, "knowledge/adr/0002-mine.md", adr_text("Accepted — 2026-02-02"))
+        mine = commit_all(repo, "こちらのブランチでも 0002 を取る")
+        run_git(repo, "switch", "-q", "main")
+        run_git(repo, "merge", "-q", "--ff-only", "theirs")
+        run_git(repo, "switch", "-q", "mine")
+
+        code, out = check(repo, "--base", "main", "--head", mine)
+        assert code == 0, f"ブランチ単体で重複を検出している（分岐点が base なので出ないはず）:\n{out}"
+
+        run_git(repo, "merge", "-q", "--no-ff", "-m", "main を取り込む", "main")
+        merged = run_git(repo, "rev-parse", "HEAD")
+        code, out = check(repo, "--base", "main", "--head", merged)
+        assert code == 1, f"merge commit で重複を検出していない:\n{out}"
+        assert "0002-mine.md" in out and "0002-theirs.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_without_four_digit_prefix_is_checked_like_status_key():
+    """番号の取り出しはステータスの突き合わせ（adr_number）と揃える。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/adr-001-dup.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "3 桁・接頭辞付きの名前で同じ番号を足す")
+        code, out = check(repo)
+        assert code == 1, f"3 桁・接頭辞付きの番号の重複で exit 1 になっていない:\n{out}"
+        assert "adr-001-dup.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_duplicated_when_adr_dir_is_new_is_error():
+    """base に ADR ディレクトリが無くても、新しく作ったディレクトリの中の重複は検査する。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "README.md", "ADR はまだ無い\n")
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0001-a.md", adr_text("Accepted — 2026-01-01"))
+        write_doc(repo, "knowledge/adr/0001-b.md", adr_text("Accepted — 2026-01-01"))
+        commit_all(repo, "最初の ADR を同じ番号で 2 本足す")
+        code, out = check(repo)
+        assert code == 1, f"ADR ディレクトリを新設した変更での重複で exit 1 になっていない:\n{out}"
+        assert "0001-a.md" in out and "0001-b.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_adr_unique_new_number_passes_without_number_warning():
     repo = new_repo()
     try:
@@ -1237,7 +1298,7 @@ def test_adr_unique_new_number_passes_without_number_warning():
         commit_all(repo, "欠番を挟んで ADR を足す")
         code, out = check(repo)
         assert code == 0, out
-        assert "番号" not in out, f"重複の無い番号で番号の指摘が出ている:\n{out}"
+        assert "同じ番号" not in out, f"重複の無い番号で番号の指摘が出ている:\n{out}"
     finally:
         shutil.rmtree(repo)
 
