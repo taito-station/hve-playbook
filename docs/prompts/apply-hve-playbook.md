@@ -27,7 +27,7 @@
   - `<target>/.claude/CLAUDE.md` が無ければ、HVE 方法論をそのまま `.claude/CLAUDE.md` として作る。あれば `.claude/CLAUDE.md` は変えず、`.claude/CLAUDE.hve.md` を作る・上書きする。
   - `<target>/docs/` を作る（空のディレクトリ）。
   - cq/mdq が未導入なら、`HypervelocityEngineering` を使用中の Python 環境に `pip install -e` する。環境変数 `HVE_REPO_PATH` の場所か hve-playbook の隣のディレクトリに既存の clone があればそれを使い、無ければ `dahatake/HypervelocityEngineering` を hve-playbook の隣に `git clone` する。
-  - user-level の設定（`~/.claude`）は変えない（`<target>/.claude` 配下に symlink が無い場合。手順 2 で確かめる）。
+  - user-level の設定（`~/.claude`）は変えない（`<target>/.claude` 配下に symlink が無い場合。手順 2 で確かめる）。`<target>` か `<target>/.claude` が `~/.claude`・`$HOME` と同じ実体なら、何も書かずに `[ERROR]` で止まる。
 - Bash ツールはコマンドごとにシェルの状態を引き継がない。手順 1 で決めた hve-playbook の絶対パスは、以降のコマンドに毎回そのまま書き込む（以下 `<hve-playbook>` と書く）。
 
 ### 1. hve-playbook の場所と状態を確かめる
@@ -45,6 +45,7 @@
 
 ### 2. 対象リポジトリの状態を確かめる
 
+- 導入先が user-level の場所でないことを確かめる。`[ <target>/.claude -ef ~/.claude ] || [ <target> -ef ~/.claude ] || [ <target> -ef ~ ] || [ <target>/.claude -ef ~ ]` が真なら、何もせずにここで止めて報告する（setup.sh も `[ERROR]` で止まる。手順 2 の `git init`・退避や手順 3 のブランチを残さないため）。
 - git 管理下でなければ、`git init` してよいかユーザーに確認する。
 - 追跡済みファイルに未コミットの変更（`git -C <target> status --short --untracked-files=no`）があれば、先にコミットか stash をしてもらう。setup.sh は未コミットの編集を上書きし、git では復元できないので、そのままでは進めない。
 - 次のものがあるかを確かめる。
@@ -70,6 +71,7 @@ bash <hve-playbook>/setup.sh <target>
 
 出力を確認する。
 
+- `[ERROR] user-level の場所（~/.claude・$HOME）に配置する指定です` で止まったら（手順 2 の確認をすり抜けた場合。setup.sh は何も書いていない）、手順 3 でブランチを切っていれば元のブランチに戻してから消し、ユーザーに報告して終える。
 - 出力で CLAUDE.md の扱いを確かめる（手順 5 の分岐に使う）。
   - `[INFO] CLAUDE.md を配置しました`: `.claude/CLAUDE.md` を新しく作った
   - `[WARN] ... CLAUDE.hve.md として配置しました`: `.claude/CLAUDE.hve.md` を新しく作った

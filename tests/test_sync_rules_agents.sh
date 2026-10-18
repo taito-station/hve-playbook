@@ -21,6 +21,10 @@
 #   - setup.sh を再実行しても .claude/rules/hve-local/ には触れない（既存の挙動を固定する回帰テスト）
 #   - setup.sh は LICENSE を .claude/LICENSE-hve-playbook に配り、再実行で最新の LICENSE に戻す
 #     （写しの位置が symlink でも、リンク先は書き換えずに実ファイルの写しに置き換える）
+#   - setup.sh は ~/.claude を導入先の .claude にする指定（$HOME・綴り違い・~/.claude を指す symlink・
+#     大文字小文字の違い・~/.claude 未作成・導入先が ~/.claude そのもの）を [ERROR] と exit 1 で止め、
+#     ~/.claude を変えない。.claude が $HOME を指す symlink も止める。HOME が未設定なら判定を飛ばし、
+#     存在しないディレクトリなら誤検出しない
 
 set -u
 command -v python3 >/dev/null 2>&1 || { echo "[FAIL] 前提: python3 が必要"; exit 1; }
@@ -239,6 +243,75 @@ PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$T" >"$TMP/setup6.log" 2>&
 check "setup.sh 再実行（LICENSE の symlink）: exit 0" [ $? -eq 0 ]
 check "setup.sh 再実行: 写しの位置の symlink のリンク先を書き換えない" [ "$(cat "$TMP/outside.txt")" = "outside" ]
 check "setup.sh 再実行: 写しの位置の symlink を実ファイルの写しに置き換える" sh -c '[ ! -L "$1" ] && cmp -s "$2" "$1"' _ "$L" "$REPO_DIR/LICENSE"
+
+# 10) ~/.claude を導入先にしない（Issue #52）
+# HOME は一時ディレクトリに差し替える（止まらなかった場合も実際の ~/.claude を書き換えない）
+run_setup_home() { HOME="$1" PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$2" >"$3" 2>&1; echo $? >"$3.rc"; }
+snap() { find "$1" -print | LC_ALL=C sort; }
+# 適用プロンプト（docs/prompts/apply-hve-playbook.md の手順 4）がこの文言で分岐する
+ERR_MSG='[ERROR] user-level の場所（~/.claude・$HOME）に配置する指定です'
+FH="$TMP/fake-home"
+mkdir -p "$FH/.claude/rules/hve"
+echo keep >"$FH/.claude/rules/hve/keep"
+echo own >"$FH/.claude/CLAUDE.md"
+FH_SNAP="$(snap "$FH")"
+untouched() { [ "$(snap "$FH")" = "$FH_SNAP" ] && [ "$(cat "$FH/.claude/rules/hve/keep")" = keep ] && [ "$(cat "$FH/.claude/CLAUDE.md")" = own ]; }
+i=0
+for spelling in "$FH" "$FH/" "$FH/."; do
+    i=$((i + 1)); LOG="$TMP/home$i.log"
+    run_setup_home "$FH" "$spelling" "$LOG"
+    check "\$HOME 指定（${i}: ${spelling#"$TMP"/}）: exit 1" [ "$(cat "$LOG.rc")" = 1 ]
+    check "\$HOME 指定（${i}）: [ERROR] を出す" grep -qF "$ERR_MSG" "$LOG"
+    check "\$HOME 指定（${i}）: ~/.claude の中身が変わらない" untouched
+    check "\$HOME 指定（${i}）: ~/docs を作らない" [ ! -e "$FH/docs" ]
+done
+# 大文字小文字だけ違う綴り（大文字小文字を区別しないファイルシステムでだけ確かめる）
+FH_CASE="${FH%/*}/FAKE-HOME"
+if [ "$FH" -ef "$FH_CASE" ]; then
+    run_setup_home "$FH" "$FH_CASE" "$TMP/home-case.log"
+    check "大文字小文字違いの \$HOME 指定: exit 1" [ "$(cat "$TMP/home-case.log.rc")" = 1 ]
+    check "大文字小文字違いの \$HOME 指定: [ERROR] を出す" grep -qF "$ERR_MSG" "$TMP/home-case.log"
+    check "大文字小文字違いの \$HOME 指定: ~/.claude の中身が変わらない" untouched
+    check "大文字小文字違いの \$HOME 指定: ~/docs を作らない" [ ! -e "$FH/docs" ]
+else
+    echo "[SKIP] 大文字小文字違いの \$HOME 指定（大文字小文字を区別するファイルシステム）"
+fi
+# 導入先に ~/.claude そのものを渡す
+run_setup_home "$FH" "$FH/.claude" "$TMP/home-claude.log"
+check "~/.claude を導入先に指定: exit 1" [ "$(cat "$TMP/home-claude.log.rc")" = 1 ]
+check "~/.claude を導入先に指定: [ERROR] を出す" grep -qF "$ERR_MSG" "$TMP/home-claude.log"
+check "~/.claude を導入先に指定: ~/.claude の中身が変わらない（.claude/.claude・docs を作らない）" untouched
+# 導入先の .claude が ~/.claude を指す symlink
+TL="$TMP/target-link"; mkdir -p "$TL"; ln -s "$FH/.claude" "$TL/.claude"
+run_setup_home "$FH" "$TL" "$TMP/home-link.log"
+check "~/.claude を指す symlink の .claude: exit 1" [ "$(cat "$TMP/home-link.log.rc")" = 1 ]
+check "~/.claude を指す symlink の .claude: [ERROR] を出す" grep -qF "$ERR_MSG" "$TMP/home-link.log"
+check "~/.claude を指す symlink の .claude: ~/.claude の中身が変わらない" untouched
+check "~/.claude を指す symlink の .claude: 導入先の docs/ を作らない" [ ! -e "$TL/docs" ]
+# 導入先の .claude が $HOME そのものを指す symlink（$HOME 直下に書き込ませない）
+TH="$TMP/target-link-home"; mkdir -p "$TH"; ln -s "$FH" "$TH/.claude"
+run_setup_home "$FH" "$TH" "$TMP/home-link-home.log"
+check "\$HOME を指す symlink の .claude: exit 1" [ "$(cat "$TMP/home-link-home.log.rc")" = 1 ]
+check "\$HOME を指す symlink の .claude: [ERROR] を出す" grep -qF "$ERR_MSG" "$TMP/home-link-home.log"
+check "\$HOME を指す symlink の .claude: \$HOME 直下に書き込まない" untouched
+# ~/.claude がまだ無い
+FH2="$TMP/fake-home-empty"; mkdir -p "$FH2"
+run_setup_home "$FH2" "$FH2" "$TMP/home-empty.log"
+check "~/.claude 未作成で \$HOME 指定: exit 1" [ "$(cat "$TMP/home-empty.log.rc")" = 1 ]
+check "~/.claude 未作成で \$HOME 指定: [ERROR] を出す" grep -qF "$ERR_MSG" "$TMP/home-empty.log"
+check "~/.claude 未作成で \$HOME 指定: ~/.claude を作らない" [ ! -e "$FH2/.claude" ]
+check "~/.claude 未作成で \$HOME 指定: ~/docs を作らない" [ ! -e "$FH2/docs" ]
+# 通常の導入先は止めない（誤検出しない）
+TN="$TMP/target-normal"; mkdir -p "$TN"
+run_setup_home "$FH" "$TN" "$TMP/home-normal.log"
+check "HOME が別にある通常の導入先: exit 0" [ "$(cat "$TMP/home-normal.log.rc")" = 0 ]
+check "HOME が別にある通常の導入先: ~/.claude の中身が変わらない" untouched
+TU="$TMP/target-unset-home"; mkdir -p "$TU"
+env -u HOME PATH="$TMP/stub-bin:$PATH" bash "$REPO_DIR/setup.sh" "$TU" >"$TMP/home-unset.log" 2>&1
+check "HOME 未設定の通常の導入先: exit 0（set -u で落ちない）" [ $? -eq 0 ]
+TX="$TMP/target-missing-home"; mkdir -p "$TX"
+run_setup_home "$TMP/no-such-home" "$TX" "$TMP/home-missing.log"
+check "HOME が存在しないディレクトリの通常の導入先: exit 0（-ef は存在しないパスで偽。誤検出しない）" [ "$(cat "$TMP/home-missing.log.rc")" = 0 ]
 
 echo
 echo "結果: PASS=$pass FAIL=$fail"
