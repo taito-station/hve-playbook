@@ -148,7 +148,7 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 
 `hve-scripts/` は導入先に配る knowledge の検査スクリプト（stale 検出・決定ログの不変性・sha の追従・hook）。setup.sh が導入先の `.claude/scripts/hve/` に置く。使い方は `rules/hve/knowledge-maturity.md` の「Stale 検出の仕組み」（[ADR-0014](knowledge/adr/0014-knowledge-check-scripts-and-sha-follow-up.md)）。
 
-このリポジトリ自身にも pre-push と PR の CI（`.github/workflows/knowledge-check.yml`。main の必須チェック。[ADR-0026](knowledge/adr/0026-ci-runs-knowledge-checks-and-adr-number-check.md)）で適用している。clone したら一度だけ `git -C hve-playbook config core.hooksPath .githooks` を実行して有効にする。
+このリポジトリ自身にも pre-push と PR の CI（`.github/workflows/knowledge-check.yml`。main の必須チェック。[ADR-0027](knowledge/adr/0027-ci-runs-knowledge-checks-and-adr-number-check.md)）で適用している。clone したら一度だけ `git -C hve-playbook config core.hooksPath .githooks` を実行して有効にする。
 
 ## テスト
 

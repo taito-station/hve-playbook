@@ -1,4 +1,4 @@
-# knowledge の検査（ADR 0026）。tests/ の全件はここでは流さない（ADR 0025）
+# knowledge の検査（ADR 0027）。tests/ の全件はここでは流さない（ADR 0025）
 name: knowledge-check
 
 on:

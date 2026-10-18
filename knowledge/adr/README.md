@@ -30,6 +30,6 @@
 | [0022](0022-permission-log-masks-secrets-and-debug-opt-in.md) | 許可要求ログの hook は既知の形の秘密値を伏せて書き、debug ログは opt-in、本体は環境変数で止められるようにする | Accepted | 2026-10-13 |
 | [0023](0023-via-scope-for-commit-instruction-and-skill-enforcer.md) | 「コミットして」は main への commit の指示に当たらず、skill-enforcer の via はルート名の完全一致に限る | Accepted | 2026-10-13 |
 | [0024](0024-warn-when-sync-replaces-foreign-symlinks.md) | sync はリポの外を指す symlink を張り替え、元のリンク先と戻すコマンドを WARN に出す | Accepted | 2026-10-14 |
-| [0025](0025-run-tests-locally-by-discipline.md) | テストは CI・hook で自動実行せず、PR を作る前にローカルで全件を流す規律にする | Partially superseded by 0026-ci-runs-knowledge-checks-and-adr-number-check | 2026-10-15 |
+| [0025](0025-run-tests-locally-by-discipline.md) | テストは CI・hook で自動実行せず、PR を作る前にローカルで全件を流す規律にする | Partially superseded by 0027-ci-runs-knowledge-checks-and-adr-number-check | 2026-10-15 |
 | [0026](0026-setup-refuses-user-level-claude-dir.md) | setup.sh は導入先の .claude が ~/.claude と同じ実体なら [ERROR] で止める | Accepted | 2026-10-18 |
-| [0026](0026-ci-runs-knowledge-checks-and-adr-number-check.md) | PR の CI で knowledge の検査と ADR の番号の重複検査を流し、main の必須チェックにする | Accepted | 2026-10-18 |
+| [0027](0027-ci-runs-knowledge-checks-and-adr-number-check.md) | PR の CI で knowledge の検査と ADR の番号の重複検査を流し、main の必須チェックにする | Accepted | 2026-10-18 |
