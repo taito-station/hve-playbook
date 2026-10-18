@@ -8,7 +8,7 @@ Accepted — 2026-10-15
 
 hve-playbook には `.github/workflows/` が無く、pre-push（`.githooks/pre-push`）が実行するのは knowledge の検査（ADR 0014 の dogfood）だけだった。`tests/` の契約テスト（`tests/test_*.sh` の 20 本。`tests/hve_scripts` の Python のテストは `test_hve_scripts.sh` から実行される）は、手で流したときにしか効かない。PR #69（#62）で足した見出しの語の契約テストも、手で流さない限り hook の定数と規則の正本のずれを検出しない（Issue #72）。
 
-手元（macOS）で HOME を一時ディレクトリに向けて全件を流すと、全 PASS で約 405 秒かかった（SKIP は tmux 不在・Chrome 不在の 2 件）。
+手元（macOS）で HOME を一時ディレクトリに向けて全件を流すと、全 PASS で約 405 秒かかった（SKIP は 2 件。`test_tmux_pane_awaiting.sh` は tmux 不在、`test_ui_approval_server.sh` は PATH に google-chrome / chromium が無いため。Chrome.app は入っている）。
 
 ## 意思決定の要因
 
@@ -27,9 +27,11 @@ hve-playbook には `.github/workflows/` が無く、pre-push（`.githooks/pre-p
 
 選択した選択肢: **CI・hook ではテストを実行しない。`.claude/rules/testing.md` に、PR を作る前にローカルで全件を流す規律を書き、全件は `bash tests/run-all.sh` で流す**。
 
-- 流す時点: create-pr を呼ぶ前と、そのあと PR のコミットが変わったら（review-pr の修正、base の取り込み）awaiting にする前の最後のコミット。skill の手順の中の push ごとには流さない。変更がドキュメントだけでも流す
+- 流す時点: create-pr を呼ぶ前と、create-pr の Step 5（review-pr）が戻ったあと Step 6（squash）の前（コミットが変わったときだけ）。review-pr を単独で起動してコミットを変えたときは push の前。skill の手順の中の push ごとには流さない。create-pr は Step 5 から Step 10 までを自動で進めるので、Step 9 で消える `docs/temp/pr-body.md` がまだあり、squash で中身が変わらないこの位置に置く
+- 変更がドキュメントだけでも流す。resolve-issue の「ドキュメントのみの変更はテストをスキップする」より、このリポジトリでは本規則を優先する（resolve-issue は導入先にも配る global skill なので、skill 側は変えない）
+- 全件で約 7 分かかるので、Bash の `timeout` を 600000 にするか `run_in_background` で流す。サブエージェントに任せるときは worktree を分けない（未コミットの変更を見ないため）
 - `tests/run-all.sh` は HOME を一時ディレクトリに向けて `tests/test_*.sh` を 1 本ずつ実行し、本ごとの PASS / FAIL と SKIP の有無を出す。FAIL が 1 本でもあれば exit 1。`scripts/` は sync が `~/.claude/scripts/` に配るので、`tests/` に置く
-- FAIL が出たら直してから進む。tmux・Chrome が無い環境での SKIP は FAIL として扱わない。PR 本文の Test plan に最後に流した結果を書く
+- FAIL が出たら直してから進む。create-pr の中では Step 6 に進まず、直して流し直すか止まって報告する（create-pr は escalate でも PR を作るが、テストの FAIL は PR を作る前に止める）。テストが自分で SKIP を出して exit 0 で終わったものは FAIL として扱わない。PR 本文の Test plan に最後に流した結果を書く
 - `.githooks/pre-push`（knowledge の検査）は変えない
 - ADR 0007 の「このリポジトリ自身の `.claude/rules` は `rules/hve` だけを指す」は、`rules/global` を project-level で重ねて読み込ませないための決定で、リポジトリ専用の規則を置くことは妨げない。`tests/test_sync_rules_agents.sh` の検査を「`.claude/rules` 直下は `hve` と `testing.md` だけ」に改め、global を重ねないことは引き続き固定する
 
