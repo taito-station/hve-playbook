@@ -15,7 +15,7 @@ hve-playbook には `.github/workflows/` が無く、pre-push（`.githooks/pre-p
 - リポジトリオーナーの指示（2026-10-15）: リモートでのテスト（CI）はしない。hook ではなく、規律としてローカルでテストする
 - 契約テストの多くは規則・skill の文面を固定するので、ドキュメントだけの変更でも流す必要がある
 - 規則は hve-playbook の開発にだけ効き、導入先や `~/.claude` には配られないこと
-- 全件で約 7 分かかるので、push のたびや skill の中の push ごとには流さないこと
+- 全件で約 7 分かかるので、push のたびや review-pr の各巡では流さないこと
 
 ## 検討した選択肢
 
@@ -27,11 +27,11 @@ hve-playbook には `.github/workflows/` が無く、pre-push（`.githooks/pre-p
 
 選択した選択肢: **CI・hook ではテストを実行しない。`.claude/rules/testing.md` に、PR を作る前にローカルで全件を流す規律を書き、全件は `bash tests/run-all.sh` で流す**。
 
-- 流す時点: create-pr を呼ぶ前と、create-pr の Step 5（review-pr）が戻ったあと Step 6（squash）の前（コミットが変わったときだけ）。review-pr を単独で起動してコミットを変えたときは push の前。skill の手順の中の push ごとには流さない。create-pr は Step 5 から Step 10 までを自動で進めるので、Step 9 で消える `docs/temp/pr-body.md` がまだあり、squash で中身が変わらないこの位置に置く
+- 流す時点: create-pr を呼ぶ前と、create-pr の Step 5.1 のあと Step 5.5 の前（Step 5 でコミットが変わったときだけ）。PR を作ったあとに PR のコミットを変えて push するとき（review-pr の単独起動・手での修正・base の取り込み）は push の前。review-pr の単独起動では、ループのあと Step 6.5 の前に流し、`docs/temp/pr-body.md` の Test plan を更新してから Step 6.5 に進む。review-pr の各巡では流さない。create-pr は Step 5 から Step 10 までを自動で進めるので、Step 9 で消える `docs/temp/pr-body.md` がまだあり、squash で中身が変わらない位置に置く
 - 変更がドキュメントだけでも流す。resolve-issue の「ドキュメントのみの変更はテストをスキップする」より、このリポジトリでは本規則を優先する（resolve-issue は導入先にも配る global skill なので、skill 側は変えない）
-- 全件で約 7 分かかるので、Bash の `timeout` を 600000 にするか `run_in_background` で流す。サブエージェントに任せるときは worktree を分けない（未コミットの変更を見ないため）
-- `tests/run-all.sh` は HOME を一時ディレクトリに向けて `tests/test_*.sh` を 1 本ずつ実行し、本ごとの PASS / FAIL と SKIP の有無を出す。FAIL が 1 本でもあれば exit 1。`scripts/` は sync が `~/.claude/scripts/` に配るので、`tests/` に置く
-- FAIL が出たら直してから進む。create-pr の中では Step 6 に進まず、直して流し直すか止まって報告する（create-pr は escalate でも PR を作るが、テストの FAIL は PR を作る前に止める）。テストが自分で SKIP を出して exit 0 で終わったものは FAIL として扱わない。PR 本文の Test plan に最後に流した結果を書く
+- 全件で約 7 分かかるので、`run_in_background` で流す（`timeout` 600000 は Bash の上限で余裕が小さい）。サブエージェントに任せるときは worktree を分けない（未コミットの変更を見ないため）
+- `tests/run-all.sh` は、全件で共有する一時 HOME で `tests/test_*.sh` を順に実行し、本ごとの PASS / FAIL と SKIP の有無を出す。FAIL が 1 本でもあれば exit 1。`scripts/` は sync が `~/.claude/scripts/` に配るので、`tests/` に置く
+- FAIL が出たら push しない。create-pr の中では Step 5.5 に進まずに止まって報告する（create-pr は escalate でも PR を作るが、テストの FAIL は PR を作る前に止める）。`docs/temp/pr-body.md` と sidecar は残し、再開するときは直して流し直し、Test plan と対応履歴（その修正はセルフレビュー未経由と書く）を更新して Step 5.5 から進める。review-pr の単独起動では Step 6.5 に進まずに止まる。テストが自分で SKIP を出して exit 0 で終わったものは FAIL として扱わない。PR 本文の Test plan に最後に流した結果を書く
 - `.githooks/pre-push`（knowledge の検査）は変えない
 - ADR 0007 の「このリポジトリ自身の `.claude/rules` は `rules/hve` だけを指す」は、`rules/global` を project-level で重ねて読み込ませないための決定で、リポジトリ専用の規則を置くことは妨げない。`tests/test_sync_rules_agents.sh` の検査を「`.claude/rules` 直下は `hve` と `testing.md` だけ」に改め、global を重ねないことは引き続き固定する
 
@@ -40,6 +40,7 @@ hve-playbook には `.github/workflows/` が無く、pre-push（`.githooks/pre-p
 - 良い結果: PR を作るたびに契約テストが流れ、結果が PR 本文に残る。ドキュメントだけの変更でも流れる。push は遅くならず、CI の設定・保守も要らない
 - 悪い結果・既知の限界:
   - 強制力が無い。流し忘れれば、契約テストが落ちる状態のまま main に入りうる。PR 本文の Test plan に結果が無いことで、レビューで気づく
+  - PR 1 本につき、create-pr の前と Step 5 のあとで通常 2 回（約 14 分）流れる。review-pr の修正でほぼ毎回コミットが変わるため、省いてよい条件はめったに成り立たない
   - 手元の環境（macOS）でしか検証しない。Linux での移植性は確かめない
   - `tests/test_review_pr_contracts.sh` は worktree から流してもメインの checkout の手順書を検査する。worktree で review-pr の手順書を変えたときは、その旨を Test plan に書く
 
