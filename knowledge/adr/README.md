@@ -31,3 +31,4 @@
 | [0023](0023-via-scope-for-commit-instruction-and-skill-enforcer.md) | 「コミットして」は main への commit の指示に当たらず、skill-enforcer の via はルート名の完全一致に限る | Accepted | 2026-10-13 |
 | [0024](0024-warn-when-sync-replaces-foreign-symlinks.md) | sync はリポの外を指す symlink を張り替え、元のリンク先と戻すコマンドを WARN に出す | Accepted | 2026-10-14 |
 | [0025](0025-run-tests-locally-by-discipline.md) | テストは CI・hook で自動実行せず、PR を作る前にローカルで全件を流す規律にする | Accepted | 2026-10-15 |
+| [0026](0026-setup-refuses-user-level-claude-dir.md) | setup.sh は導入先の .claude が ~/.claude と同じ実体なら [ERROR] で止める | Accepted | 2026-10-18 |

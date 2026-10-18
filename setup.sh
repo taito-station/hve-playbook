@@ -26,6 +26,19 @@ if [ "$(cd "$TARGET" && pwd -P)" = "$SCRIPT_DIR" ]; then
     exit 1
 fi
 
+# user-level の ~/.claude は sync-dotclaude.sh の領分。setup.sh で書き換えない
+# -ef は実体（デバイスと inode）で比べるので、綴り・大文字小文字の違いや symlink 経由の指定も同じとみなす
+# （どちらかが存在しなければ偽）。導入先が $HOME と同じ実体なら、~/.claude がまだ無くても止める。
+# 導入先の .claude が $HOME そのものを指す場合も、$HOME 直下に書き込むので止める
+if [ -n "${HOME:-}" ] && {
+    [ "$TARGET/.claude" -ef "$HOME/.claude" ] || [ "$TARGET" -ef "$HOME/.claude" ] ||
+        [ "$TARGET" -ef "$HOME" ] || [ "$TARGET/.claude" -ef "$HOME" ]
+}; then
+    echo "[ERROR] user-level の場所（~/.claude・\$HOME）に配置する指定です: $TARGET"
+    echo "        setup.sh はプロジェクトの .claude に配置します。~/.claude・\$HOME 直下には配置できません"
+    exit 1
+fi
+
 TARGET_CLAUDE="$TARGET/.claude"
 mkdir -p "$TARGET_CLAUDE"
 
