@@ -20,7 +20,7 @@
   検査し、食い違えば警告する。`--adr-dir` 配下にサブディレクトリや `.md` 以外のファイル
   （`README.md` を除く）があれば、独立ファイル方式の前提（フラット配置）から外れるため
   検査対象外になる旨を警告する（base にあったそれらの削除も同様に警告）。
-  ファイル名の番号（ステータスの突き合わせと同じ、最初の 3 桁以上の数字）が同じ ADR が
+  ファイル名の先頭の 4 桁連番（`NNNN-`。名前の途中の数字は番号とみなさない）が同じ ADR が
   複数あれば error にする（base に `--adr-dir` が無く、この変更で作ったときも検査する）。
   並行ブランチがどちらも main の最大値 +1 を取ると起き、ブランチ単体では検出できない
   ので、CI では main との merge commit を `--head` に渡して検査する。その番号の
@@ -117,6 +117,8 @@ RE_FENCE = re.compile(r"^(`{3,}|~{3,})")
 RE_TABLE_ROW = re.compile(r"^\s*\|(.+)\|\s*$")
 RE_TABLE_SEP_CELL = re.compile(r"^:?-{1,}:?$")
 RE_NUMBER = re.compile(r"(\d{3,})")
+# documentation-standards の採番（`{4桁連番}-{kebab-case-title}.md`）の連番
+RE_ADR_FILE_NUMBER = re.compile(r"^(\d{4})-")
 
 
 # --- git ヘルパー -------------------------------------------------------------
@@ -917,7 +919,7 @@ def check_adr_dir_layout(root, base_sha, head, adr_dir):
 
 
 def check_adr_numbers(root, base_sha, head, adr_dir):
-    """同じ 4 桁の番号を持つ ADR が複数あれば報告する。その番号のファイルがすべて
+    """ファイル名の先頭の 4 桁連番（`NNNN-`）が同じ ADR が複数あれば報告する。その番号のファイルがすべて
     base にあった（base の時点から重複していた）なら警告、1 本でも base に無ければ
     error にする（並行ブランチが同じ番号を取ったときは、merge ref で検査すると
     base に無い重複として出る）。
@@ -928,7 +930,7 @@ def check_adr_numbers(root, base_sha, head, adr_dir):
         for name, kind in entries:
             if name == "README.md" or kind != "blob" or not name.endswith(".md"):
                 continue
-            m = RE_NUMBER.search(name)  # adr_number() と同じ取り出し方（ステータスの突き合わせのキー）
+            m = RE_ADR_FILE_NUMBER.match(name)
             if m:
                 groups.setdefault(m.group(1), []).append(name)
         return groups
