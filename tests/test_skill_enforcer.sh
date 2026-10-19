@@ -49,6 +49,37 @@ run "E4: gh pr new (create のエイリアス) も止める" blocked "gh pr new 
 run "E5: gh pr new も # via:create-pr で通す" allowed "gh pr new --title x --body-file b.md # via:create-pr"
 run "E6: gh pr newer のような別の語には当たらない" allowed "gh pr newer"
 
+# ---------- -R / --repo を pr の前後に挟んだ PR 作成 (Issue #76) ----------
+for cmd in \
+    "gh -R o/r pr new --title x" \
+    "gh -R o/r pr create --title x" \
+    "gh --repo o/r pr create --title x" \
+    "gh --repo=o/r pr create --title x" \
+    "gh -Ro/r pr new --title x" \
+    "gh pr -R o/r create --title x" \
+    "gh pr --repo o/r create --title x" \
+    "gh pr --repo=o/r new --title x" \
+    "gh pr -Ro/r create --title x" \
+    "gh -R o/r pr -R o/r create --title x"; do
+    run "E7: 止める: $cmd" blocked "$cmd"
+done
+for cmd in \
+    "gh -R o/r pr new --title x" \
+    "gh --repo o/r pr create --title x" \
+    "gh --repo=o/r pr create --title x" \
+    "gh pr -R o/r create --title x"; do
+    run "E8: # via:create-pr で通す: $cmd" allowed "$cmd # via:create-pr"
+done
+for cmd in \
+    "gh -R o/r pr list" \
+    "gh --repo o/r pr view 1" \
+    "gh pr -R o/r list" \
+    "gh -R o/r issue create --title x" \
+    "gh -R o/r pr newer" \
+    "gh pr -R o/r newer"; do
+    run "E9: PR 作成でないので通す: $cmd" allowed "$cmd"
+done
+
 # ---------- bypass: ルート名の完全一致 ----------
 run "E10: # via:create-pr で gh pr create を通す" allowed "$PR # via:create-pr"
 run "E11: # via:run-drawio-export で drawio を通す" allowed "$DRAWIO # via:run-drawio-export"
@@ -89,6 +120,8 @@ run "M2: drawio は # via:run-drawio-export を案内する" blocked_with "$DRAW
 run "M3: 別の hook の via が付いていても # via:create-pr を案内する" blocked_with "$PR # via:main-commit-ok: x" create-pr
 run "M4: 2 ルールで片方の via だけなら、足りない側の via を案内する" blocked_with "$DRAWIO && $PR # via:create-pr" run-drawio-export
 run "M5: gh pr new も # via:create-pr を案内する" blocked_with "gh pr new --title x" create-pr
+run "M6: pr の前に --repo を置いた形も # via:create-pr を案内する" blocked_with "gh --repo o/r pr create --title x" create-pr
+run "M7: pr の後に -R を置いた形も # via:create-pr を案内する" blocked_with "gh pr -R o/r create --title x" create-pr
 
 # ---------- create-pr の手順との契約 (Issue #71) ----------
 # 正規の経路である create-pr の PR 作成コマンドが、skill-enforcer に止められないこと

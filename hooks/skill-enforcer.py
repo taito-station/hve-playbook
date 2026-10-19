@@ -27,7 +27,14 @@ RULES = [
         "drawio --export を直接呼ばないこと。~/.claude/hooks/run-drawio-export.sh 経由で実行する（Xvfb 起動と後始末をまとめてやる）。",
     ),
     (
-        re.compile(r"\bgh\s+pr\s+(?:create|new)\b"),
+        # The repo-override flag -R / --repo (persistent on `pr`) may sit before
+        # and/or after `pr` (Issue #76). Only these typical forms are caught; the
+        # hook does not parse shell syntax strictly (ADR 0020 / 0023).
+        re.compile(
+            r"\bgh\s+(?:(?:-R|--repo)=?\s*\S+\s+)?"
+            r"pr\s+(?:(?:-R|--repo)=?\s*\S+\s+)?"
+            r"(?:create|new)\b"
+        ),
         "create-pr",
         "gh pr create / gh pr new を直接呼ばないこと。/create-pr スキル経由で実行する。",
     ),
