@@ -119,7 +119,7 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
 |---|---|---|
 | `check-knowledge.py` | frontmatter の必須項目、sources の実在（リポジトリ相対の正規形・大文字小文字まで一致）、stale 判定、解消待ちの報告 | 0 正常 / 1 違反 / 2 判定不能 |
 | `bump-distilled-sha.py` | stale な文書の `distilled_from_sha` を追従させる | 0 / 1 / 2 |
-| `check-decision-log.py` | 決定ログの不変性（artifact-management の「決定ログの不変性」） | 0 / 1 / 2 |
+| `check-decision-log.py` | 決定ログの不変性と ADR の番号の重複（artifact-management の「決定ログの不変性」） | 0 / 1 / 2 |
 | `hooks/session-stale-check.sh` | Claude Code の SessionStart で stale を報告する | 常に 0 |
 | `hooks/check-knowledge-impact.py` | Claude Code の PostToolUse で、source を編集したら影響する knowledge 文書を、knowledge を直接編集したら SoT の注意を出す | 常に 0 |
 
@@ -149,6 +149,8 @@ python3 .claude/scripts/hve/bump-distilled-sha.py --all-stale --dry-run  # stale
   ```
 
   `knowledge/` がまだ無いリポジトリでは、どちらの検査も対象 0 本で通る
+
+  並行ブランチが同じ ADR の番号を取ったときの重複は、`--head` に pull_request の merge commit（checkout の既定）を渡したときだけ出る。checkout に `ref: ${{ github.head_ref }}` を指定すると出ない。チェックが通ったあとに別の PR が main に入ってもすり抜けないよう、branch protection でこの job を必須チェックにし、`strict`（Require branches to be up to date）を有効にする（hve-playbook 自身の設定は ADR 0027）
 
 - **pre-push**: push するコミットを stdin から受けて検査する。例は hve-playbook の `.githooks/pre-push`。`git config core.hooksPath <dir>` で有効にする
 - **Claude Code の hook**: `.claude/settings.json` に絶対パスで書く

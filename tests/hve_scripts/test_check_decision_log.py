@@ -1165,6 +1165,163 @@ def test_adr_dir_irregular_file_deleted_is_warn():
         shutil.rmtree(repo)
 
 
+def test_adr_number_taken_by_base_is_error():
+    """並行ブランチが先に main へ入れた番号と同じ番号の ADR を足したら error にする。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        write_doc(repo, "knowledge/adr/0002-theirs.md", adr_text("Accepted — 2026-02-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0002-mine.md", adr_text("Accepted — 2026-02-02"))
+        commit_all(repo, "main と同じ番号の ADR を足す")
+        code, out = check(repo)
+        assert code == 1, f"番号の重複で exit 1 になっていない:\n{out}"
+        assert "同じ番号 0002" in out and "0002-mine.md" in out and "0002-theirs.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_duplicated_by_new_files_is_error():
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0002-a.md", adr_text("Accepted — 2026-02-01"))
+        write_doc(repo, "knowledge/adr/0002-b.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "同じ番号の新規 ADR を 2 本足す")
+        code, out = check(repo)
+        assert code == 1, f"新規 ADR 同士の番号の重複で exit 1 になっていない:\n{out}"
+        assert "同じ番号 0002" in out and "0002-a.md" in out and "0002-b.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_duplicated_in_base_is_warn():
+    """base の時点で既に重複していた番号は警告にとどめる（解消するまで何もできなくしない）。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-a.md", adr_text("Accepted — 2026-01-01"))
+        write_doc(repo, "knowledge/adr/0001-b.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0002-next.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "無関係な ADR を足す")
+        code, out = check(repo)
+        assert code == 0, f"base からの重複で exit 0 になっていない:\n{out}"
+        assert "同じ番号 0001" in out and "base の時点から" in out, f"重複を警告していない:\n{out}"
+        assert "0001-a.md" in out and "0001-b.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_third_file_on_number_duplicated_in_base_is_error():
+    """base からの重複に、さらに同じ番号を足したら新たな重複として error にする。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-a.md", adr_text("Accepted — 2026-01-01"))
+        write_doc(repo, "knowledge/adr/0001-b.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0001-c.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "重複している番号にさらに足す")
+        code, out = check(repo)
+        assert code == 1, f"3 本目の追加で exit 1 になっていない:\n{out}"
+        assert "同じ番号 0001" in out and "0001-c.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_collision_of_parallel_branches_is_caught_only_on_merge_commit():
+    """CI の経路: 並行ブランチの重複は、ブランチ単体では出ず、main と合わせた
+    merge commit を `--head` に渡したときだけ error になる。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_all(repo, "baseline")
+        run_git(repo, "switch", "-q", "-c", "theirs")
+        write_doc(repo, "knowledge/adr/0002-theirs.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "相手のブランチで 0002 を取る")
+        run_git(repo, "switch", "-q", "main")
+        run_git(repo, "switch", "-q", "-c", "mine")
+        write_doc(repo, "knowledge/adr/0002-mine.md", adr_text("Accepted — 2026-02-02"))
+        mine = commit_all(repo, "こちらのブランチでも 0002 を取る")
+        run_git(repo, "switch", "-q", "main")
+        run_git(repo, "merge", "-q", "--ff-only", "theirs")
+        run_git(repo, "switch", "-q", "mine")
+
+        code, out = check(repo, "--base", "main", "--head", mine)
+        assert code == 0, f"ブランチ単体で重複を検出している（分岐点が base なので出ないはず）:\n{out}"
+
+        run_git(repo, "merge", "-q", "--no-ff", "-m", "main を取り込む", "main")
+        merged = run_git(repo, "rev-parse", "HEAD")
+        code, out = check(repo, "--base", "main", "--head", merged)
+        assert code == 1, f"merge commit で重複を検出していない:\n{out}"
+        assert "同じ番号 0002" in out and "0002-mine.md" in out and "0002-theirs.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_only_from_four_digit_prefix():
+    """番号はファイル名の先頭の 4 桁連番（`NNNN-`）だけ。名前の途中の数字は番号とみなさない。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        write_doc(repo, "knowledge/adr/adopt-iso-8601.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/iso-8601-dates.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "名前の途中に同じ数字を持つ ADR を足す")
+        code, out = check(repo)
+        assert code == 0, f"名前の途中の数字を番号とみなしている:\n{out}"
+        assert "同じ番号" not in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_ignores_non_md_files_and_subdirectories():
+    """同じ番号の `.md` 以外のファイル（添付の図など）やサブディレクトリは数えない。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0002-x.md", adr_text("Accepted — 2026-02-01"))
+        write_doc(repo, "knowledge/adr/0002-x.png", "png\n")
+        write_doc(repo, "knowledge/adr/0002-assets/a.md", "添付\n")
+        commit_all(repo, "同じ番号の図とサブディレクトリを添える")
+        code, out = check(repo)
+        assert code == 0, f"`.md` 以外やサブディレクトリを番号の重複に数えている:\n{out}"
+        assert "同じ番号" not in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_number_duplicated_when_adr_dir_is_new_is_error():
+    """base に ADR ディレクトリが無くても、新しく作ったディレクトリの中の重複は検査する。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "README.md", "ADR はまだ無い\n")
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0001-a.md", adr_text("Accepted — 2026-01-01"))
+        write_doc(repo, "knowledge/adr/0001-b.md", adr_text("Accepted — 2026-01-01"))
+        commit_all(repo, "最初の ADR を同じ番号で 2 本足す")
+        code, out = check(repo)
+        assert code == 1, f"ADR ディレクトリを新設した変更での重複で exit 1 になっていない:\n{out}"
+        assert "同じ番号 0001" in out and "0001-a.md" in out and "0001-b.md" in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
+def test_adr_unique_new_number_passes_without_number_warning():
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0003-skip.md", adr_text("Accepted — 2026-02-01"))
+        commit_all(repo, "欠番を挟んで ADR を足す")
+        code, out = check(repo)
+        assert code == 0, out
+        assert "同じ番号" not in out, f"重複の無い番号で番号の指摘が出ている:\n{out}"
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_gitignored_untracked_file_in_adr_dir_is_not_warned():
     """G16: 作業ツリーと比べるとき、`--adr-dir` 配下の一覧は追跡済みファイルと
     `.gitignore` の対象外の未追跡ファイルだけにする。`.gitignore` 対象の未追跡ファイル

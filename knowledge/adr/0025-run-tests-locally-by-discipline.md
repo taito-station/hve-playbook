@@ -2,7 +2,10 @@
 
 ## ステータス
 
-Accepted — 2026-10-15
+Partially superseded by 0027-ci-runs-knowledge-checks-and-adr-number-check — 2026-10-19
+
+- 有効な部分: `tests/` の全件を CI・hook で自動実行せず、PR を作る前にローカルで流す規律（`.claude/rules/testing.md`・`tests/run-all.sh`）と、その流す時点・結果の扱い
+- 失効した部分: CI を置かないこと（背景の「`.github/workflows/` が無い」、結果の「CI の設定・保守も要らない」）。knowledge の検査（`check-knowledge.py`・`check-decision-log.py`。ADR の番号の重複を含む）は、PR の CI で流す（ADR-0027）
 
 ## 背景と課題
 
