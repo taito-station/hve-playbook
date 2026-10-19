@@ -2,7 +2,7 @@
 
 ## ステータス
 
-Accepted — 2026-10-18
+Accepted — 2026-10-19
 
 ## 背景と課題
 
@@ -30,7 +30,7 @@ hve-playbook には CI が無い。ADR 0025 で、リポジトリオーナーの
 選択した選択肢: **軽い検査だけを CI で流す**。
 
 - `check-decision-log.py` の独立ファイル方式に、ファイル名の先頭の 4 桁連番（`NNNN-`。documentation-standards の採番）が同じ ADR が複数あれば error にする検査を足す。名前の途中の数字（`adopt-iso-8601.md` の 8601 など）は番号とみなさない。4 桁連番で始まらない名前は検査しない。base に ADR ディレクトリが無い（この変更で作った）ときも検査する。その番号のファイルがすべて base にあった（base の時点から重複していた）なら警告にとどめ、1 本でも新しく足していれば error にする（解消できない既存の重複のせいで、無関係な PR を通せなくなるのを避ける。`## 決定ログ` 見出しの重複と同じ扱い）。インライン方式の ID（`### ADR NNNN`）は、導入先が hve-local で形式を変えられるので対象にしない
-- `.github/workflows/knowledge-check.yml` を置き、main への pull request で `check-knowledge.py` と `check-decision-log.py --base origin/<base> --head HEAD` を流す。`pull_request` の HEAD は main との merge commit なので、他の PR が先に main へ入れた番号との重複は「base に無い重複」として error になる。履歴を遡るので `fetch-depth: 0` で取得する
+- `.github/workflows/knowledge-check.yml` を置き、main への pull request（base を main に付け替えたとき（`edited`）を含む）で `check-knowledge.py` と `check-decision-log.py --base origin/<base> --head HEAD` を流す。`pull_request` の HEAD は main との merge commit なので、他の PR が先に main へ入れた番号との重複は「base に無い重複」として error になる。履歴を遡るので `fetch-depth: 0` で取得する
 - main の branch protection で、この job（`knowledge-check`）を必須チェックにし、「Require branches to be up to date」（`strict`）を有効にする。チェックが通ったあとに別の PR が main に入ったら、base を取り込んで流し直さないとマージできない。workflow が main に入る前に必須チェックにすると、他の PR が来ないチェックを待ち続けるので、設定はこの決定を入れた PR のマージ後に行う。設定と確認は次のとおり（外れたときもこれで戻す）
 
   ```bash
@@ -90,5 +90,5 @@ hve-playbook には CI が無い。ADR 0025 で、リポジトリオーナーの
 
 ## 関連リンク
 
-- Supersedes: [0025-run-tests-locally-by-discipline](0025-run-tests-locally-by-discipline.md)（一部。CI を置かない部分）
+- Partially supersedes: [0025-run-tests-locally-by-discipline](0025-run-tests-locally-by-discipline.md)（CI を置かない部分）
 - Related: [0014-knowledge-check-scripts-and-sha-follow-up](0014-knowledge-check-scripts-and-sha-follow-up.md)

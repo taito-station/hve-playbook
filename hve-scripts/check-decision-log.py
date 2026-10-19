@@ -117,7 +117,8 @@ RE_FENCE = re.compile(r"^(`{3,}|~{3,})")
 RE_TABLE_ROW = re.compile(r"^\s*\|(.+)\|\s*$")
 RE_TABLE_SEP_CELL = re.compile(r"^:?-{1,}:?$")
 RE_NUMBER = re.compile(r"(\d{3,})")
-# documentation-standards の採番（`{4桁連番}-{kebab-case-title}.md`）の連番
+# documentation-standards の採番（`{4桁連番}-{kebab-case-title}.md`）の連番。番号の重複検査だけが使う。
+# RE_NUMBER（ステータスの突き合わせ・README の行のキー）より狭くし、名前の途中の数字を番号とみなさない（ADR 0027）
 RE_ADR_FILE_NUMBER = re.compile(r"^(\d{4})-")
 
 

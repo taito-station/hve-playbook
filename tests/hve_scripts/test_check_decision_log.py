@@ -1275,6 +1275,23 @@ def test_adr_number_only_from_four_digit_prefix():
         shutil.rmtree(repo)
 
 
+def test_adr_number_ignores_non_md_files_and_subdirectories():
+    """同じ番号の `.md` 以外のファイル（添付の図など）やサブディレクトリは数えない。"""
+    repo = new_repo()
+    try:
+        write_doc(repo, "knowledge/adr/0001-first.md", adr_text("Accepted — 2026-01-01"))
+        commit_baseline(repo)
+        write_doc(repo, "knowledge/adr/0002-x.md", adr_text("Accepted — 2026-02-01"))
+        write_doc(repo, "knowledge/adr/0002-x.png", "png\n")
+        write_doc(repo, "knowledge/adr/0002-assets/a.md", "添付\n")
+        commit_all(repo, "同じ番号の図とサブディレクトリを添える")
+        code, out = check(repo)
+        assert code == 0, f"`.md` 以外やサブディレクトリを番号の重複に数えている:\n{out}"
+        assert "同じ番号" not in out, out
+    finally:
+        shutil.rmtree(repo)
+
+
 def test_adr_number_duplicated_when_adr_dir_is_new_is_error():
     """base に ADR ディレクトリが無くても、新しく作ったディレクトリの中の重複は検査する。"""
     repo = new_repo()

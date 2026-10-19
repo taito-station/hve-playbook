@@ -4,6 +4,8 @@ name: knowledge-check
 on:
   pull_request:
     branches: [main]
+    # edited: base を別ブランチから main に付け替えたときも流す（必須チェックが来ずに止まらないように）
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
