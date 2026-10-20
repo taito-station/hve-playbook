@@ -2,7 +2,7 @@
 # skills/global/ui-approval/serve-ui-approval.py の回帰テスト。
 #
 # 実行: bash tests/test_ui_approval_server.sh
-# 前提: python3 のみ (stdlib で完結。venv 不要)。google-chrome があれば描画・操作の検査も走る (無ければ SKIP)
+# 前提: python3 のみ (stdlib で完結。venv 不要)。Chrome / Chromium があれば描画・操作の検査も走る (無ければ SKIP。CHROME=/path/to/chrome で明示指定可)
 #
 # 検査の要点:
 #   1. GET / がトークン付きで描画される (CSS の {} と .format の衝突で KeyError にならない)
@@ -36,11 +36,34 @@ else
     echo "[PASS] unittest: $RAN tests"
 fi
 
-CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+# CHROME 環境変数で明示指定可。未指定なら既知のパスを順に探す (test_questionnaire_template.sh と同じ)。
+CHROME="${CHROME:-}"
 if [ -z "$CHROME" ]; then
-    echo "[SKIP] chrome: google-chrome / chromium が無い"
+    for candidate in \
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+        "$(command -v google-chrome 2>/dev/null)" \
+        "$(command -v google-chrome-stable 2>/dev/null)" \
+        "$(command -v chromium 2>/dev/null)" \
+        "$(command -v chromium-browser 2>/dev/null)"
+    do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+            CHROME="$candidate"
+            break
+        fi
+    done
+fi
+
+# 明示指定された CHROME が実行不能な場合もここで SKIP に落とす
+if [ -z "$CHROME" ] || [ ! -x "$CHROME" ]; then
+    echo "[SKIP] chrome: Chrome / Chromium が見つからない (CHROME=/path/to/chrome で明示指定可)"
     if [ "$FAIL" -eq 0 ]; then echo "PASS: all"; exit 0; else echo "FAIL: $FAIL"; exit 1; fi
 fi
+
+# macOS の Chrome は HOME に実の ~/Library が無いと終了処理で固まる (run-all.sh は HOME を一時
+# ディレクトリに向ける)。Chrome の起動だけ実のホームで行い、プロファイルは --user-data-dir で
+# $WORK に置いて普段の Chrome のプロファイルには触れない (Issue #78)
+REAL_HOME="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')"
 
 WORK="$(mktemp -d)"
 SERVER_PID=""
@@ -148,7 +171,8 @@ scenario = """
 h = h.replace("</body>", scenario + "</body>", 1)
 open(path, "w", encoding="utf-8").write(h)
 PY
-    timeout 60 "$CHROME" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=5000 \
+    HOME="$REAL_HOME" timeout 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
+        --user-data-dir="$WORK/chrome-profile" --no-first-run --virtual-time-budget=5000 \
         --dump-dom "file://$WORK/page.html" > "$WORK/dom.html" 2>/dev/null
     dom_state "$WORK/dom.html" > "$WORK/state5.json"
     if python3 - "$WORK/state5.json" "$WORK/dom.html" <<'PY'
@@ -230,7 +254,8 @@ PY
     python3 "$PROXY" "$PPORT" "$PORT6" "$WORK/scenario6.html" > "$WORK/proxy.log" 2>&1 &
     PROXY_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$PPORT/?t=x" && break; sleep 0.3; done
-    timeout 60 "$CHROME" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
+    HOME="$REAL_HOME" timeout 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
+        --user-data-dir="$WORK/chrome-profile" --no-first-run --virtual-time-budget=10000 \
         --dump-dom "http://127.0.0.1:$PPORT/?t=$TOKEN6" > "$WORK/dom6.html" 2>/dev/null
     for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$SERVER_PID" 2>/dev/null || break; sleep 0.3; done
     dom_state "$WORK/dom6.html" > "$WORK/state6.json"
