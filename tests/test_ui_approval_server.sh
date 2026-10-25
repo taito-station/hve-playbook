@@ -36,7 +36,7 @@ else
     echo "[PASS] unittest: $RAN tests"
 fi
 
-# CHROME 環境変数で明示指定可。未指定なら既知のパスを順に探す (test_questionnaire_template.sh と同じ)。
+# CHROME 環境変数で明示指定可。未指定なら既知のパスを順に探す (探索と SKIP の判定は test_questionnaire_template.sh と同じ)。
 CHROME="${CHROME:-}"
 if [ -z "$CHROME" ]; then
     for candidate in \
@@ -182,7 +182,7 @@ scenario = """
 h = h.replace("</body>", scenario + "</body>", 1)
 open(path, "w", encoding="utf-8").write(h)
 PY
-    HOME="$CHROME_HOME" "$TIMEOUT" 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
+    HOME="$CHROME_HOME" "$TIMEOUT" -k 5 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
         --user-data-dir="$WORK/chrome-profile5" --no-first-run --use-mock-keychain --disable-crash-reporter \
         --virtual-time-budget=5000 \
         --dump-dom "file://$WORK/page.html" > "$WORK/dom.html" 2>/dev/null
@@ -266,7 +266,7 @@ PY
     python3 "$PROXY" "$PPORT" "$PORT6" "$WORK/scenario6.html" > "$WORK/proxy.log" 2>&1 &
     PROXY_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$PPORT/?t=x" && break; sleep 0.3; done
-    HOME="$CHROME_HOME" "$TIMEOUT" 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
+    HOME="$CHROME_HOME" "$TIMEOUT" -k 5 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
         --user-data-dir="$WORK/chrome-profile6" --no-first-run --use-mock-keychain --disable-crash-reporter \
         --virtual-time-budget=10000 \
         --dump-dom "http://127.0.0.1:$PPORT/?t=$TOKEN6" > "$WORK/dom6.html" 2>/dev/null
