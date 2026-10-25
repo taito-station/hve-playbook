@@ -60,15 +60,26 @@ if [ -z "$CHROME" ] || [ ! -x "$CHROME" ]; then
     if [ "$FAIL" -eq 0 ]; then echo "PASS: all"; exit 0; else echo "FAIL: $FAIL"; exit 1; fi
 fi
 
+# Chrome を打ち切る timeout。macOS には標準で無い (Homebrew の coreutils なら gtimeout もある)
+TIMEOUT="$(command -v timeout || command -v gtimeout || true)"
+if [ -z "$TIMEOUT" ]; then
+    echo "[SKIP] chrome: timeout / gtimeout が無い (macOS は coreutils を入れる)"
+    if [ "$FAIL" -eq 0 ]; then echo "PASS: all"; exit 0; else echo "FAIL: $FAIL"; exit 1; fi
+fi
+
 # macOS の Chrome は HOME に実の ~/Library が無いと終了処理で固まる (run-all.sh は HOME を一時
-# ディレクトリに向ける)。Chrome の起動だけ実のホームで行い、プロファイルは --user-data-dir で
-# $WORK に置いて普段の Chrome のプロファイルには触れない (Issue #78)
-REAL_HOME="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')"
+# ディレクトリに向ける)。macOS では Chrome の起動だけ実のホームで行う。プロファイルは --user-data-dir
+# で $WORK に置き、キーチェーンとクラッシュレポートにも触れさせない (Issue #78)
+CHROME_HOME="$HOME"
+if [ "$(uname -s)" = "Darwin" ]; then
+    REAL_HOME="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)' 2>/dev/null || true)"
+    [ -n "$REAL_HOME" ] && CHROME_HOME="$REAL_HOME"
+fi
 
 WORK="$(mktemp -d)"
 SERVER_PID=""
 PROXY_PID=""
-trap '[ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null; [ -n "$PROXY_PID" ] && kill "$PROXY_PID" 2>/dev/null; rm -rf "$WORK"' EXIT
+trap '[ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null; [ -n "$PROXY_PID" ] && kill "$PROXY_PID" 2>/dev/null; sleep 0.5; rm -rf "$WORK" 2>/dev/null' EXIT
 mkdir -p "$WORK/repo/docs/images"
 git init -q "$WORK/repo"
 # 1x1 の実 PNG (naturalWidth > 0 を見るため)
@@ -171,8 +182,9 @@ scenario = """
 h = h.replace("</body>", scenario + "</body>", 1)
 open(path, "w", encoding="utf-8").write(h)
 PY
-    HOME="$REAL_HOME" timeout 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
-        --user-data-dir="$WORK/chrome-profile" --no-first-run --virtual-time-budget=5000 \
+    HOME="$CHROME_HOME" "$TIMEOUT" 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
+        --user-data-dir="$WORK/chrome-profile5" --no-first-run --use-mock-keychain --disable-crash-reporter \
+        --virtual-time-budget=5000 \
         --dump-dom "file://$WORK/page.html" > "$WORK/dom.html" 2>/dev/null
     dom_state "$WORK/dom.html" > "$WORK/state5.json"
     if python3 - "$WORK/state5.json" "$WORK/dom.html" <<'PY'
@@ -254,8 +266,9 @@ PY
     python3 "$PROXY" "$PPORT" "$PORT6" "$WORK/scenario6.html" > "$WORK/proxy.log" 2>&1 &
     PROXY_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$PPORT/?t=x" && break; sleep 0.3; done
-    HOME="$REAL_HOME" timeout 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
-        --user-data-dir="$WORK/chrome-profile" --no-first-run --virtual-time-budget=10000 \
+    HOME="$CHROME_HOME" "$TIMEOUT" 60 "$CHROME" --headless=new --disable-gpu --no-sandbox \
+        --user-data-dir="$WORK/chrome-profile6" --no-first-run --use-mock-keychain --disable-crash-reporter \
+        --virtual-time-budget=10000 \
         --dump-dom "http://127.0.0.1:$PPORT/?t=$TOKEN6" > "$WORK/dom6.html" 2>/dev/null
     for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$SERVER_PID" 2>/dev/null || break; sleep 0.3; done
     dom_state "$WORK/dom6.html" > "$WORK/state6.json"
