@@ -30,7 +30,7 @@ bash hve-playbook/setup.sh /path/to/my-project
 
 既存のプロジェクトに入れる（再適用を含む）ときは、下の「2.」の適用プロンプトを使う。setup.sh の前に、上書きされるファイルや導入先の `.claude/` 配下の symlink を確かめる。
 
-user-level から一部の skill などだけを使いたいときは、sync は使わず、`skills/global/<名前>/` などを自分の `~/.claude/` に手で取り込む（sync は全部を張る作りで、選べない）。HVE の規則（`rules/hve/`）と hve-implement skill は、user-level の skill（create-pr・review-pr・documentation-standards・resolve-issue）があれば使い、無いときの代替（PR は作業ブランチを push して `gh pr create`、ADR の様式は artifact-management の「書式」の読み替えなど）をその場に書いてある。
+user-level から一部の skill などだけを使いたいときは、sync は使わず、`skills/global/<名前>/` などを自分の `~/.claude/` に手で取り込む（sync は全部を張る作りで、選べない）。HVE の規則（`rules/hve/`）と hve-implement skill は、user-level の skill（create-pr・documentation-standards・resolve-issue）があれば使い、無いときの代替（PR は作業ブランチを push して `gh pr create`、ADR の様式は artifact-management の「書式」の読み替えなど）をその場に書いてある。hook の skill-enforcer を取り込むときは create-pr skill も取り込む（skill-enforcer は `gh pr create` の直接の実行を止めるので、代替の手順を辿れない）。
 
 ### 動作環境
 
