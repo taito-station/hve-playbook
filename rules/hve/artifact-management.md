@@ -71,6 +71,8 @@ description: 成果物管理規律 — ファイル配置・更新ポリシー�
 
 独立ファイル方式は documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
 
+documentation-standards スキルが無い導入先では、この規則が同スキルを参照する箇所（テンプレート・採番・ステータス値）を次で読み替える。ファイル名は `NNNN-<kebab-case-title>.md`（`NNNN` は `knowledge/adr/` 内の最大値 +1 の 4 桁連番）、章は MADR（下の対応表の右列）とし既存の ADR に倣う。`## ステータス` 節は `<値> — YYYY-MM-DD` で書き、値は `Proposed`・`Accepted`・`Deprecated`・`Superseded by <ID>`・`Partially superseded by <ID>`（有効な部分と失効した部分を書く）から選ぶ。一覧 `knowledge/adr/README.md` があれば行を足す。
+
 インライン方式は 1 エントリを見出し `### <ID>: 要約 (YYYY-MM-DD) — ステータス` と、その下の `####` の節で書き、`## 決定ログ` 節の末尾に追記する。節と MADR の章の対応:
 
 | インライン方式の節 | MADR の章 |
