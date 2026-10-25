@@ -1,7 +1,7 @@
 # CLAUDE.md (user-level)
 
 このファイルはすべての Claude Code セッションで読み込まれる user-level の global 設定。
-`~/.claude/CLAUDE.md` に配置（または dotclaude リポからシンボリックリンク）。
+`~/.claude/CLAUDE.md` に配置（hve-playbook の `sync-dotclaude.sh` がシンボリックリンクを張る）。
 
 ## 基本情報
 

@@ -11,7 +11,7 @@ Includes [youhei-ushio/dotclaude-public](https://github.com/youhei-ushio/dotclau
 
 | 役割 | デプロイ方法 | デプロイ先 | 内容 |
 |---|---|---|---|
-| **user-level 基盤** | `sync-dotclaude.sh` (symlink) | `~/.claude/` | hooks, global skills, scripts, rules/global, agents/global, settings |
+| **user-level 基盤** | `sync-dotclaude.sh` (symlink) | `~/.claude/` | CLAUDE.md, statusline.sh, hooks, global skills, scripts, rules/global, agents/global, settings（symlink ではなくマージした生成物） |
 | **project-level HVE** | `setup.sh` (copy) | target/.claude/ | rules/hve, HVE skills/agents/workflows, knowledge の検査スクリプト（hve-scripts → scripts/hve）, LICENSE の写し（LICENSE-hve-playbook） |
 
 ## 使う前に
@@ -171,15 +171,21 @@ HOME を、全件で共有する一時ディレクトリに向けて `tests/test
 
 ## 開発規律
 
-`rules/hve/` で以下の規律を強制する（優先順位順）:
+`rules/hve/` で以下の規律を強制する。規律同士の優先順位は 捏造禁止 > オーバーエンジニアリング禁止 > 最小差分原則 で、捏造禁止はほかのすべての規律にも優先する:
 
 1. **捏造禁止** — 根拠のない情報を成果物に含めない
 2. **オーバーエンジニアリング禁止** — YAGNI、不要な抽象化を入れない
 3. **最小差分原則** — 必要な変更だけを行う
-4. **検証必須** — 動作を証明できるまで完了としない
-5. **出力品質基準** — 日本語、見出し+箇条書き、出典付き
-6. **成果物管理** — ファイル配置・更新ポリシー
-7. **ツール利用ポリシー** — cq/mdq/LSP/grep の優先順位
+
+ほかの規律（相互の順位は無い）:
+
+- **検証必須** — 動作を証明できるまで完了としない
+- **出力品質基準** — 日本語、見出し+箇条書き、出典付き
+- **成果物管理** — ファイル配置・更新ポリシー、決定ログの不変性
+- **ツール利用ポリシー** — cq/mdq/LSP/grep の優先順位
+- **実装フロー** — 実装前の Plan・Knowledge 検索・棄却済み案チェック・質問票と、実装後の Knowledge 同期のゲート（`implement-flow.md`）
+- **Knowledge 成熟度** — knowledge/ の frontmatter・status・stale 検出（`knowledge-maturity.md`）
+- **プロジェクト固有の補足** — 導入先の補足・上書きを `.claude/rules/hve-local/` に書く（`local-overrides.md`）
 
 このほか、コードを読んだときに `rules/hve/clean-architecture.md`（言語を問わないクリーンアーキテクチャ規約）を読み込む（[ADR-0018](knowledge/adr/0018-language-agnostic-clean-architecture-rule.md)）。
 
