@@ -227,7 +227,7 @@ Step 8: PR 作成
 対象: 実装したい内容（例: CSV 出力に日付の列を足す）
 ```
 
-Issue を対応するときは resolve-issue skill を使う（パス判定・Plan の敵対的レビュー・PO 承認・Issue への記録を含む）。
+Issue を対応するときは resolve-issue skill を使う（パス判定・Plan の敵対的レビュー・PO 承認・Issue への記録を含む）。resolve-issue skill が無ければ、implement-flow の対象（feat / fix / refactor / 改修）の Issue は `/hve-implement` の単独モードで対応する。
 
 resolve-issue skill は、導入先に hve-implement があれば bug / feature パスで自動的に呼ぶ（計画の前に Step 2〜4、実装で Step 5〜7）。
 

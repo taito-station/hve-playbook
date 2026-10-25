@@ -27,7 +27,7 @@ description: |
 | resolve-issue の後段 | resolve-issue が `--phase post <Issue 番号>` で呼ぶ | Step 5〜7 |
 
 - `--phase` が無ければ単独モード。`--phase` は resolve-issue からだけ渡す（単独で使うときは付けない）
-- Issue を対応するときは resolve-issue を使う（パス判定・Plan の敵対的レビュー・PO 承認・Issue への記録は resolve-issue が持つ）。単独モードは Issue の無い実装指示の入口
+- Issue を対応するときは resolve-issue を使う（パス判定・Plan の敵対的レビュー・PO 承認・Issue への記録は resolve-issue が持つ）。単独モードは Issue の無い実装指示の入口。resolve-issue skill が無ければ、implement-flow の対象（feat / fix / refactor / 改修）の Issue は単独モードで行い、Step 1 で `gh issue view <Issue 番号> --comments` を読む
 - resolve-issue から呼ばれたときは、Step 0（ブランチ）・Step 1（Issue 分析）・Step 8（PR 作成）は resolve-issue が行う。
   Step 1 のスコープは `gh issue view <Issue 番号> --comments` で読み、前段の結果は resolve-issue の Plan に書く
 - 前段は resolve-issue の Plan の作成前（bug パスは修正方針の記録前）に、後段は resolve-issue Step 3 の実装として呼ばれる。
@@ -54,7 +54,7 @@ Plan モードを使えない環境（headless など）では、計画を提示
 - 指示の目的を理解する
 - 影響する領域・モジュール・データモデルを列挙する
 - Step 2 で検索するキーワード・領域を決める
-- 単独モードでは、タスクを「バグ修正」か「それ以外」に分類する（Step 8 の `--depth` を決める。計画に書いて承認を得る）
+- 単独モードでは、タスクを「バグ修正」か「それ以外」に分類する（Step 8 の `--depth` を決める。計画に書いて承認を得る。create-pr skill が無ければ分類しない）
 
 | 結果 | 次のステップ |
 |---|---|
@@ -153,9 +153,10 @@ Step 1〜3 の結果から、実装に必要だが足りない情報を「ブロ
 ### Step 8: PR 作成
 
 1. 変更をコミットする（commit-workflow skill があればその規約に従う）
-2. create-pr skill を Skill ツールで呼ぶ。`--depth` は承認された計画の分類（Step 1）で決める:
+2. create-pr skill があれば Skill ツールで呼ぶ。`--depth` は承認された計画の分類（Step 1）で決める:
    - バグ修正 → `/create-pr --depth lightweight`
    - それ以外 → `/create-pr --depth full`
+3. 2 の create-pr skill が無ければ、作業ブランチを push して `gh pr create` で PR を作る（本文は導入先のブランチ運用規約の雛形があればそれに従う）
 
 | 結果 | 次のステップ |
 |---|---|

@@ -8,7 +8,7 @@ knowledge/ 配下の文書の信頼度と鮮度を管理する仕組み。
 
 ## frontmatter 標準
 
-knowledge/ 配下の各ファイルは以下の frontmatter を持つ（決定ログの `knowledge/adr/` と `README.md` は対象外。ADR の様式は documentation-standards に従う）:
+knowledge/ 配下の各ファイルは以下の frontmatter を持つ（決定ログの `knowledge/adr/` と `README.md` は対象外。ADR の様式は documentation-standards に従い、同スキルが無ければ artifact-management の「書式」の読み替えに従う）:
 
 ```yaml
 ---
