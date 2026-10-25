@@ -24,5 +24,5 @@ bash tests/run-all.sh
 ## 結果の扱い
 
 - FAIL が出たら push しない。create-pr の中で FAIL が出たら Step 5.5 に進まずに止まり、ユーザーに報告する。このとき `docs/temp/pr-body.md` と `docs/temp/.pr-body.owner` は消さない（create-pr を最初から起動し直すと、Step 3 が pr-body.md を作り直して対応履歴が消える）。再開するときは、直す → 全件を流し直す → Test plan を更新し、対応履歴に「テストの FAIL を直した修正（セルフレビュー未経由）」を足す → Step 5.5 から進める。review-pr の単独起動で FAIL が出たら、Step 6.5 に進まずに止まって報告する
-- テストが自分で SKIP を出して exit 0 で終わったもの（tmux・python3・node が無い、PATH に google-chrome / chromium が無いなど）は FAIL として扱わない。SKIP したテストと理由を結果に書く
+- テストが自分で SKIP を出して exit 0 で終わったもの（tmux・python3・node が無い、Chrome / Chromium が見つからない、timeout / gtimeout が無い（coreutils の無い macOS）など）は FAIL として扱わない。SKIP したテストと理由を結果に書く
 - PR 本文の Test plan に、最後に流した結果（PASS・FAIL の数と SKIP したテスト）を書く
