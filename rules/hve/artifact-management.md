@@ -71,7 +71,7 @@ description: 成果物管理規律 — ファイル配置・更新ポリシー�
 
 独立ファイル方式は documentation-standards スキルの MADR テンプレートに従う（`skills/global/documentation-standards/SKILL.md` の「ADR」セクション参照）。
 
-documentation-standards スキルが無い導入先では、この規則が同スキルを参照する箇所（配置先・テンプレート・採番・ステータス値）を次で読み替える。「既存の別配置」は、そのリポジトリが `knowledge/adr/` の外ですでに ADR を置いているディレクトリ（`docs/adr/` など）を指す。ファイル名は `NNNN-<kebab-case-title>.md`（`NNNN` は配置先の中の最大値 +1 の 4 桁連番、`<kebab-case-title>` は英語）。章は `## ステータス`・`## 背景と課題`・`## 意思決定の要因`・`## 検討した選択肢`・`## 決定内容`（その下に `### 結果（Consequences）`）・`## 選択肢の評価（Pros and Cons）`・`## 関連リンク` の順とし、既存の ADR があれば倣う。`## ステータス` 節は `<値> — YYYY-MM-DD` で書き、値は `Proposed`・`Accepted`・`Deprecated`・`Superseded by NNNN-<kebab-case-title>`・`Partially superseded by NNNN-<kebab-case-title>`（有効な部分と失効した部分を書く）から選ぶ（hve-local で独自のステータス語を定めていればその語）。一覧 `knowledge/adr/README.md` があれば行を足す。
+documentation-standards スキルが無い導入先では、この規則が同スキルを参照する箇所（配置先・テンプレート・採番・ステータス値）を次で読み替える。「既存の別配置」は、そのリポジトリが `knowledge/adr/` の外ですでに ADR を置いているディレクトリ（`docs/adr/` など）を指す。ファイル名は `NNNN-<kebab-case-title>.md`（`NNNN` は配置先の中の最大値 +1 の 4 桁連番、`<kebab-case-title>` は英語）。章は `## ステータス`・`## 背景と課題`・`## 意思決定の要因`・`## 検討した選択肢`・`## 決定内容`（その下に `### 結果（Consequences）`）・`## 選択肢の評価（Pros and Cons）`・`## 関連リンク` の順とし、既存の ADR があれば倣う。`## ステータス` 節は `<値> — YYYY-MM-DD` で書き、値は `Proposed`・`Accepted`・`Deprecated`・`Superseded by NNNN-<kebab-case-title>`・`Partially superseded by NNNN-<kebab-case-title>`（有効な部分と失効した部分を書く）から選ぶ（hve-local で独自のステータス語を定めていればその語）。配置先の一覧（`knowledge/adr/README.md` など）があれば行を足す。
 
 インライン方式は 1 エントリを見出し `### <ID>: 要約 (YYYY-MM-DD) — ステータス` と、その下の `####` の節で書き、`## 決定ログ` 節の末尾に追記する。節と MADR の章の対応:
 

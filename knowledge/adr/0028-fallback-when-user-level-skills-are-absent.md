@@ -26,8 +26,8 @@ Accepted — 2026-10-25
 
 - PR の作成（`rules/hve/implement-flow.md` の Step 8、hve-implement の Step 8）: create-pr が無ければ、変更をコミットし、作業ブランチを push して `gh pr create` で作る（本文は導入先のブランチ運用規約の雛形があればそれ）。implement-flow のフロー図は、global 版との行の包含（`tests/test_implement_flow_drift.sh`）のため変えず、Step 8 の本文に行を足す
 - ADR の様式（`rules/hve/artifact-management.md` の「書式」）: documentation-standards への参照（配置先・テンプレート・採番・ステータス値）の読み替えを 1 か所にまとめる。「既存の別配置」の意味、ファイル名の形、章の名前と順序、ステータス行の書式と 5 つの値、一覧への追記だけを書き、テンプレートは複製しない。`rules/hve/knowledge-maturity.md` の ADR の様式の参照は、この読み替えを指す
-- Issue の対応の入口（hve-implement の「Issue を対応するときは resolve-issue を使う」、`docs/usage-prompts.md` の同じ案内）: resolve-issue が無ければ単独モードで行い、Step 1 で `gh issue view` で Issue を読む。Issue への記録や `Closes` の付与など resolve-issue の役目は写さない
-- README の一部取り込みの注記に、hook の skill-enforcer を取り込むときは create-pr skill も取り込むことを書く。skill-enforcer は `gh pr create` の直接の実行を止めるため、create-pr が無いと代替を辿れず、`# via:create-pr` を経路を通らずに付ける運用（ADR 0023 に反する）を招く。規則（rules/hve）は hook を前提にしないので、規則側には書かない（PR #83 のセルフレビューの escalate へのオーナー判断）
+- Issue の対応の入口（hve-implement の「Issue を対応するときは resolve-issue を使う」、`docs/usage-prompts.md` の同じ案内）: resolve-issue が無ければ、implement-flow の対象（feat / fix / refactor / 改修）の Issue は単独モードで行い、Step 1 で `gh issue view` で Issue を読む。hve-implement の対象外の Issue（ドキュメントのみ・設定変更のみ・依存更新のみ）を単独モードに回さないよう、対象で絞る（PR #83 のセルフレビューの escalate へのオーナー判断）。Issue への記録や `Closes` の付与など resolve-issue の役目は写さない。create-pr が無ければ、Step 1 の `--depth` のための分類もしない
+- README の一部取り込みの注記に、hook の skill-enforcer を取り込むときは create-pr skill と、それが呼ぶ review-pr skill も取り込むことを書く。skill-enforcer は `gh pr create` などの直接の実行を止めるため、create-pr（とその委譲先の review-pr）が無いと代替を辿れず、`# via:create-pr` を経路を通らずに付ける運用（ADR 0023 に反する）を招く。規則（rules/hve）は hook を前提にしないので、規則側には書かない（PR #83 のセルフレビューの escalate へのオーナー判断）
 - 代替を書かない参照:
   - knowledge-maturity の squash・rebase 後の sha の追従（review-pr を含む）。既存の「手で squash・rebase したときも同じように実行する」で足りる
   - knowledge-maturity のパース契約。hve-playbook の保守者への注意で、導入先が辿る手順ではない
