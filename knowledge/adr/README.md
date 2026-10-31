@@ -24,7 +24,7 @@
 | [0016](0016-hve-implement-skill-and-two-phase-call-from-resolve-issue.md) | implement-flow の実行手順を hve-implement skill として配り、resolve-issue からは 2 段で呼ぶ | Accepted | 2026-10-05 |
 | [0017](0017-qa-answers-in-qa-dir-wherever-check-knowledge-exists.md) | HVE 導入先では、質問の回答を経路を問わず qa/ に残す | Partially superseded by 0019-gmail-answers-as-questionnaire-defaults | 2026-10-07 |
 | [0018](0018-language-agnostic-clean-architecture-rule.md) | 言語を問わないクリーンアーキテクチャ規約を rules/hve に置き、コードを読んだときに読み込む | Accepted | 2026-10-12 |
-| [0019](0019-gmail-answers-as-questionnaire-defaults.md) | Gmail で見つけた質問の回答は保存せず、質問票の既定値候補として PO に確定してもらう | Partially superseded by 0029-remove-gmail-search-from-uncertainty-check | 2026-10-12 |
+| [0019](0019-gmail-answers-as-questionnaire-defaults.md) | Gmail で見つけた質問の回答は保存せず、質問票の既定値候補として PO に確定してもらう | Partially superseded by 0030-drop-past-gmail-qa-special-rules | 2026-10-12 |
 | [0020](0020-gate-plan-headings-and-main-commit-with-hooks.md) | 計画の必須見出しと main への commit を hook でゲートする | Accepted | 2026-10-12 |
 | [0021](0021-ship-license-copy-with-hve-assets.md) | setup.sh は導入先に LICENSE の写しを .claude/LICENSE-hve-playbook として配る | Accepted | 2026-10-13 |
 | [0022](0022-permission-log-masks-secrets-and-debug-opt-in.md) | 許可要求ログの hook は既知の形の秘密値を伏せて書き、debug ログは opt-in、本体は環境変数で止められるようにする | Accepted | 2026-10-13 |
@@ -34,4 +34,5 @@
 | [0026](0026-setup-refuses-user-level-claude-dir.md) | setup.sh は導入先の .claude が ~/.claude と同じ実体なら [ERROR] で止める | Accepted | 2026-10-18 |
 | [0027](0027-ci-runs-knowledge-checks-and-adr-number-check.md) | PR の CI で knowledge の検査と ADR の番号の重複検査を流し、main の必須チェックにする | Accepted | 2026-10-19 |
 | [0028](0028-fallback-when-user-level-skills-are-absent.md) | HVE の規則と hve-implement は、user-level の skill が無いときの代替をその場に書く | Accepted | 2026-10-25 |
-| [0029](0029-remove-gmail-search-from-uncertainty-check.md) | 不確定点チェックの回答探索から Gmail 検索を外す | Accepted | 2026-10-31 |
+| [0029](0029-remove-gmail-search-from-uncertainty-check.md) | 不確定点チェックの回答探索から Gmail 検索を外す | Partially superseded by 0030-drop-past-gmail-qa-special-rules | 2026-10-31 |
+| [0030](0030-drop-past-gmail-qa-special-rules.md) | 過去に保存した source: gmail の Q&A の特例規定を外す | Accepted | 2026-10-31 |
