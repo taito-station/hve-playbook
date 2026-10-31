@@ -2,7 +2,10 @@
 
 ## ステータス
 
-Accepted — 2026-10-12
+Partially superseded by 0029-remove-gmail-search-from-uncertainty-check — 2026-10-31
+
+- 有効な部分: Gmail 由来の回答を Q&A 書式で保存しないこと、既存の `source: gmail` の Q&A を既知の回答として除外に使わず既定値候補にし、PO が確定したら置き換えること、質問票を件数に関わらず `/questionnaire` で作ること
+- 失効した部分: 不確定点チェックで Gmail を検索し、見つけた事実を質問票の既定値候補にすること。0029 で Gmail 検索の手順そのものを外した
 
 ## 背景と課題
 
