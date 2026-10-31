@@ -33,13 +33,14 @@ resolve-issue と create-issue の不確定点チェックは、Issue の不明�
 - resolve-issue の前段の規則（hve-implement を呼ぶ場合）から「Gmail で見つけた回答」の扱いを削除する。hve-implement の Step 4 の表の探索順も knowledge → PO の質問票にする
 - 過去に保存した `source: gmail` の Q&A の扱い（ADR 0019。既知の回答として除外に使わず既定値候補にし、PO が確定したら置き換える）は変えない。これまで手順 2 を参照していた PII の除外とガードレールは、その規則の場所に書き直した。過去分の扱いそのものは [hve-playbook#63](https://github.com/taito-station/hve-playbook/issues/63) で決める
 - 過去分の Q&A の内容は、引き続き既定値候補の理由として `qa/*.md` に載る。ただしその内容はすでに `knowledge/<domain>/` で git 管理されているので、`qa/*.md` に載っても公開される範囲は増えない。このため本 ADR の対象外とした
+- ただし #63 で過去分の Q&A を `knowledge/<domain>/` から置き換え・削除しても、それを既定値候補にした質問票の記録（`qa/*.md`）には写しが HEAD に残る。この写しの扱いも #63 で決める
 - ADR 0019 のうち「Gmail 検索で見つけた事実を既定値候補にする」を置き換える（0019 は Partially superseded）
 - 契約は `tests/test_qa_answer_destination.sh` と `tests/test_hve_implement_contract.sh` で固定する
 
 ### 結果（Consequences）
 
 - 良い結果: メールから新しく情報を取り込む経路が無くなり、質問票の記録にメール由来の機密な業務情報が新しく載ることは無くなる。機密・送信元の規則を足さずに済む。不確定点チェックの手順が短くなる
-- 悪い結果: メールに答えがある質問も、PO が自分で調べて答える必要がある。ただし、手順の記録の文言（「Gmail から回答候補を発見」など）が載った Issue は、gh search で検索できる範囲（アクセスできるリポジトリの Issue）では、仕組みを決めた #56 以外に見つからなかった（2026-10-25 に確認）。使われていた形跡は無い。導入先の hve-implement の写しは setup.sh を実行した時点のままなので、Step 4 の表は再適用するまで「knowledge → Gmail → PO の質問票」の記述が残る。resolve-issue（sync で常に最新）の側に Gmail の手順が無く、写しと食い違うときは resolve-issue の定義を優先するので、Gmail 検索は実行されない。導入先で setup.sh を再適用すると記述も揃う。Gmail 検索を再び使いたくなったら、本 ADR を supersede する新しい ADR で、機密情報と送信元の扱い（本 Issue の Q02・Q03）を決めてから戻す
+- 悪い結果: メールに答えがある質問も、PO が自分で調べて答える必要がある。ただし、手順の記録の文言（「Gmail から回答候補を発見」など）が載った Issue は、gh search で検索できる範囲（アクセスできるリポジトリの Issue）では、仕組みを決めた #56 以外に見つからなかった（2026-10-25 に確認）。使われていた形跡は無い。導入先の hve-implement の写しは setup.sh を実行した時点のままなので、Step 4 の表は再適用するまで「knowledge → Gmail → PO の質問票」の記述が残る。resolve-issue（sync で常に最新）の側に Gmail の手順が無く、写しと食い違うときは resolve-issue の定義を優先するので、Gmail 検索は行わない定めになる。ただしこれは規則による定めで、機械的な保証ではない（`allowed-tools` から外しても、Gmail MCP を接続したセッションでは確認を挟めば呼べる）。確実にするには導入先で setup.sh を再適用し、写しの記述も揃える。ADR 0019 の要因の 1 つ「上流 HVE の Work IQ の扱い（メールを PO の回答の材料に留める）と揃える」に当たる経路は、本 ADR で持たなくなる。Gmail 検索を再び使いたくなったら、本 ADR を supersede する新しい ADR で、機密情報と送信元の扱い（本 Issue の Q02・Q03）と、上流の Work IQ との揃え方（ADR 0019 の要因）を決めてから戻す
 
 ## 選択肢の評価（Pros and Cons）
 
