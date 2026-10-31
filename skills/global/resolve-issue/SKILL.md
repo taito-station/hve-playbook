@@ -128,7 +128,7 @@ if ERRORS is not empty:
 **`.claude/skills/hve-implement/SKILL.md` がある場合（implement-flow の対象外＝ドキュメントのみ・設定変更のみ・依存更新のみの変更を除く）**: 項目 1 の代わりに `/hve-implement --phase pre <issue番号>` を
 Skill ツールで呼び、Knowledge 検索・棄却済み案チェック・質問票（implement-flow の Step 2〜4）を済ませる。
 質問票の回答探索は項目 1 の探索順とガードレールに従う（hve-implement が参照する）。ただし PO の回答は `knowledge/<domain>/` に保存せず（HVE の check-knowledge.py は項目 1 の書式を knowledge 文書として扱えない）、次のとおり `qa/` に残す。knowledge には AKM の蒸留で入れる。導入先の hve-implement の写しの記述と食い違うときは、本 skill の定義を優先する:
-- PO の回答: questionnaire skill が書く `qa/*.md`（`docs/qa/` があればそこ）を正とする。項目 1 の手順 3 は Issue コメントへの反映だけにする
+- PO の回答: questionnaire skill が書く `qa/*.md`（`docs/qa/` があればそこ）を正とする。項目 1 の手順 3 は Issue コメントへの反映と、同じ質問の `source: gmail` の Q&A の削除だけにする
 結果は項目 2 の Plan の「ゲートの確認結果」に書き、前提や設計方針に効くものは「前提」「設計方針」にも書く。
 STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 ではなく hve-implement の Step 7 で書く。
 
