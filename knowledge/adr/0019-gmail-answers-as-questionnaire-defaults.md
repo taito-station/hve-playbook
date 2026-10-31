@@ -2,10 +2,10 @@
 
 ## ステータス
 
-Partially superseded by 0029-remove-gmail-search-from-uncertainty-check — 2026-10-31
+Partially superseded by 0030-drop-past-gmail-qa-special-rules — 2026-10-31
 
-- 有効な部分: 下の失効した部分以外の決定はすべて有効。特に、HVE の有無を問わず適用すること、create-issue の質問票ゲートと hve-implement の Step 4 は resolve-issue の定義に従うこと、AKM と knowledge-maturity を変えないこと、Gmail 由来の回答を Q&A 書式で保存しないこと、既存の `source: gmail` の Q&A を既知の回答として除外に使わず既定値候補にし、PO が確定したら置き換えること、質問票を件数に関わらず `/questionnaire` で作ること、結果の欄にある導入先への手当て（qa ディレクトリに置いた `source: gmail` のファイルの検出と、削除・再確認・`sources` の付け替え）
-- 失効した部分: 不確定点チェックで Gmail を検索し、見つけた事実を質問票の既定値候補にすること。0029 で Gmail 検索の手順そのものを外した
+- 有効な部分: 下の失効した部分以外の決定はすべて有効。特に、HVE の有無を問わず適用すること、create-issue の質問票ゲートと hve-implement の Step 4 は resolve-issue の定義に従うこと、AKM と knowledge-maturity を変えないこと、Gmail 由来の回答を Q&A 書式で保存しないこと、質問票を件数に関わらず `/questionnaire` で作ること、結果の欄にある導入先への手当て（qa ディレクトリに置いた `source: gmail` のファイルの検出と、削除・再確認・`sources` の付け替え）
+- 失効した部分: 不確定点チェックで Gmail を検索し、見つけた事実を質問票の既定値候補にすること（0029 で Gmail 検索の手順そのものを外した）。既存の `source: gmail` の Q&A を既知の回答として除外に使わず既定値候補にし、PO が確定したら置き換えること（0030 で特例規定を外した。手元で実在 0 件）
 
 ## 背景と課題
 
