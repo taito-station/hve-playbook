@@ -76,7 +76,7 @@ check "resolve-issue: bug パスで後段を呼ばない" bash -c '! awk '"'"'in
 check "resolve-issue: feature パスで前段（--phase pre）を呼ぶ" section_has "$RI" "#### [feature]" "#### [ops]" "--phase pre"
 check "resolve-issue: feature パスで後段を呼ばない" bash -c '! awk '"'"'index($0,"#### [feature]")==1{on=1;next} on&&index($0,"#### [ops]")==1{on=0} on'"'"' "$1" | grep -qF -- "--phase post"' _ "$RI"
 check "resolve-issue: feature の前段の PO 回答は questionnaire の qa/*.md を正とする" section_has "$RI" "#### [feature]" "#### [ops]" "questionnaire skill が書く \`qa/*.md\`"
-check "resolve-issue: Gmail の回答を既定値候補にするときも PII の規則を適用する" section_has "$RI" "#### [feature]" "#### [ops]" "上記の PII の除外を適用する"
+check "skill: feature の前段のガードレールに PII を書かない規則がある" row_has "$SKILL" "resolve-issue の前段（feature）" "PII を書かない"
 check "resolve-issue: PO 承認後に ADR を飛ばすのは前段を呼んだときだけ" section_has "$RI" "#### [feature]" "#### [ops]" "前処理で hve-implement の前段を呼んだ場合は ADR を Step 7 で書く"
 check "resolve-issue: revert はテストの 3 回失敗の STOP に限る" section_has "$RI" "### Step 3" "### Step 4" "テストの 3 回失敗で STOP したら項目 3 の revert"
 check "resolve-issue: ops パスでは呼ばない" bash -c '! awk '"'"'index($0,"#### [ops]")==1{on=1;next} on&&index($0,"### Step 3")==1{on=0} on'"'"' "$1" | grep -qF hve-implement' _ "$RI"
