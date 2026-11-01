@@ -24,7 +24,7 @@ paths:
 
 ## 原則（言語・バックエンド・クライアント共通）
 
-- 内側は外側に依存しない: 外側（入口・外部アダプター・起動）→ ユースケース → ドメインモデルの向きだけを許す（外側同士は、バックエンドでは下の表の範囲で許す。クライアントでは #58 で決める）。内側は外側の型・ライブラリを知らない
+- 内側は外側に依存しない: 外側（入口・外部アダプター・起動）→ ユースケース → ドメインモデルの向きだけを許す（外側同士は、下のバックエンドとクライアントの表の範囲で許す）。内側は外側の型・ライブラリを知らない
 - ドメインモデルは外部依存を持たない（フレームワーク・DB・HTTP クライアントを import しない）
 - 外部依存（外部 API・DB・ファイル・時計など）は、ユースケース側に置いた抽象（gateway）越しに使う。実装は外側のレイヤーが持つ
 - 依存の組み立て（実装を生成して抽象に差し込む）は外側で行う。ドメインモデルとユースケースは実装を参照しない
@@ -58,8 +58,9 @@ paths:
 - use-case のエラーの種類と、HTTP ステータスなど入口の応答への対応表
 - 認証・認可の置き場所
 - ユースケースの入出力専用の型（DTO）を設けるか
+- クライアントの状態管理・ルーティング・サーバの状態のキャッシュに使うライブラリ（置くレイヤーはクライアントの節のとおり）
 
-Rust と PHP は、言語別規約（下記）がトランザクションの境界を除くこれらを定めている。
+Rust と PHP は、言語別規約（下記）がこのうちバックエンドの項目（トランザクションの境界を除く）を定めている。
 
 ## 言語別規約との関係
 
@@ -79,4 +80,43 @@ hve-playbook は Rust と PHP に、fridgers-backend 型の言語別規約（hve
 
 ## クライアント（フロントエンド・モバイル）
 
-原則の節だけを適用する。レイヤー構成と命名の規約はまだ無い（[hve-playbook#58](https://github.com/taito-station/hve-playbook/issues/58) で作る）。
+ブラウザ・端末で動くコードに当てる（サーバ側のコードはバックエンドの節に従う）。
+
+- 適用範囲: Web は React の SPA、モバイルは Flutter。それ以外のクライアント（Vue・Svelte・SwiftUI、ファイルの配置でルーティングを決めるフレームワーク（Next.js など））は原則の節だけを適用し、構成は `.claude/rules/hve-local/clean-architecture.md` に書く
+- use-case の層は必須。画面の層（Web の presentation・Flutter の ui）は model と use-case（と下の補助・ルートの定数）だけに依存し、外部依存の抽象（gateway・repository）も実装も直接使わない
+- ドメインの概念を持たない補助（Web は `src/utils/`、Flutter は `lib/utils/`）は層に属さず、どの層からも使ってよい。補助は層のコードを import しない
+- エラーの変換: データの層（gateway・data）のエラーは use-case のエラーへ、use-case のエラーは画面の層で利用者向けの表示へ変換する。画面には内部の詳細を出さない（詳細はログに残す。秘密情報・認証情報・個人情報は出さない）
+- クライアントのコードと設定（Web の app、Flutter の `lib/config/` など）は利用者の手元に配られるので、秘密情報（API キー・クライアントシークレットなど）を置かない。認可はサーバで判定し、クライアントでの判定は表示の制御に留める。利用者に見せてはいけないデータは、サーバの応答に含めない
+- ルートのパスの定数（画面の遷移に使う）は、Web は `src/presentation/` に置く。Flutter は case study どおり `lib/routing/routes.dart` に置き、ui はこのファイルだけ参照してよい（このファイルは他の層を import しない）
+- サーバの状態のキャッシュのライブラリが画面の層で動く形（React の hook など）のときは、取得を use-case（Web は interactor）経由にすれば、キャッシュを画面の層に置いてよい
+- 既存のクライアントがこの構成でなければ、既存の構成と命名に合わせる。この構成へ移行するかは各リポジトリの Issue で決める
+- 手本のリポジトリは無い。要るようになったら、バックエンドのテンプレートと同じく別のリポジトリとして作る
+
+### Web（React の SPA）
+
+レイヤーの名前はバックエンドに揃える。
+
+| レイヤー | 置き場所 | 中身 | 依存してよい先 |
+|---|---|---|---|
+| model | `src/domain/model/` | エンティティ・値オブジェクト | なし |
+| use-case | `src/domain/use-case/` | `interactor/`（ユースケース。1 ユースケース 1 ファイル）、`gateway/`（外部依存の抽象。1 外部依存 1 ファイル）、`errors/` | model |
+| gateway | `src/gateway/<外部サービス名>/` | use-case の gateway の実装（API クライアント・ブラウザの保存領域など）、`errors/`。API の型からモデルへの変換と、サーバの状態の取得・キャッシュを含む | model・use-case |
+| presentation | `src/presentation/` | 画面（`pages/`）、部品（`components/`）、画面の状態 | model・use-case の interactor と errors |
+| app | `src/app/` | 起動、依存の組み立て（gateway の実装を生成して interactor に渡す）、ルーティングの登録 | すべて |
+
+presentation は、interactor を受け取る口（Context と hook、または props）を自分の中に置き、値は app が渡す。presentation は app を import しない。
+
+### モバイル（Flutter）
+
+公式の case study（https://docs.flutter.dev/app-architecture/case-study ）のパッケージ構成と名前を基にする。外れるのは、use-case の層を必須にして `lib/domain/use_cases/` に置くことと、repository の抽象を `lib/domain/repositories/` に置くこと（case study は domain に抽象の置き場所を設けていない）の 2 つ。原則の gateway は repository に当たる。
+
+| レイヤー | 置き場所 | 中身 | 依存してよい先 |
+|---|---|---|---|
+| model | `lib/domain/models/` | ドメインモデル | なし |
+| use-case | `lib/domain/use_cases/` | ユースケース（1 ユースケース 1 ファイル）、エラー型（`lib/domain/use_cases/errors/`。エラー型は model だけに依存する） | model・repository の抽象 |
+| repository の抽象 | `lib/domain/repositories/` | 外部依存の抽象（`abstract interface class`） | model・use-case のエラー型 |
+| data | `lib/data/repositories/`・`lib/data/services/`・`lib/data/model/` | repository の実装、service（API・プラットフォーム・ローカルファイルのラッパー）、API のモデル。API のモデルからドメインモデルへの変換、data のエラーから use-case のエラー型への変換と、サーバの状態の取得・キャッシュは repository の実装で行う | model・repository の抽象・use-case のエラー型 |
+| ui | `lib/ui/<feature>/view_models/`・`widgets/`（共通は `lib/ui/core/`） | view（widget）と view model。画面の状態は view model が持つ | model・use-case |
+| 組み立て・起動 | `lib/main.dart`・`lib/config/`・`lib/routing/` | 起動、依存の組み立て（repository の実装を生成して use-case に渡す）、ルーティング | すべて |
+
+補助の `lib/utils/` には、case study の Result・Command などを置く。環境ごとの起動（`main_<環境>.dart`）は組み立て・起動に含む。
