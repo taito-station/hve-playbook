@@ -94,7 +94,7 @@ kind 名前空間付き (`"defect:" + key` / `"judgment:" + key`) で
 - 「対応履歴」セクションの位置は `## Test plan` の直前 (`## ブラウザテスト` が
   ある場合はその後ろ)。create-pr Step 3 のテンプレートには書かず、初回はここで挿入する
 - 「対応履歴」セクションを追加または更新し、今巡の auto-fix /
-  escalate / silent-reject の件数と主な内訳を 3-5 行で要約
+  escalate / silent-reject の件数と主な内訳を、次巡のレビュアーと PR の読み手が経緯を追える程度に要約
 - 本巡 commit がある場合: `### N 巡目`
 - escalate 直行経路で commit 無しの場合: `### N 巡目 (escalate 中断
   / 理由: $ESCALATE_REASON)`
@@ -116,7 +116,7 @@ kind 名前空間付き (`"defect:" + key` / `"judgment:" + key`) で
 ### 1 巡目
 - depth: <lightweight|full|legacy> / ロール: <Correctness+Security|+Impact|A/B+FC>
 - 分類: auto-fix <件数> / silent-reject <件数> / escalate <件数>
-- 主な auto-fix: <短い箇条書き 2-3 件>
+- 主な auto-fix: <短い箇条書き>
 - silent-reject 内訳: <件数> 件 (主な理由: 事実誤認 N 件 / 主観 1 票 N 件)
 - escalate (あれば): <内容>
 - 収束キー解消: <件数> 件 (FIXED_KEYS_THIS_ROUND。Step 6 で RESOLVED_KEYS に反映)

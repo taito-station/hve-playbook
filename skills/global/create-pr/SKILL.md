@@ -21,7 +21,7 @@ allowed-tools: Read, Edit, Write, Grep, Glob, Bash, Agent, mcp__playwright__brow
 
 Step 5 で委譲する `review-pr` skill のレビュー構成 (`--depth` 指定時: Correctness / Security / Impact + Analyst、フラグなし: Reviewer A / B 2 名並列 + Fact-checker 1 名) と巡数上限を、create-pr 呼び出し側から独断で短縮してはならない (例: 「小さい修正だから 1 名で」「diff が少ないから 1 巡で」等)。
 
-短縮禁止の **正本・理由・実例・具体的に禁止される行動** は `skills/global/review-pr/SKILL.md` の「短縮禁止」セクション参照。create-pr 側は委譲時に短縮指示を渡さず、review-pr の判定に任せる。
+短縮禁止の **正本・理由・具体的に禁止される行動** は `skills/global/review-pr/SKILL.md` の「短縮禁止」セクション参照。create-pr 側は委譲時に短縮指示を渡さず、review-pr の判定に任せる。
 
 例外: `--depth` フラグによる ITER_MAX・観点の変更は「独断での短縮」に該当しない。これは workflow 設計レベルの決定（Issue の種別・承認された計画の分類に基づくパス分岐）であり、実行時の ad-hoc 判断ではないため。`--depth` フラグは resolve-issue skill が Issue の種別から、hve-implement skill（単独モード）が承認された計画の分類（バグ修正かそれ以外か）から決定し、create-pr 経由で review-pr に転送する。
 
@@ -173,7 +173,7 @@ echo "$BRANCH" > "$REPO_ROOT/docs/temp/.pr-body.owner"
   結果は `## ブラウザテスト` セクション (Step 4 の 8) と Test plan のテキストで記録する
   - **対象外**: `create-manual` が作る顧客向けマニュアル本体の埋め込み画像
     (`docs/images/issue-<number>/*.png` を `?raw=true` で参照) は、検証証跡では
-    なく成果物そのものなので従来どおりコミットする
+    なく成果物そのものなのでコミットする
 
 ##### 基本フォーマット
 
@@ -293,15 +293,13 @@ git diff --name-only "origin/$BASE"...HEAD | grep -E '\.(blade\.php|vue|tsx|jsx)
 2. **URL 推測 → 検証**: test plan 項目 + 変更画面 (route から逆引き) で `mcp__playwright__browser_navigate`
 3. **操作・検証**: 必要に応じて `mcp__playwright__browser_click` / `browser_type` / `browser_snapshot`
 4. **テストデータ作成は確認不要で自律実行**: 検証に必要なら artisan tinker / factory / 直接 DB 投入で作成して良い。ユーザーに「作ってよいか」を確認する必要はない — 実装内容を網羅的にテストするために必要なデータは自分で判断して作る。**ただし本番系 / 破壊的操作 (truncate / drop / migrate:fresh 等) は禁止**。ローカル DB はテスト用なのでデータ更新は自由
-5. **全操作パスを実行する**: 実装した機能の**全ての操作パス**をブラウザで実行する。
-   「テストデータが無い」「DB を変更してしまう」は理由にならない（項番 4 で作る）。
-   特に以下を飛ばさない:
+5. **全操作パスを実行する**: 実装した機能の**全ての操作パス**をブラウザで実行する
+   （必要なテストデータは項番 4 で作る）。対象:
    - **主要フロー（CRUD の全操作）**: 作成・表示・更新・削除がある機能なら全て実行
    - **状態遷移の全パス**: 予約→確認→完了、取消、エラー復帰など
    - **バリデーション**: 必須項目の空送信、不正値、境界値
    - **エッジケース**: 0 件時の表示、重複操作の防止
-   テスト完了報告時に「未実行のパスは無い」ことを確認する。
-   やむを得ず実行できないパスがある場合は理由と共に明示する（「やらなかった」ではなく「できない理由」を具体的に）
+   完了報告では未実行のパスが無いことを確かめ、実行できないパスがある場合は、そのパスと実行できない理由を明示する
 6. **失敗時のリトライ**:
    - 1 件でも失敗したら **修正してリトライ**
    - **同一ケースが** 3 回連続失敗したら、`rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/review-"*.diff "$REPO_ROOT/docs/temp/.cost-snapshot"` で中間ファイルを掃除してから **ユーザーに報告して停止** (別ケースの失敗とは合算しない)
@@ -394,12 +392,7 @@ Skill ツール経由で呼び出す:
 - `--depth lightweight` — バグ修正パス: Correctness + Security のみ、1 巡
 - `--depth full` — 機能追加パス: Correctness + Security + Impact、最大 3 巡
 
-create-pr 単独起動時（resolve-issue / hve-implement skill 経由でない場合）は `DEPTH_FLAG` なし = 現行動作（全観点、最大 5 巡）。
-
-**depth 独自付与の禁止**: create-pr が PR の内容・規模・難易度・変更ファイル種別を
-判断して独自に `--depth` を付与することは**禁止**する (Step 0 参照)。
-「skill ファイルだけの変更だから lightweight でよい」「diff が小さいから lightweight」
-等の ad-hoc 判断は短縮禁止ルールの適用対象。
+create-pr 単独起動時（resolve-issue / hve-implement skill 経由でない場合）は `DEPTH_FLAG` なし = legacy（全観点、最大 5 巡）。
 
 `review-pr` は内部で以下を全自動で実行する (詳細は
 `skills/global/review-pr/SKILL.md` 参照):
@@ -439,10 +432,6 @@ escalate は「人間の判断が要る」であって「成果物を捨てる�
 PR があればユーザーはブラウザで diff を見て判断でき、判断後に続きを再開できる。
 Step 8 の最終報告で escalate 内容と「ユーザー判断待ちである」ことを明記する。
 Step 10 の `AskUserQuestion` で escalate 内容を提示する。
-
-**採らない案**: 「escalate 時は push せず cleanup も skip する」案は採らない。
-理由: escalate 時も PR を作ることでユーザーが diff を確認でき、判断後に
-続きを再開できる。
 
 Step 9 に到達しない中断経路は 5 つあり、`docs/temp/` の扱いは経路ごとに違う:
 
@@ -585,11 +574,8 @@ fi
 
 ### Step 7: push + PR 作成
 
-3 つの小節に分かれる。**経路 B (force push) だけを独立した見出しにしてある**のは、
-「fix 経路に lease 付き force push が現れないこと」を固定する静的検査を置く場合に、
-「経路 B: force push」見出しの節だけを除外できるようにするため。経路 A の通常 push
-(7-1) と PR 作成 (7-2) は検査対象に残り、「経路 A は force を使わない」が検査で担保される。
-この小節の外に当該コマンド名を書くと検査が落ちる (意図どおり)。
+3 つの小節に分かれる。force push は「経路 B: force push」の小節だけで行い、
+経路 A の通常 push（7-1）と PR 作成（7-2）では force を使わない。
 
 #### Step 7-1: push
 
@@ -742,8 +728,6 @@ skill が「ユーザー確認を取って停止する」のは以下のとき�
 
 **正典は Step 4「実施判定 (OR 条件)」**。キーワード一覧と diff パターンをここに複製
 すると片方だけ更新されて食い違うため、Step 4 を参照する。
-
-判定の skip 判断は不要。条件が false でも実施したほうが安心な場合は実施して構わない。
 
 ---
 
