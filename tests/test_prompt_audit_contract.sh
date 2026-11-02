@@ -1,5 +1,5 @@
 #!/bin/bash
-# prompt audit（2026-11、対象モデル Claude Opus 5.5）で直した食い違いの契約検査（Issue #90）
+# prompt audit（2026-11、対象モデル Claude Opus 5.5）で直した箇所の契約検査（Issue #90・#91）
 #
 # 実行: bash tests/test_prompt_audit_contract.sh
 #
@@ -8,6 +8,7 @@
 #   - resolve-issue が独自の ADR テンプレートを持たず、様式を documentation-standards に任せる
 #   - CLAUDE.md が今のツール一覧に無いツール名（view）を挙げない
 #   - design pipeline の成果物の有無を確かめるだけの agent() は effort を low にする
+#   - CLAUDE.md の委譲の規則に条件（複数ファイルにまたがる調査）があり、Bash の規則から消した経緯の行（許可要求ログの件数）が戻らず、`cd` を使ってよい例外は残る
 
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -46,6 +47,12 @@ check "CLAUDE.md: 既知のファイルは直接 Read してよい" has "$CM" "�
 for s in ARD AAS AAD-WEB; do
     check "pipeline: ${s}:verify の effort が low" verify_low "$s"
 done
+
+# 5) CLAUDE.md の委譲の規則と経緯の記述（Issue #91 の A）
+check "CLAUDE.md: 調査の委譲に条件の無い既定を置かない" lacks "$CM" "- リサーチ・調査はサブエージェントに任せる"
+check "CLAUDE.md: 複数ファイルにまたがる調査を委譲し、単発の確認は自分で読む" has "$CM" "- 複数ファイルにまたがる調査は、サブエージェントに任せてメインのコンテキストを節約する（ファイル・シンボルが分かっている単発の確認は自分で読む）"
+check "CLAUDE.md: Bash の規則から消した経緯の行（許可要求ログの件数）が戻っていない" lacks "$CM" "許可要求ログ 257 件"
+check "CLAUDE.md: cd を使ってよい例外は残す" has "$CM" "どうしても作業ディレクトリを移す必要がある場合（\`npm ci\` など cwd 依存のもの）だけ \`cd\` を使う。"
 
 echo
 echo "結果: PASS=$pass FAIL=$fail"
