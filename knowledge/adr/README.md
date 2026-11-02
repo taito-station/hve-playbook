@@ -36,3 +36,4 @@
 | [0028](0028-fallback-when-user-level-skills-are-absent.md) | HVE の規則と hve-implement は、user-level の skill が無いときの代替をその場に書く | Accepted | 2026-10-25 |
 | [0029](0029-remove-gmail-search-from-uncertainty-check.md) | 不確定点チェックの回答探索から Gmail 検索を外す | Partially superseded by 0030-drop-past-gmail-qa-special-rules | 2026-10-31 |
 | [0030](0030-drop-past-gmail-qa-special-rules.md) | 過去に保存した source: gmail の Q&A の特例規定を外す | Accepted | 2026-10-31 |
+| [0031](0031-client-clean-architecture.md) | クライアントのクリーンアーキテクチャ規約を、Web（React）とモバイル（Flutter）に分けて定める | Accepted | 2026-10-31 |
