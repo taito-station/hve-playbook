@@ -18,7 +18,7 @@ allowed-tools: Read, Edit, Write, Grep, Glob, Bash, Agent, mcp__playwright__brow
 |---|---|---|---|
 | **lightweight** | Correctness + Security + Analyst | 1 | バグ修正の軽量パス |
 | **full** | Correctness + Security + Impact + Analyst | 3 | 機能追加のフルパス |
-| **(なし)** | Reviewer A / B + Fact-checker (後方互換) | 5 | 従来方式 |
+| **(なし)** | Reviewer A / B + Fact-checker (後方互換) | 5 | 観点を分けない全観点レビュー |
 
 ### MODE 決定ロジック (Step 0.2.5 で確定)
 
@@ -73,8 +73,8 @@ ITER_MAX 到達の解釈 (ITER_MAX > 1 の fix モード):
 
 ### 理由
 
-- 修正のコード量と影響範囲は比例しない。1 行の変更でも race condition / セキュリティ脆弱性を生むことはある (実例: わずか 1 行の変更で 2 巡目に `os.replace` の inode race を独立レビュアーが発見したケース、1 行の修正に 1 巡目で shell injection が見つかったケースがある)
-- 「簡素な修正は本当に簡素なら自然に 1-2 巡で収束する」のがこの skill の終了条件 (auto-fix 0 件で break) の意図。短縮判断を呼び出し側に持ち込むと、その判定基準自体がブレて一貫性が損なわれる (撤回後 2 巡で自然終了した実証例がある)
+- 修正のコード量と影響範囲は比例しない。1 行の変更でも race condition / セキュリティ脆弱性を生むことはある
+- 「簡素な修正は本当に簡素なら自然に 1-2 巡で収束する」のがこの skill の終了条件 (auto-fix 0 件で break) の意図。短縮判断を呼び出し側に持ち込むと、その判定基準自体がブレて一貫性が損なわれる
 - 過剰な巡数を恐れて短縮するくらいなら、終了条件を信じて回す方が安全
 
 ### 具体的に禁止される行動
@@ -91,7 +91,8 @@ ITER_MAX 到達の解釈 (ITER_MAX > 1 の fix モード):
 ## 重要原則
 
 1. レビューは **必ず別エージェント (Agent ツール経由) で実行する**。
-   コードを書いた自分自身でレビューするとバイアスが残るため。
+   コードを書いた自分自身でレビューするとバイアスが残るため。Skill ツールで
+   他のレビュー skill を呼ぶと同一コンテキストで走るので、レビュアーの代わりにしない。
 2. レビューは **ポジションロール方式** で実行する (`--depth` で構成が変わる):
    - **`--depth lightweight`**: Correctness + Security + Analyst (3 エージェント)
    - **`--depth full`**: Correctness + Security + Impact + Analyst (4 エージェント)
@@ -769,10 +770,6 @@ criticalDecisions 検証と主マーク再評価は行わない)。
 finding リストに追加する (`agreement = 1`、`factcheck = "verified"` 扱い。
 `convergence_key` と `kind` は Step 2.2 と同じ規則で付与し、`kind` 未指定は
 defect)。`FINDINGS` という最終リストを得る。これを Step 3 に渡す。
-
-**重要**: Skill ツールで他のレビュー skill を直接呼び出すと同一コンテキスト
-実行になりバイアスが残るため不可。必ず Agent ツールでレビュアー + Analyst を
-起動する。
 
 ### Step 3: 指摘分類
 
