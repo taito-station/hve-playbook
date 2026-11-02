@@ -58,7 +58,7 @@ const ardCheck = await agent(
 - docs/architectural-requirements-app-*.md（最低 1 ファイル）
 
 各ファイルの存在を ls で確認し、結果を報告してください。`,
-  { label: 'ARD:verify', phase: 'ARD', schema: ARTIFACT_CHECK_SCHEMA }
+  { label: 'ARD:verify', phase: 'ARD', schema: ARTIFACT_CHECK_SCHEMA, effort: 'low' }
 )
 
 if (!ardCheck.exists) {
@@ -99,7 +99,7 @@ const aasCheck = await agent(
 - docs/catalog/persona-catalog.md
 
 各ファイルの存在を ls で確認し、結果を報告してください。`,
-  { label: 'AAS:verify', phase: 'AAS', schema: ARTIFACT_CHECK_SCHEMA }
+  { label: 'AAS:verify', phase: 'AAS', schema: ARTIFACT_CHECK_SCHEMA, effort: 'low' }
 )
 
 if (!aasCheck.exists) {
@@ -136,7 +136,7 @@ const aadCheck = await agent(
 - docs/catalog/screen-service-consistency-report.md
 
 各ディレクトリの ls で確認し、結果を報告してください。`,
-  { label: 'AAD-WEB:verify', phase: 'AAD-WEB', schema: ARTIFACT_CHECK_SCHEMA }
+  { label: 'AAD-WEB:verify', phase: 'AAD-WEB', schema: ARTIFACT_CHECK_SCHEMA, effort: 'low' }
 )
 
 if (!aadCheck.exists) {
