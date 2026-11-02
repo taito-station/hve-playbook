@@ -73,10 +73,12 @@ python3 /tmp/embed-svg-to-md.py <入力.md> /tmp/pdf-source.md
 
 #### 3-1. 基本
 
+入力の Markdown を標準入力で渡し、PDF を標準出力から出力先へ直接書く（入力の隣に中間の `.pdf` を作らない）。手順 2（SVG 埋め込み）を通ったときだけ、`<入力.md>` の代わりに `/tmp/pdf-source.md` を渡す。`--basedir` には、どちらの場合も元の Markdown があるディレクトリを渡す（相対パスの画像を解決するため）。
+
 ```bash
-npx --yes md-to-pdf /tmp/pdf-source.md \
-  --pdf-options '{"format": "A4", "margin": {"top": "20mm", "bottom": "20mm", "left": "15mm", "right": "15mm"}}'
-cp /tmp/pdf-source.pdf <出力先.pdf>
+npx --yes md-to-pdf --basedir "<入力の Markdown があるディレクトリ>" \
+  --pdf-options '{"format": "A4", "margin": {"top": "20mm", "bottom": "20mm", "left": "15mm", "right": "15mm"}}' \
+  < "<入力.md>" > "<出力先.pdf>"
 ```
 
 #### 3-2. 相対パス画像 (`../images/foo.png` など)
