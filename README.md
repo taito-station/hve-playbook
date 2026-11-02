@@ -139,6 +139,8 @@ ARD (要件定義) → AAS (アーキテクチャ設計) → AAD-WEB (Web 詳細
 | `/review-pr` | 敵対的セルフレビュー（多観点・複数巡） |
 | `/commit-workflow` | Conventional Commits 準拠のコミット作成 |
 | `/resolve-issue` | Issue 分析から PR 作成までの一貫フロー |
+| `/next-issue` | 他セッションとの衝突・依存を見て、次に対応する open の Issue を推奨付きで選ぶ |
+| `/post-merge-cleanup` | マージ済みの作業ブランチ・worktree を片付けてデフォルトブランチを最新にする |
 
 ## Scripts
 
