@@ -41,6 +41,8 @@
       "Skill(questionnaire)",
       "Skill(pdf-read)",
       "Skill(review-permissions)",
+      "Skill(next-issue)",
+      "Skill(post-merge-cleanup)",
       "Bash(gh pr merge *)"
     ],
     "defaultMode": "acceptEdits"
