@@ -104,13 +104,30 @@ knowledge/ 配下の全文書を対象に、整合性を検査する。
 
 doc_class（文書分類）が定義されている場合、分類ごとの充足状況を検査する。
 
-1. knowledge/ 配下の全ファイルの `doc_class` を集計する
-2. 分類ごとにファイル数と status の内訳を報告する
-3. 以下を列挙する:
-   - `Tentative` ステータスのファイル一覧
-   - TBD が残っている箇所の一覧
-   - 文書が存在しない分類（doc_class が定義されている場合）
-4. 不足がある場合は QA 質問票の生成を提案する（ユーザー判断で実行）
+1. 集計はコマンドで取る。対象は check-knowledge.py と同じ（`knowledge/adr/` と `knowledge/README.md` は対象外）。frontmatter の `doc_class`・`status` と、TBD が残っている行番号を、文書ごとに 1 行（タブ区切り）で出す:
+   ```bash
+   python3 - <<'PY'
+   import pathlib, re
+   root = pathlib.Path("knowledge")
+   for p in sorted(root.rglob("*.md")):
+       rel = p.relative_to(root).as_posix()
+       if rel.startswith("adr/") or rel == "README.md":
+           continue
+       lines = p.read_text(encoding="utf-8").splitlines()
+       meta = {}
+       if lines and lines[0].strip() == "---":
+           for line in lines[1:]:
+               if line.strip() == "---":
+                   break
+               m = re.match(r"(doc_class|status):\s*(.*?)\s*(?:#.*)?$", line)
+               if m:
+                   meta[m.group(1)] = m.group(2).strip("\"'")
+       tbd = [str(i + 1) for i, line in enumerate(lines) if "TBD" in line]
+       print("\t".join([meta.get("doc_class", ""), meta.get("status", ""), str(p), "TBD:" + ",".join(tbd)]))
+   PY
+   ```
+2. 出力から、分類ごとのファイル数と status の内訳、`Tentative` のファイル一覧、TBD が残っている箇所、文書が存在しない分類（doc_class が定義されている場合）を報告する
+3. 不足がある場合は QA 質問票の生成を提案する（ユーザー判断で実行）
 
 **doc_class が未定義の場合**: 分類別集計をスキップし、status と TBD の集計のみ行う
 
