@@ -35,45 +35,25 @@ Markdown を PDF にする。基本生成 / SVG 埋め込み / 相対パス画�
 
 `md-to-pdf` はSVGの相対パス参照を正しく解決できない場合があるため、PythonスクリプトでSVGをbase64インラインに変換する。
 
-`/tmp/embed-svg-to-md.py` を作成して実行する:
-
-```python
-#!/usr/bin/env python3
-import base64, re, sys
-from pathlib import Path
-
-def main():
-    md_path = Path(sys.argv[1])
-    output_path = Path(sys.argv[2])
-    md_dir = md_path.parent
-    content = md_path.read_text(encoding='utf-8')
-
-    def replace_svg(match):
-        alt, src = match.group(1), match.group(2)
-        if not src.endswith('.svg'):
-            return match.group(0)
-        svg_path = (md_dir / src).resolve()
-        if not svg_path.exists():
-            return match.group(0)
-        b64 = base64.b64encode(svg_path.read_bytes()).decode('ascii')
-        return f'<img src="data:image/svg+xml;base64,{b64}" alt="{alt}" style="max-width:100%"/>'
-
-    content = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', replace_svg, content)
-    output_path.write_text(content, encoding='utf-8')
-
-if __name__ == '__main__':
-    main()
-```
+このスキル同梱の `embed-svg-to-md.py` を使う（場所は `assets/manual-style.css` と同じく `~/.claude/skills/pdf/` か `/etc/claude-defaults/skills/pdf/`）。出力は、`mktemp -d` で実行ごとに作る作業ディレクトリに書く（並走する別のセッションの出力や、前回の残りと取り違えないため）。
 
 ```bash
-python3 /tmp/embed-svg-to-md.py <入力.md> /tmp/pdf-source.md
+mktemp -d
 ```
+
+表示されたパスを `<作業ディレクトリ>` として控え、手順 3・4 で使う。
+
+```bash
+python3 ~/.claude/skills/pdf/embed-svg-to-md.py "<入力.md>" "<作業ディレクトリ>/pdf-source.md"
+```
+
+`~/.claude/skills/pdf/` に無ければ `/etc/claude-defaults/skills/pdf/embed-svg-to-md.py` に読み替える（スクリプトを別の場所に作り直さない）。終了コードが 0 でなければ手順 3 に進まず、手順 4 の片付けをして止まる。
 
 ### 3. PDF生成
 
 #### 3-1. 基本
 
-入力の Markdown を標準入力で渡し、PDF を標準出力から出力先へ直接書く（入力の隣に中間の `.pdf` を作らない）。手順 2（SVG 埋め込み）を通ったときだけ、`<入力.md>` の代わりに `/tmp/pdf-source.md` を渡す。`--basedir` には、どちらの場合も元の Markdown があるディレクトリを渡す（相対パスの画像を解決するため）。
+入力の Markdown を標準入力で渡し、PDF を標準出力から出力先へ直接書く（入力の隣に中間の `.pdf` を作らない）。手順 2（SVG 埋め込み）を通ったときだけ、`<入力.md>` の代わりに、その実行で作った `<作業ディレクトリ>/pdf-source.md` を渡す。`--basedir` には、どちらの場合も元の Markdown があるディレクトリを渡す（相対パスの画像を解決するため）。
 
 ```bash
 npx --yes md-to-pdf --basedir "<入力の Markdown があるディレクトリ>" \
@@ -148,6 +128,11 @@ CSS テンプレートが提供する Markdown → 見た目のマッピング:
 
 - `Read` ツールでPDFを開き、画像が正しく表示されていることを確認する
 - 日本語が中国語フォント (WenQuanYi Zen Hei) で出ていないか目視（後述「日本語フォントの落とし穴」）
+- 手順 2 を通ったときは、確認を済ませてから作業ディレクトリを消す。手順 2・3 が失敗して止まったときも消す。作業ディレクトリには手順 2 の出力しか置かないので、その出力と空のディレクトリだけを消す（パスを写し間違えても、別のディレクトリの中身を消さないため）:
+
+```bash
+rm -f "<作業ディレクトリ>/pdf-source.md" && rmdir "<作業ディレクトリ>"
+```
 
 ## 注意事項
 
