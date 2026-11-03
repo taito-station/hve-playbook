@@ -28,6 +28,9 @@ log('ARD（要件定義）を開始します')
 const ardParams = args || {}
 const companyName = ardParams.company_name || 'TBD'
 const targetBusiness = ardParams.target_business || ''
+const attachedDocs = Array.isArray(ardParams.attached_docs)
+  ? ardParams.attached_docs.join(', ')
+  : (ardParams.attached_docs || '')
 
 const ardResult = await agent(
   `HVE ARD ワークフローを実行してください。
@@ -40,6 +43,7 @@ const ardResult = await agent(
 - target_region: ${ardParams.target_region || 'TBD'}
 - analysis_purpose: ${ardParams.analysis_purpose || 'TBD'}
 - include_kpi_okr: ${ardParams.include_kpi_okr || false}
+- attached_docs: ${attachedDocs || '未指定'}
 
 スキルファイルを Read して手順に従ってください:
 1. Read .claude/skills/hve-ard/SKILL.md でワークフロー全体像を確認
