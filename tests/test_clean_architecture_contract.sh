@@ -1,5 +1,5 @@
 #!/bin/bash
-# クリーンアーキテクチャ共通規約のクライアントの節の契約検査（Issue #58）
+# クリーンアーキテクチャ共通規約のクライアントの節の契約検査（Issue #58・#101）
 #
 # 実行: bash tests/test_clean_architecture_contract.sh
 #
@@ -14,6 +14,10 @@
 #   - 「#58 で作る・決める」の記述が残っていない
 #   - 未定義の領域に、クライアントのライブラリの選択がある
 #   - 判断の ADR・一覧の行・質問票の記録がある
+#   - 認証情報と永続化したキャッシュの節（#101）に、保持の責務（データの層）、API クライアントが抽象を受け取る経路、
+#     端末への保存の原則（保護された領域・Web はスクリプトから読める領域に置かない）、破棄の責務（use-case が呼び、
+#     保持する層が消す。画面の層のキャッシュは画面の層が消す）があり、未定義の領域に hve-local で決める項目がある。
+#     #101 の ADR と一覧の行がある
 
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -87,6 +91,24 @@ ADR="$(ls "$ROOT"/knowledge/adr/[0-9][0-9][0-9][0-9]-client-clean-architecture.m
 check "Issue #58 の ADR がある（番号でなく slug で探す）" [ -n "$ADR" ]
 check "ADR 一覧に Issue #58 の ADR の行がある" grep -qF -- "-client-clean-architecture.md)" "$ROOT/knowledge/adr/README.md"
 check "質問票の記録がある" [ -f "$ROOT/qa/client-clean-architecture-questionnaire.md" ]
+
+# 7) 認証情報と永続化したキャッシュ（Issue #101）
+CRED="### 認証情報と永続化したキャッシュ"
+check "認証情報: クライアントの節に認証情報と永続化したキャッシュの節がある" section_has "$CA" "$CLIENT" "## " "$CRED"
+check "認証情報: データの層が保持する" section_has "$CA" "$CRED" "#" "データの層（Web は gateway の実装、Flutter は data の repository の実装と service）が保持し"
+check "認証情報: 画面の層と use-case は認証情報の値を受け取らない" section_has "$CA" "$CRED" "#" "画面の層と use-case は認証情報の値を受け取らず"
+check "認証情報: API クライアントは use-case 側の抽象を受け取って要求に付ける" section_has "$CA" "$CRED" "#" "use-case 側に置いた認証情報の抽象を受け取って要求に付ける"
+check "認証情報: 抽象の実装は app が差し込む" section_has "$CA" "$CRED" "#" "実装は app（組み立て・起動）が差し込む"
+check "認証情報: 端末に保存するときはプラットフォームが保護する保存領域を使う" section_has "$CA" "$CRED" "#" "プラットフォームが保護する保存領域"
+check "認証情報: 平文のファイルやスクリプトから読める領域に置かない" section_has "$CA" "$CRED" "#" "平文のファイルやスクリプトから読める領域に置かない"
+check "認証情報: Web はスクリプトから読める保存領域に置かない" section_has "$CA" "$CRED" "#" "Web はスクリプトから読める保存領域（localStorage・sessionStorage など）に認証情報を置かず"
+check "破棄: ログアウト・ユーザー切り替えのユースケースが破棄を呼ぶ" section_has "$CA" "$CRED" "#" "ログアウト・ユーザー切り替えのユースケース（use-case の層）が、認証情報・サーバの状態のキャッシュ・ローカルの保存の破棄を"
+check "破棄: 消す処理の実装は保持しているデータの層が持つ" section_has "$CA" "$CRED" "#" "消す処理の実装は保持しているデータの層が持つ"
+check "破棄: 画面の層で動くキャッシュは画面の層がユースケースの完了に合わせて消す" section_has "$CA" "$CRED" "#" "画面の層がログアウト・ユーザー切り替えのユースケースの完了に合わせて消す"
+check "未定義の領域: 認証情報を保存する端末の領域とライブラリ" section_has "$CA" "## 未定義の領域" "## " "クライアントが認証情報を保存する端末の領域とライブラリ"
+ADR101="$(ls "$ROOT"/knowledge/adr/[0-9][0-9][0-9][0-9]-client-credential-storage-and-cache-disposal.md 2>/dev/null | head -1)"
+check "Issue #101 の ADR がある（番号でなく slug で探す）" [ -n "$ADR101" ]
+check "ADR 一覧に Issue #101 の ADR の行がある" grep -qF -- "-client-credential-storage-and-cache-disposal.md)" "$ROOT/knowledge/adr/README.md"
 
 echo
 echo "passed: $pass, failed: $fail"

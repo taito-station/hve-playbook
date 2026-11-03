@@ -37,3 +37,4 @@
 | [0029](0029-remove-gmail-search-from-uncertainty-check.md) | 不確定点チェックの回答探索から Gmail 検索を外す | Partially superseded by 0030-drop-past-gmail-qa-special-rules | 2026-10-31 |
 | [0030](0030-drop-past-gmail-qa-special-rules.md) | 過去に保存した source: gmail の Q&A の特例規定を外す | Accepted | 2026-10-31 |
 | [0031](0031-client-clean-architecture.md) | クライアントのクリーンアーキテクチャ規約を、Web（React）とモバイル（Flutter）に分けて定める | Accepted | 2026-10-31 |
+| [0032](0032-client-credential-storage-and-cache-disposal.md) | クライアントの認証情報の保持と永続化したキャッシュの破棄の責務を、データの層と use-case に置く | Accepted | 2026-11-03 |
