@@ -21,6 +21,8 @@ Markdown を PDF にする。基本生成 / SVG 埋め込み / 相対パス画�
 
 ## 手順
 
+コマンド例の `"<…>"` は、パスに置き換えるプレースホルダ。ダブルクォートの中でもシェルは `$`・`` ` ``・`"`・`\` を解釈する（`$(…)` やバッククォートはコマンドとして実行される）。パスに `$`・`` ` ``・`"`・`\` が含まれるときは、それぞれの直前に `\` を付けてから置き換える（例: `資料 $(v2).md` → `"資料 \$(v2).md"`）。
+
 ### 1. drawio → SVG 変換（drawioファイルが更新されている場合）
 
 `hooks/run-drawio-export.sh` を Xvfb 経由で呼ぶラッパーとして用意してある。
@@ -63,7 +65,7 @@ npx --yes md-to-pdf --basedir "<入力の Markdown があるディレクトリ>"
 
 #### 3-2. 相対パス画像 (`../images/foo.png` など)
 
-`--basedir` を **必ず指定** する。指定しないと相対パス画像が PDF に埋め込まれない（テキストのみ通る）。
+`--basedir` を **必ず指定** する。指定しないと相対パス画像が PDF に埋め込まれない（テキストのみ通る）。`cd` してから渡すので、`<入力.md>` には、`<md があるディレクトリ>` から見たファイル名を入れる。
 
 ```bash
 cd "<md があるディレクトリ>" && npx --yes md-to-pdf "<入力.md>" \
@@ -153,15 +155,16 @@ font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo",
 
 ```bash
 python3 -c "
+import sys
 from pypdf import PdfReader
-r = PdfReader('<出力.pdf>')
+r = PdfReader(sys.argv[1])
 fonts = set()
 for p in r.pages:
     if '/Resources' in p and '/Font' in p['/Resources']:
         for fr in p['/Resources']['/Font'].values():
             f = fr.get_object() if hasattr(fr,'get_object') else fr
             fonts.add(str(f.get('/BaseFont')))
-print(fonts)"
+print(fonts)" "<出力.pdf>"
 ```
 
 期待値: `IPAPGothic` または Hiragino/Yu Gothic 等が含まれている。`WenQuanYi` のみだった場合は CSS 修正が必要。
