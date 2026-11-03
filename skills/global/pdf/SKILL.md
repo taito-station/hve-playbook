@@ -26,7 +26,7 @@ Markdown を PDF にする。基本生成 / SVG 埋め込み / 相対パス画�
 `hooks/run-drawio-export.sh` を Xvfb 経由で呼ぶラッパーとして用意してある。
 
 ```bash
-~/.claude/hooks/run-drawio-export.sh <入力.drawio> <出力.svg>
+~/.claude/hooks/run-drawio-export.sh "<入力.drawio>" "<出力.svg>"
 ```
 
 複数ファイルを変換する場合はループで順次呼ぶ。`drawio` CLI と `Xvfb` が前提。
@@ -66,8 +66,8 @@ npx --yes md-to-pdf --basedir "<入力の Markdown があるディレクトリ>"
 `--basedir` を **必ず指定** する。指定しないと相対パス画像が PDF に埋め込まれない（テキストのみ通る）。
 
 ```bash
-cd <md があるディレクトリ> && npx --yes md-to-pdf manual.md \
-  --basedir <共通ルート> \
+cd "<md があるディレクトリ>" && npx --yes md-to-pdf "<入力.md>" \
+  --basedir "<共通ルート>" \
   --pdf-options '{"format":"A4","printBackground":true,"preferCSSPageSize":true}' \
   --launch-options '{"args":["--no-sandbox","--disable-dev-shm-usage"]}'
 ```
@@ -77,8 +77,8 @@ cd <md があるディレクトリ> && npx --yes md-to-pdf manual.md \
 このスキル同梱の `assets/manual-style.css` を `--stylesheet` で渡すと、章扉/赤ヘッダ/コールアウト/番号付き表/ページ番号フッタなどの体裁が一発で揃う。
 
 ```bash
-npx --yes md-to-pdf <md> \
-  --basedir <共通ルート> \
+npx --yes md-to-pdf "<入力.md>" \
+  --basedir "<共通ルート>" \
   --stylesheet ~/.claude/skills/pdf/assets/manual-style.css \
   --pdf-options '{"format":"A4","printBackground":true,"preferCSSPageSize":true}' \
   --launch-options '{"args":["--no-sandbox","--disable-dev-shm-usage"]}'
