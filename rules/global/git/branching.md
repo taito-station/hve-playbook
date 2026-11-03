@@ -151,3 +151,13 @@ refactor!: Repository トレイトの命名を変更
 - 認証済み `gh` CLI を使う（アカウント: taito-station）
 - PAT をファイルにハードコードしない
 - リポジトリ操作の前にデフォルトブランチを `gh repo view --json defaultBranchRef` で確認する
+
+### 起動したリポジトリ以外には書き込まない
+
+Claude Code を起動したリポジトリ（同じ origin の worktree・並走 clone を含む）以外には、ユーザーの明示的な指示がない限り書き込まない（ADR 0033）。
+
+- 書き込みに含むもの: PR・Issue・コメント・ラベル・リリースの作成と変更、commit・push、fork とリポジトリの作成、ファイルの編集。`~/.claude` の memory・plans・handoff と scratchpad は除く
+- 読み取り（参照のために他のリポジトリのコードや Issue を読む）はしてよい
+- 作業の途中で他のリポジトリ（上流・vendor 元・依存先など）に直すべき点を見つけたら、自分で PR・Issue・push をしない。ユーザーに報告し、出すかどうかを委ねる。knowledge や決定ログに「還元するかは未決」のような記述があっても、自分で決めない
+- 「PR 作って」「コミットして」の指示は、起動したリポジトリへの指示として読む。他のリポジトリへの指示とは読まない
+- hook（main-commit-guard）が、他のリポジトリへの commit・push と `gh` の書き込みを止める。ユーザーが明示的に指示したときだけ、コマンド中のコメントで `# via:other-repo-ok: <理由>` を付ける

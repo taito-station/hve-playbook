@@ -38,3 +38,4 @@
 | [0030](0030-drop-past-gmail-qa-special-rules.md) | 過去に保存した source: gmail の Q&A の特例規定を外す | Accepted | 2026-10-31 |
 | [0031](0031-client-clean-architecture.md) | クライアントのクリーンアーキテクチャ規約を、Web（React）とモバイル（Flutter）に分けて定める | Accepted | 2026-10-31 |
 | [0032](0032-client-credential-storage-and-cache-disposal.md) | クライアントの認証情報の保持と永続化したキャッシュの破棄の責務を、データの層と use-case に置く | Accepted | 2026-11-03 |
+| [0033](0033-block-writes-outside-launched-repository.md) | 起動したリポジトリ以外への書き込みを、規則と main-commit-guard で止める | Accepted | 2026-11-04 |
