@@ -21,12 +21,17 @@ Markdown を PDF にする。基本生成 / SVG 埋め込み / 相対パス画�
 
 ## 手順
 
+コマンド例のダブルクォートの中の `<…>` は、パスに置き換えるプレースホルダ。外部から受け取ったファイル名を字面どおり入れると、コマンドとして実行されたり、オプションとして読まれたりするので、置き換えるときは次の 2 つを守る:
+
+- ダブルクォートの中でもシェルは `$`・`` ` ``・`"`・`\` を解釈する（`$(…)` やバッククォートはコマンドとして実行される）。パスに `$`・`` ` ``・`"`・`\` が含まれるときは、それぞれの直前に `\` を付けてから置き換える（例: `資料 $(v2).md` → `"資料 \$(v2).md"`、`` 図 `a` "b".md `` → `` "図 \`a\` \"b\".md" ``）
+- 相対パスは `./` で始める（`-` で始まる名前がオプションとして読まれないため。例: `--config-file=x.md` → `"./--config-file=x.md"`）。絶対パスはそのままでよい
+
 ### 1. drawio → SVG 変換（drawioファイルが更新されている場合）
 
 `hooks/run-drawio-export.sh` を Xvfb 経由で呼ぶラッパーとして用意してある。
 
 ```bash
-~/.claude/hooks/run-drawio-export.sh <入力.drawio> <出力.svg>
+~/.claude/hooks/run-drawio-export.sh "<入力.drawio>" "<出力.svg>"
 ```
 
 複数ファイルを変換する場合はループで順次呼ぶ。`drawio` CLI と `Xvfb` が前提。
@@ -51,6 +56,8 @@ python3 ~/.claude/skills/pdf/embed-svg-to-md.py "<入力.md>" "<作業ディレ�
 
 ### 3. PDF生成
 
+手順 2（SVG 埋め込み）を通ったときは、3-1 の形で生成する。3-2・3-3 の形は入力の隣に PDF を書くので、作業ディレクトリの `pdf-source.md` を渡すと PDF が作業ディレクトリにでき、手順 4 の片付けが失敗する。体裁の CSS が要るときは、3-1 のコマンドに 3-3 の `--stylesheet` を足す。3-2・3-3 の `<入力.md>` は元の Markdown を指す。
+
 #### 3-1. 基本
 
 入力の Markdown を標準入力で渡し、PDF を標準出力から出力先へ直接書く（入力の隣に中間の `.pdf` を作らない）。手順 2（SVG 埋め込み）を通ったときだけ、`<入力.md>` の代わりに、その実行で作った `<作業ディレクトリ>/pdf-source.md` を渡す。`--basedir` には、どちらの場合も元の Markdown があるディレクトリを渡す（相対パスの画像を解決するため）。
@@ -63,11 +70,11 @@ npx --yes md-to-pdf --basedir "<入力の Markdown があるディレクトリ>"
 
 #### 3-2. 相対パス画像 (`../images/foo.png` など)
 
-`--basedir` を **必ず指定** する。指定しないと相対パス画像が PDF に埋め込まれない（テキストのみ通る）。
+`--basedir` を **必ず指定** する。指定しないと相対パス画像が PDF に埋め込まれない（テキストのみ通る）。`cd` してから渡すので、`<入力.md>` には `<md があるディレクトリ>` の中のファイル名を入れ、`<共通ルート>` を相対パスで書くときも `<md があるディレクトリ>` から見たパスにする。
 
 ```bash
-cd <md があるディレクトリ> && npx --yes md-to-pdf manual.md \
-  --basedir <共通ルート> \
+cd "<md があるディレクトリ>" && npx --yes md-to-pdf "./<入力.md>" \
+  --basedir "<共通ルート>" \
   --pdf-options '{"format":"A4","printBackground":true,"preferCSSPageSize":true}' \
   --launch-options '{"args":["--no-sandbox","--disable-dev-shm-usage"]}'
 ```
@@ -77,8 +84,8 @@ cd <md があるディレクトリ> && npx --yes md-to-pdf manual.md \
 このスキル同梱の `assets/manual-style.css` を `--stylesheet` で渡すと、章扉/赤ヘッダ/コールアウト/番号付き表/ページ番号フッタなどの体裁が一発で揃う。
 
 ```bash
-npx --yes md-to-pdf <md> \
-  --basedir <共通ルート> \
+npx --yes md-to-pdf "<入力.md>" \
+  --basedir "<共通ルート>" \
   --stylesheet ~/.claude/skills/pdf/assets/manual-style.css \
   --pdf-options '{"format":"A4","printBackground":true,"preferCSSPageSize":true}' \
   --launch-options '{"args":["--no-sandbox","--disable-dev-shm-usage"]}'
@@ -149,19 +156,20 @@ font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo",
 
 このスキル同梱の `assets/manual-style.css` には既に IPAPGothic フォールバックが入っている。
 
-**確認方法**:
+**確認方法**（`"<出力.pdf>"` は「手順」の冒頭の規則に従って置き換える）:
 
 ```bash
 python3 -c "
+import sys
 from pypdf import PdfReader
-r = PdfReader('<出力.pdf>')
+r = PdfReader(sys.argv[1])
 fonts = set()
 for p in r.pages:
     if '/Resources' in p and '/Font' in p['/Resources']:
         for fr in p['/Resources']['/Font'].values():
             f = fr.get_object() if hasattr(fr,'get_object') else fr
             fonts.add(str(f.get('/BaseFont')))
-print(fonts)"
+print(fonts)" "<出力.pdf>"
 ```
 
 期待値: `IPAPGothic` または Hiragino/Yu Gothic 等が含まれている。`WenQuanYi` のみだった場合は CSS 修正が必要。
