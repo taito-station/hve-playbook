@@ -156,7 +156,8 @@ refactor!: Repository トレイトの命名を変更
 
 Claude Code を起動したリポジトリ（同じ origin の worktree・並走 clone を含む）以外には、ユーザーの明示的な指示がない限り書き込まない（ADR 0033）。
 
-- 書き込みに含むもの: PR・Issue・コメント・ラベル・リリースの作成と変更、commit・push、fork とリポジトリの作成、ファイルの編集。`~/.claude` の memory・plans・handoff と scratchpad は除く
+- 書き込みに含むもの: 他のリポジトリ（作業ツリーとその remote・GitHub 上のリポジトリ）への PR・Issue・コメント・ラベル・リリースの作成と変更、commit・push、fork とリポジトリの作成、ファイルの編集
+- 書き込みに含まないもの: `~/.claude` の memory・plans・handoff と scratchpad、検証のために自分で作った remote の無い一時リポジトリ、skill の手順が定める書き込み先（update-config の `~/.claude/settings.json`、learn の vault、setup.sh の導入先など。ユーザーの指示でその skill を使うとき）
 - 読み取り（参照のために他のリポジトリのコードや Issue を読む）はしてよい
 - 作業の途中で他のリポジトリ（上流・vendor 元・依存先など）に直すべき点を見つけたら、自分で PR・Issue・push をしない。ユーザーに報告し、出すかどうかを委ねる。knowledge や決定ログに「還元するかは未決」のような記述があっても、自分で決めない
 - 「PR 作って」「コミットして」の指示は、起動したリポジトリへの指示として読む。他のリポジトリへの指示とは読まない

@@ -115,6 +115,7 @@ run "B6: リポジトリ外" allowed 'git commit -m x' "$TMP/norepo"
 run "B8: cwd が main でも -C が作業ブランチを指せば通す" allowed "git -C $TMP/feature commit -m x" "$TMP/main"
 run "B25: cd で作業ブランチのリポジトリに移ってから commit" allowed "cd $TMP/feature && git commit -m x" "$TMP/main"
 run "B12: 理由付きの via" allowed 'git commit -m x # via:main-commit-ok: 初期化のため' "$TMP/main"
+run "B58: 他の via と並べた via" allowed 'git commit -m x # via:create-pr # via:main-commit-ok: 初期化のため' "$TMP/main"
 run "B31: 同じ行のコメントの中の commit" allowed 'git status # ok; git commit -m x' "$TMP/main"
 run "B15: commit 以外の git" allowed 'git status' "$TMP/main"
 run "B16: commit が subcommand でない" allowed 'git log --grep commit' "$TMP/main"
@@ -202,6 +203,59 @@ run "R41: gh api の {owner}/{repo} は実行するディレクトリで解決�
 run "R42: gh の書き込みでないサブコマンド（auth・run view）" oallowed 'gh auth setup-git && gh run view 1 -R up/b'
 
 # main の commit の判定は、CLAUDE_PROJECT_DIR があっても変わらない
+# エイリアスと書き込みのサブコマンド
+run "R60: gh pr new（create のエイリアス）" oblocked 'gh pr new --repo up/b --fill'
+run "R61: gh issue new" oblocked 'gh issue new --repo up/b --title t --body x'
+run "R62: gh release new" oblocked 'gh release new v1 --repo up/b'
+run "R63: gh repo new" oblocked 'gh repo new me/x --private'
+run "R64: gh pr lock" oblocked 'gh pr lock 1 --repo up/b'
+run "R65: gh issue develop（リモートにブランチを作る）" oblocked 'gh issue develop 1 --repo up/b'
+run "R66: gh workflow run" oblocked 'gh workflow run ci.yml --repo up/b'
+run "R67: gh secret set" oblocked 'gh secret set X --repo up/b --body y'
+run "R68: gh repo deploy-key add" oblocked 'gh repo deploy-key add k.pub --repo up/b'
+run "R69: 前置の GH_REPO=" oblocked 'GH_REPO=up/b gh pr create --fill'
+run "R70: サブコマンドの前に置いた --repo" oblocked 'gh pr --repo up/b create --fill'
+run "R71: gh issue transfer の移す先" oblocked 'gh issue transfer 1 up/b'
+run "R72: 引数なしの gh repo fork（新しいリポジトリを作る）" oblocked 'gh repo fork --clone=false'
+# git push の宛先（git と同じ決め方）
+_repo_at "$TMP/ws/a-pd" https://github.com/me/a.git
+git -C "$TMP/ws/a-pd" remote add upstream https://github.com/up/b.git
+git -C "$TMP/ws/a-pd" config remote.pushDefault upstream
+_repo_at "$TMP/ws/a-trk" https://github.com/me/a.git
+git -C "$TMP/ws/a-trk" remote add upstream https://github.com/up/b.git
+git -C "$TMP/ws/a-trk" config branch.feat/x.remote upstream
+_repo_at "$TMP/ws/a-pu" https://github.com/me/a.git
+git -C "$TMP/ws/a-pu" config remote.origin.pushurl https://github.com/up/b.git
+run "R73: remote.pushDefault が別のリポジトリを指す素の git push" oblocked 'git push' "$TMP/ws/a-pd"
+run "R74: 追跡先が別のリポジトリの素の git push" oblocked 'git push' "$TMP/ws/a-trk"
+run "R75: origin の pushurl が別のリポジトリ" oblocked 'git push origin feat/x' "$TMP/ws/a-pu"
+run "R76: git push --repo upstream" oblocked 'git push --repo upstream'
+run "R77: git push --repo=upstream" oblocked 'git push --repo=upstream'
+# fork の clone: gh の既定の宛先（gh-resolved=base）は親
+_repo_at "$TMP/ws/fork" https://github.com/me/b.git
+git -C "$TMP/ws/fork" remote add upstream https://github.com/up/b.git
+git -C "$TMP/ws/fork" config remote.upstream.gh-resolved base
+run "R78: fork の clone で --repo 無しの gh pr create（親へ向かう）" oblocked 'gh pr create --fill' "$TMP/ws/fork" "$TMP/ws/fork"
+# gh api のパス
+run "R79: gh api の {owner} だけを置き換えたパス" oblocked 'gh api -X POST repos/{owner}/b/issues -f title=t'
+run "R80: gh api の完全な URL" oblocked 'gh api https://api.github.com/repos/up/b/issues -X POST -f title=t'
+run "R81: gh api の /user/repos への POST（リポジトリの作成）" oblocked 'gh api -X POST /user/repos -f name=x'
+run "R82: gh api の値を詰めた -f（POST になる）" oblocked 'gh api repos/up/b/issues -ftitle=t'
+
+# 通す
+run "R90: via を他の via と並べる" oallowed 'gh issue create --repo up/b --title t --body x # via:create-issue # via:other-repo-ok: ユーザーが指示'
+run "R91: --help（読み取り）" oallowed 'gh repo create --help && gh pr create -h'
+run "R92: 宛先にシェルの変数を含む gh api（値が分からないので判定しない）" oallowed 'gh api -X POST "repos/$OWNER_REPO/issues/1/comments" -f body=x'
+run "R93: 宛先にシェルの変数を含む --repo" oallowed 'gh pr edit 1 --repo "$OWNER/$REPO" --body-file f'
+run "R94: サブシェルの中の cd はサブシェルの外に効かない" oallowed "(cd $TMP/ws/b && git log -1) && git commit -m x"
+run "R95: 書き込みでない gh repo deploy-key list・サブコマンドの前の --repo の読み取り" oallowed 'gh repo deploy-key list --repo up/b && gh pr --repo up/b view 1'
+run "R96: 起動したリポジトリに origin が無い" oallowed "git -C $TMP/ws/b commit -m x" "$TMP/ws/local" "$TMP/ws/local"
+# ssh の別名ホスト（git@github-work:me/a）の clone: host の無い宛先は起動したリポジトリの host とみなす
+_repo_at "$TMP/ws/alias" git@github-work:me/a.git
+run "R97: ssh の別名ホストの clone で、自分のリポジトリへの gh の書き込み" oallowed 'gh pr create --repo me/a --fill && gh api -X PATCH repos/me/a/pulls/1 -f body=x' "$TMP/ws/alias" "$TMP/ws/alias"
+run "R98: ssh の別名ホストの clone でも、別のリポジトリは止める" oblocked 'gh pr create --repo up/b --fill' "$TMP/ws/alias" "$TMP/ws/alias"
+run "R99: fork の clone で --repo に fork 自身を明示" oallowed 'gh pr edit 1 --repo me/b --body-file f' "$TMP/ws/fork" "$TMP/ws/fork"
+
 mblocked() { [ "$(_rc_in "$1" "$2" "$3")" = "2" ] && grep -q "main-commit-ok" "$TMP/stderr"; }
 run "R50: 起動したリポジトリの main 上の commit は main-commit として止める" mblocked 'git commit -m x' "$TMP/main" "$TMP/main"
 

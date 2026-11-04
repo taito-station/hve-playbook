@@ -118,7 +118,7 @@ Issue本文に `##` などの `#` で始まる行が含まれると、Claude Cod
 
 一時ファイルの配置先: `docs/temp/issue-body.md`
 
-種別に応じたラベルを `--label` で付与する:
+種別に応じたラベルを `--label` で付与する。`<owner>/<repo>` は起動したリポジトリにする。別のリポジトリに起票するのはユーザーが明示的に指示したときだけで、そのときはコマンドの末尾のコメントに `# via:other-repo-ok: <理由>` を足す（main-commit-guard が他のリポジトリへの書き込みを止める。branching.md の「起動したリポジトリ以外には書き込まない」）:
 
 ```bash
 # Writeツールで docs/temp/issue-body.md を作成（Step 3 のテンプレートを使用）

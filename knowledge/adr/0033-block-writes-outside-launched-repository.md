@@ -45,13 +45,17 @@ PR は 2026-11-03 に上流のメンテナーが閉じた。閉じられたこ�
   - 他のリポジトリに直すべき点を見つけたら、ユーザーに報告して委ねる
 - **hook**: `hooks/main-commit-guard.py`（PreToolUse、matcher `Bash`）に判定を足す
   - 起動したリポジトリは `CLAUDE_PROJECT_DIR` の origin を `host/owner/repo` にそろえたもの。無い・リポジトリでない・origin が無いときは判定しない
+  - host の無い宛先（`--repo OWNER/REPO`・`gh api repos/...`）は、起動したリポジトリの host とみなす（ssh の別名ホストの clone や GHE で、自分のリポジトリを止めないため。セルフレビューの F5 でユーザーが決めた）
   - 止めるもの:
-    - `git commit`: 判定するリポジトリの origin が違うとき。判定するリポジトリは main の判定と同じく `git -C`・`cd`・`env -C` を追う。origin の無いリポジトリは通す
-    - `git push`: 宛先の remote の URL が違うとき
-    - `gh` の書き込み（pr・issue・label・release・repo の作成と変更）: 宛先が違うとき。宛先は `-R`・`--repo`、引数の URL、無ければ実行するディレクトリの origin
-    - `gh api` の書き込み: パスの `repos/<owner>/<repo>` が違うとき
-  - 読み取りは通す
-  - 逃げ道は `# via:other-repo-ok: <理由>`（理由必須）。main の `# via:main-commit-ok:` とは別で、片方でもう片方は通らない
+    - `git commit`: 判定するリポジトリの origin が違うとき。判定するリポジトリは main の判定と同じく `git -C`・`cd`・`env -C` を追う（サブシェルの中の `cd` は外へ持ち出さない）。origin の無いリポジトリは通す
+    - `git push`: 宛先の remote の push の URL が違うとき。remote は位置引数・`--repo`、無ければ git と同じく pushRemote → pushDefault → 追跡先 → origin の順で決める
+    - `gh` の書き込み: 宛先が違うとき。対象は pr・issue・label・release・repo の作成と変更（エイリアスの `new` を含む）と、workflow・run・secret・variable・cache の書き込み。宛先は、引数の URL、`-R`・`--repo`、前置の `GH_REPO=`、`gh issue transfer` の移す先、無ければ gh の既定の宛先
+    - gh の既定の宛先は `remote.<name>.gh-resolved` の remote（`gh repo fork`・`gh repo set-default` が付ける）で、無ければ origin。fork の clone では親が既定の宛先になるので、親への `--repo` 無しの PR も止まる（セルフレビューの F6 でユーザーが決めた。今回の事例と同じ形を止めるため）
+    - `gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める
+    - `gh api` の書き込み: パスの `repos/<owner>/<repo>`（完全な URL を含む）が違うとき。`user/repos`・`orgs/<org>/repos` への POST も止める
+  - 読み取りと `-h`・`--help` は通す。宛先にシェルの変数・コマンド置換を含むときは、値が分からないので判定しない
+  - 逃げ道は `# via:other-repo-ok: <理由>`（理由必須）。main の `# via:main-commit-ok:` とは別で、片方でもう片方は通らない。コメントの中で他の via（`# via:create-pr` など）と並べてよい（main-commit-ok も同じ）
+  - block の message は、規則の正本の小見出し「起動したリポジトリ以外には書き込まない」を指す。規則は branching.md の「GitHub 操作」の下に置いたまま（セルフレビューの F8 でユーザーが決めた）
 - 契約は `tests/test_main_commit_guard.sh` で固定する（今回の事例の再現を含む）
 
 ### 結果（Consequences）
@@ -61,10 +65,11 @@ PR は 2026-11-03 に上流のメンテナーが閉じた。閉じられたこ�
   - 同じリポジトリの worktree・並走 clone・remote の無い一時リポジトリでの作業と、他のリポジトリの読み取りは止まらない
 - 悪い結果・既知の限界:
   - hook は Bash の `git` と `gh` だけを見る。他のリポジトリのファイルの Edit・Write と、`gh` 以外の手段（`curl` での API 呼び出しなど）は、規則の文面に頼る
-  - main-commit-guard と同じ best-effort の静的判定で、Claude Code がふだん出す形を対象にする。変数・コマンド置換を介したパスやリポジトリ名は見逃し、分割に失敗したコマンドは通す（ADR 0020 と同じく、限界は個別に列挙しない）
-  - fork の clone では、`gh` が `--repo` 無しに親のリポジトリへ向かうことがある。これは追わず、実行するディレクトリの origin で判定する
+  - `gh api graphql` の mutation は追わない（パスにリポジトリが無く、本文から宛先を決めるのは過剰。skill の手順にも graphql の書き込みは無い）
+  - `git cherry-pick`・`merge`・`revert`・`am` など、commit 以外でコミットを作るサブコマンドは追わない。外へ出すのは push なので、そこで止まる（セルフレビューの F17 でユーザーが決めた）
+  - main-commit-guard と同じ best-effort の静的判定で、Claude Code がふだん出す形を対象にする。変数・コマンド置換を介したパスやリポジトリ名は判定せずに通し、分割に失敗したコマンドも通す（ADR 0020 と同じく、限界は個別に列挙しない）
   - 起動したディレクトリが git リポジトリでないとき（`~/workspace` で起動したなど）は判定しない
-  - Bash の呼び出しのうち `commit`・`push`・`gh` を文字として含むものは、main-commit-guard が解析に進むようになった。起動したリポジトリの origin を求める git の呼び出しは、`git commit`・`git push`・`gh` のセグメントがあるときだけ行う
+  - Bash の呼び出しのうち `commit`・`push` を含むか、単語の `gh` を含むものは、main-commit-guard が解析に進むようになった。起動したリポジトリの origin を求める git の呼び出しは、書き込みの宛先が分かったときだけ行う
   - 目的は善意の誤操作の防止で、意図的な迂回への防御ではない（ADR 0020 と同じ）
 
 ## 選択肢の評価（Pros and Cons）
