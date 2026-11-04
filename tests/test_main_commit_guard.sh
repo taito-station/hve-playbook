@@ -275,6 +275,27 @@ run "R111: サブシェルの中の export はサブシェルの外に効かな�
 run "R112: 本文に書いた URL は宛先と読まない" oallowed 'gh pr comment 1 --body https://github.com/up/b/pull/4'
 run "R113: ssh の別名ホストの clone で、github.com の URL を指定した自分のリポジトリへの書き込み" oallowed 'gh pr comment https://github.com/me/a/pull/1 --body x && gh api -X POST https://api.github.com/repos/me/a/issues -f title=t' "$TMP/ws/alias" "$TMP/ws/alias"
 run "R114: 別名ホストの並走 clone での commit（起動したリポジトリは github.com）" oallowed "git -C $TMP/ws/alias commit -m x"
+# 3 巡目の指摘
+# 起動したリポジトリで、作業ブランチの追跡先が upstream（`git switch -c x upstream/main` など）
+_repo_at "$TMP/ws/a-trk-up" https://github.com/me/a.git
+git -C "$TMP/ws/a-trk-up" remote add upstream https://github.com/up/b.git
+git -C "$TMP/ws/a-trk-up" config branch.feat/x.remote upstream
+run "R120: 追跡先が upstream でも、起動したリポジトリ（origin が同じ）での commit は通す" oallowed 'git commit -m x' "$TMP/ws/a-trk-up" "$TMP/ws/a-trk-up"
+run "R121: 追跡先が upstream の素の git push は止める（外へ出すのは push）" oblocked 'git push' "$TMP/ws/a-trk-up" "$TMP/ws/a-trk-up"
+run "R122: 真偽値の短いフラグの後ろの URL（pr merge -d）" oblocked 'gh pr merge -d https://github.com/up/b/pull/3'
+run "R123: 真偽値の短いフラグの後ろの URL（pr merge --squash -d）" oblocked 'gh pr merge --squash -d https://github.com/up/b/pull/3'
+run "R124: 真偽値の短いフラグの後ろの URL（pr close -d）" oblocked 'gh pr close -d https://github.com/up/b/pull/3'
+run "R125: 真偽値の短いフラグの後ろの URL（pr review -a）" oblocked 'gh pr review -a https://github.com/up/b/pull/3'
+run "R126: 真偽値の短いフラグの後ろの URL（pr review -c ... -b）" oblocked 'gh pr review -c https://github.com/up/b/pull/3 -b lgtm'
+git init -q --bare "$TMP/ws/bare.git"
+_repo_at "$TMP/ws/file-remote" "file://$TMP/ws/bare.git"
+run "R127: file:// の remote（ローカルの bare リポジトリ）の一時リポジトリでの commit・push" oallowed "git -C $TMP/ws/file-remote commit -m x && git -C $TMP/ws/file-remote push origin feat/x"
+run "R128: 引数なしの gh repo sync（親からローカルへ取り込むだけ）" oallowed 'gh repo sync' "$TMP/ws/fork" "$TMP/ws/fork"
+run "R129: gh repo sync --source <親> <起動したリポジトリ>" oallowed 'gh repo sync --source up/b me/a'
+run "R130: gh repo sync の宛先が別のリポジトリ" oblocked 'gh repo sync up/b --source me/a'
+run "R131: 値を詰めた -R（-Rup/b）" oblocked 'gh pr create -Rup/b --fill'
+run "R132: 値を詰めた -R のコメント" oblocked 'gh issue comment 3 -Rup/b --body-file f'
+
 # 他のリポジトリの判定で例外が出ても、main の判定は続ける
 _repo "$TMP/ws/one-level" main && git -C "$TMP/ws/one-level" remote set-url origin https://github.com/foo.git
 mainblocked_with_other() { [ "$(_rc_in "$1" "$2" "$3")" = "2" ] && grep -q "main-commit-ok" "$TMP/stderr"; }

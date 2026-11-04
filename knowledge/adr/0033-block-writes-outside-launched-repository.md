@@ -45,11 +45,11 @@ PR は 2026-11-03 に上流のメンテナーが閉じた。閉じられたこ�
   - 他のリポジトリに直すべき点を見つけたら、ユーザーに報告して委ねる
 - **hook**: `hooks/main-commit-guard.py`（PreToolUse、matcher `Bash`）に判定を足す
   - 起動したリポジトリは `CLAUDE_PROJECT_DIR` の origin。無い・リポジトリでない・origin が無いときは判定しない
-  - 比べるのは host を除いた `owner/repo`（ssh の別名ホストの clone や GHE で、自分のリポジトリを止めないため）。セルフレビューでユーザーが決めた（F5: host の無い宛先は起動したリポジトリの host で補う、G4: host を含む宛先も owner/repo で比べる）。別の host に同じ owner/repo があるときは見分けない
+  - 比べるのは host を除いた `owner/repo`（ssh の別名ホストの clone や GHE で、自分のリポジトリを止めないため）。セルフレビューの G4 でユーザーが決めた（host を含む宛先も owner/repo で比べる。その前の F5 で決めた「host の無い宛先は起動したリポジトリの host で補う」は、G4 で host を比べなくなったので不要になり、置き換えた）。別の host に同じ owner/repo があるときは見分けない
   - 止めるもの:
-    - `git commit`: 判定するリポジトリの origin が違うとき。判定するリポジトリは main の判定と同じく `git -C`・`cd`・`env -C` を追う（サブシェルの中の `cd` は外へ持ち出さない）。origin の無いリポジトリは通す
+    - `git commit`: 判定するリポジトリの origin（無ければ push の宛先の remote、次に最初の remote）が違うとき。判定するリポジトリは main の判定と同じく `git -C`・`cd`・`env -C` を追う（サブシェルの中の `cd` は外へ持ち出さない）。origin を先に見るので、起動したリポジトリで追跡先を upstream にした作業ブランチの commit は通す（外へ出すのは push で、そこで止まる）。remote の無いリポジトリは通す
     - `git push`: 宛先の remote の push の URL が違うとき。remote は位置引数・`--repo`、無ければ git と同じく pushRemote → pushDefault → 追跡先 → origin の順で決める
-    - `gh` の書き込み: 宛先が違うとき。対象は pr・issue・label・release・repo の作成と変更（エイリアスの `new` を含む）と、workflow・run・secret・variable・cache の書き込み。宛先は、引数の URL、`-R`・`--repo`、前置の `GH_REPO=`、`gh issue transfer` の移す先、無ければ gh の既定の宛先
+    - `gh` の書き込み: 宛先が違うとき。対象は pr・issue・label・release・repo の作成と変更（エイリアスの `new` を含む）と、workflow・run・secret・variable・cache の書き込み。宛先は、引数の PR・Issue の URL（本文などの値に書いた URL は除く）、`-R`・`--repo`、`GH_REPO`（前置の代入と、同じコマンド内の `export`）、`gh repo edit` などの位置引数、無ければ gh の既定の宛先。`gh issue transfer` は移す元と移す先の両方を見る。引数なしの `gh repo sync` は親からローカルへ取り込むだけなので通す
     - gh の既定の宛先は gh と同じ決め方にする。remote を upstream → github → origin → その他の順に並べ、`remote.<name>.gh-resolved`（`gh repo clone`・`gh repo fork --clone`・`gh repo set-default` が付ける）の付いた remote、無ければ先頭の remote（端末に問い合わせられない Bash では、gh は先頭を選ぶ。cli/cli の `context/remote.go`・`context/context.go`）
     - fork の clone や upstream の remote を足した clone では親が既定の宛先になるので、親への `--repo` 無しの PR も止まる（セルフレビューの F6 でユーザーが決めた。今回の事例と同じ形を止めるため）。upstream の remote を持つリポジトリで起動したときも、`--repo` 無しの PR の作成は止まる（gh が実際に upstream へ PR を出すため）
     - `gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める

@@ -27,7 +27,7 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   `owner/repo`（同じ origin の worktree・並走 clone、ssh の別名ホスト・GHE の clone は同じとみなす）。
   `CLAUDE_PROJECT_DIR` が無い・リポジトリでない・origin が無いときは判定しない
 - `git commit`: 判定するリポジトリ（上と同じく `git -C`・`cd`・`env -C` を追う。サブシェルの中の `cd` は
-  閉じ括弧で戻す）の push の宛先の remote（無ければ最初の remote）が違えば止める。
+  閉じ括弧で戻す）の origin（無ければ push の宛先の remote、次に最初の remote）が違えば止める。
   remote の無いリポジトリ（検証用の一時リポジトリ）は外に出せないので通す
 - `git push`: 宛先の remote の push の URL（位置引数・`--repo`、無ければ git と同じく pushRemote → pushDefault →
   追跡先 → origin）か、URL そのものが違えば止める
@@ -36,7 +36,8 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   無ければ gh の既定の宛先）が違えば止める。`gh issue transfer` は移す元と移す先の両方を見る。
   gh の既定の宛先は gh と同じく、remote を upstream → github → origin → その他の順に並べて `gh-resolved` の
   付いた remote、無ければ先頭の remote（fork の clone で親へ向かうのを追う）。
-  `gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める
+  `gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める。引数なしの `gh repo sync` は
+  親からローカルへ取り込むだけなので通す
 - `gh api`: `-X`・`--method` が GET 以外か、本文を送るオプションがあって GET の明示が無いとき、
   パスの `repos/<owner>/<repo>`（完全な URL を含む）が違えば止める。`{owner}`・`{repo}` は `GH_REPO`、無ければ
   gh の既定の宛先で置き換える。`user/repos`・`orgs/<org>/repos` への POST（リポジトリの作成）も止める
@@ -119,8 +120,10 @@ GH_VALUE_FLAGS = {
     "-R", "--repo", "-t", "--title", "-b", "--body", "-F", "--body-file", "-B", "--base", "-H", "--head",
     "-l", "--label", "-a", "--assignee", "-r", "--reviewer", "-m", "--milestone", "-p", "--project",
     "-T", "--template", "-n", "--notes", "--notes-file", "-c", "--color", "-d", "--description",
-    "-q", "--jq", "--json", "--name", "--org", "--env",
+    "-q", "--jq", "--json", "--name", "--org", "--env", "-s", "--source", "--branch",
 }
+# 本文などの文字列を値に取るオプション。PR・Issue の URL を探すとき、これらの値は宛先と読まない
+GH_TEXT_FLAGS = {"-b", "--body", "-t", "--title", "--subject", "-n", "--notes"}
 # 新しいリポジトリの作成の宛先（起動したリポジトリと一致しない値）
 NEW_REPO = "<new>"
 # サブシェルの括弧を _parse から _blocked へ伝える印（cd をサブシェルの外へ持ち出さないため）
@@ -273,10 +276,10 @@ def _norm_url(url: str) -> str | None:
     """remote の URL を `owner/repo`（host を除いたパス。小文字、`.git` なし）にそろえる。
     host は比べない（ssh の別名ホスト・GHE でも同じ owner/repo は同じリポジトリとみなす）。形が分からなければ None。"""
     u = url.strip()
-    if _dynamic(u):
-        return None
+    if _dynamic(u) or u.lower().startswith("file://"):
+        return None  # file:// はローカルのパスと同じ扱い（検証用の一時リポジトリの bare など）
     m = re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/]+@)?[^/:]+(?::\d+)?/(.+?)(?:\.git)?/?$", u)
-    if m is None and not u.startswith(("/", ".", "~")):
+    if m is None and "://" not in u and not u.startswith(("/", ".", "~")):
         m = re.match(r"^(?:[^@/]+@)?[^/:]+:(.+?)(?:\.git)?/?$", u)  # scp 形式（git@host:owner/repo）
     if m is None or "/" not in m.group(1):
         return None
@@ -356,9 +359,11 @@ def _push_target(args: list[str], d: str) -> str | None:
 
 
 def _commit_target(d: str) -> str | None:
-    """`git commit` を判定するリポジトリ。push の宛先の remote、無ければ最初の remote。
+    """`git commit` を判定するリポジトリ。origin、無ければ push の宛先の remote、次に最初の remote。
+    origin を先に見るのは、起動したリポジトリで追跡先を upstream にした作業ブランチ（`git switch -c x upstream/main`）
+    の commit を止めないため（外へ出すのは push で、そこで判定する）。
     remote の無いリポジトリ（検証用の一時リポジトリ）は外に出せないので None（通す）。"""
-    t = _remote_url(d, _push_remote(d))
+    t = _origin(d) or _remote_url(d, _push_remote(d))
     if t:
         return t
     for name in (_git_out(d, "remote") or "").splitlines():
@@ -476,6 +481,8 @@ def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list
             continue
         if args[i].startswith("--repo="):
             repo = args[i].split("=", 1)[1]
+        elif args[i].startswith("-R") and len(args[i]) > 2:
+            repo = args[i][2:].lstrip("=")  # 値を詰めた形（`-Rowner/repo`）
         i += 1
     if i >= len(args) or args[i] not in GH_WRITES.get(group, ()):
         return None
@@ -493,10 +500,19 @@ def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list
             repo = rest[j + 1]
         elif t.startswith("--repo="):
             repo = t.split("=", 1)[1]
+        elif t.startswith("-R") and len(t) > 2:
+            repo = t[2:].lstrip("=")
     pos = _gh_positionals(rest)
-    # 操作するリポジトリ: 位置引数の PR・Issue の URL → --repo → GH_REPO → gh repo の位置引数 → gh の既定の宛先
+    if group == "repo" and sub == "sync" and not pos:
+        return None  # 引数なしの sync は親からローカルへ取り込むだけで、remote に書き込まない
+    # 操作するリポジトリ: PR・Issue の URL → --repo → GH_REPO → gh repo の位置引数 → gh の既定の宛先。
+    # URL は本文などの値（GH_TEXT_FLAGS の直後）を除いたトークンから探す。短いフラグはサブコマンドで
+    # 値を取るか真偽値かが変わる（`pr merge -d` は真偽値）ので、位置引数に限らずに探す
     target = None
-    m = next((GH_URL_RE.match(t) for t in pos if GH_URL_RE.match(t)), None)
+    m = next(
+        (GH_URL_RE.match(t) for j, t in enumerate(rest) if GH_URL_RE.match(t) and not (j and rest[j - 1] in GH_TEXT_FLAGS)),
+        None,
+    )
     if m:
         target = f"{m.group(2)}/{m.group(3)}".lower()  # group(1) は host（比べない）
     elif repo is not None:
