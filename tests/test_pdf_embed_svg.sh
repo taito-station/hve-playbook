@@ -5,9 +5,11 @@
 # 前提: python3（無ければ SKIP）
 #
 # 検査すること:
-#   - 同梱の embed-svg-to-md.py が、SVG と、入力の Markdown から辿れるローカルの画像（親ディレクトリを辿るものを含む）の参照を
-#     data URI に置き換え、存在しないファイル・URL・画像でないファイルの参照は残す（#102: 出力を作業ディレクトリに置いても画像が壊れないため）
-#   - SKILL.md の手順 2 が、SVG 以外のローカルの画像も埋め込むと書いてある
+#   - 同梱の embed-svg-to-md.py が、SVG と、入力の Markdown から辿れるローカルの画像（親ディレクトリを辿るもの・大文字の拡張子を含む）の参照を
+#     data URI に置き換え、存在しないファイル・URL（http・data）・絶対パス・画像でないファイル・圧縮された画像（.svgz）の参照は残す
+#     （#102: 出力を作業ディレクトリに置いても画像が壊れないため。data URI は置き換え前に判定し、長い参照で落ちない）
+#   - alt の `"` を属性の中でエスケープする
+#   - SKILL.md の手順 2 が、SVG 以外のローカルの画像も埋め込むことと、外部から受け取った Markdown の参照先を確かめることを書いてある
 #   - SKILL.md の手順 2・3 が、/tmp の固定パス（/tmp/embed-svg-to-md.py・/tmp/pdf-source.md）を使わない
 #   - 手順 2 が mktemp -d で実行ごとの作業ディレクトリを作り、手順 3-1 がその中の出力を渡す
 #   - 片付けは作業ディレクトリの中の出力と空のディレクトリだけを消し（rm -rf を使わない）、失敗したときも片付ける
@@ -34,8 +36,11 @@ check "SKILL.md: 手順 3-1 が作業ディレクトリの出力を渡す" grep 
 check "SKILL.md: 片付けは作業ディレクトリの中の出力と空のディレクトリだけを消す" grep -qF 'rm -f "<作業ディレクトリ>/pdf-source.md" && rmdir "<作業ディレクトリ>"' "$SKILL"
 check "SKILL.md: rm -rf で作業ディレクトリを消さない" lacks 'rm -rf "<作業ディレクトリ>"'
 check "SKILL.md: 手順 2・3 が失敗したときも片付ける" grep -qF '手順 2・3 が失敗して止まったときも' "$SKILL"
-check "SKILL.md: 手順 2 は SVG 以外のローカルの画像も埋め込む" grep -qF 'SVG だけでなく、入力の Markdown から辿れるローカルの画像（PNG・JPEG など）もすべて data URI にする' "$SKILL"
+check "SKILL.md: 手順 2 は SVG 以外のローカルの画像も埋め込む" grep -qF 'SVG だけでなく、入力の Markdown から辿れるローカルのファイルのうち、拡張子から画像と判定できるもの（PNG・JPEG など）を data URI にする' "$SKILL"
 check "SKILL.md: 手順 2 の出力は作業ディレクトリに置いても画像が壊れない" grep -qF '作業ディレクトリに置いても相対パスの画像が壊れない' "$SKILL"
+check "SKILL.md: 手順 2 が残す参照を列挙している" grep -qF 'URL・絶対パス・存在しないファイル・画像と判定できない拡張子の参照と、タイトル付きの参照' "$SKILL"
+check "SKILL.md: 外部から受け取った Markdown は参照先を確かめる" grep -qF '外部から受け取った Markdown は参照先を確かめてから使う' "$SKILL"
+check "SKILL.md: 手順 3-1 の --basedir は手順 2 が残した参照にだけ効く" grep -qF '手順 2 を通ったときは画像が埋め込み済みなので、手順 2 が残した参照にだけ効く' "$SKILL"
 
 # 2) スクリプトの動作
 if ! command -v python3 >/dev/null 2>&1; then
@@ -48,32 +53,43 @@ else
     printf 'png' > "$W/doc/img/b.png"
     printf 'jpeg' > "$W/images/c.jpg"
     printf 'text' > "$W/doc/files/d.txt"
-    cat > "$W/doc/in.md" <<'EOF'
+    printf 'upper' > "$W/doc/img/U.PNG"
+    printf 'gzip' > "$W/doc/img/z.svgz"
+    # 期待値の base64 は実装と独立に固定する（png=cG5n, jpeg=anBlZw==, upper=dXBwZXI=）
+    long_data="data:image/png;base64,$(printf 'A%.0s' $(seq 1 3000))"
+    cat > "$W/doc/in.md" <<EOF
 # t
 ![図A](img/a.svg)
 ![図B](img/b.png)
 ![図C](../images/c.jpg)
+![図D](img/U.PNG)
+![引用 "x"](img/b.png)
 ![無い](img/missing.svg)
 ![無いPNG](img/missing.png)
 ![遠い](https://example.com/e.png)
+![埋め込み済み]($long_data)
+![絶対]($W/images/c.jpg)
 ![添付](files/d.txt)
+![圧縮](img/z.svgz)
 EOF
-    b64() { python3 -c 'import base64,sys;print(base64.b64encode(open(sys.argv[1],"rb").read()).decode())' "$1"; }
-    b64_svg="$(b64 "$W/doc/img/a.svg")"
-    b64_png="$(b64 "$W/doc/img/b.png")"
-    b64_jpg="$(b64 "$W/images/c.jpg")"
+    b64_svg="$(python3 -c 'import base64,sys;print(base64.b64encode(open(sys.argv[1],"rb").read()).decode())' "$W/doc/img/a.svg")"
     python3 "$SCRIPT" "$W/doc/in.md" "$W/out.md"
     rc=$?
     check "スクリプト: 終了コード 0" test "$rc" -eq 0
     check "スクリプト: 出力を書く" test -s "$W/out.md"
     check "スクリプト: SVG を data URI に置き換える" grep -qF "<img src=\"data:image/svg+xml;base64,$b64_svg\" alt=\"図A\"" "$W/out.md"
-    check "スクリプト: PNG も data URI に置き換える" grep -qF "<img src=\"data:image/png;base64,$b64_png\" alt=\"図B\"" "$W/out.md"
-    check "スクリプト: 親ディレクトリを辿る画像も data URI に置き換える" grep -qF "<img src=\"data:image/jpeg;base64,$b64_jpg\" alt=\"図C\"" "$W/out.md"
-    check "スクリプト: 出力にファイルで参照する画像が残らない" bash -c '! grep -qE "^!\[(図A|図B|図C)\]" "$1"' _ "$W/out.md"
+    check "スクリプト: PNG も data URI に置き換える" grep -qF '<img src="data:image/png;base64,cG5n" alt="図B"' "$W/out.md"
+    check "スクリプト: 親ディレクトリを辿る画像も data URI に置き換える" grep -qF '<img src="data:image/jpeg;base64,anBlZw==" alt="図C"' "$W/out.md"
+    check "スクリプト: 大文字の拡張子も data URI に置き換える" grep -qF '<img src="data:image/png;base64,dXBwZXI=" alt="図D"' "$W/out.md"
+    check "スクリプト: alt の \" をエスケープする" grep -qF '<img src="data:image/png;base64,cG5n" alt="引用 &quot;x&quot;"' "$W/out.md"
+    check "スクリプト: 出力にファイルで参照する画像が残らない" bash -c '! grep -qE "^!\[(図A|図B|図C|図D|引用)" "$1"' _ "$W/out.md"
     check "スクリプト: 存在しない SVG はそのまま" grep -qF '![無い](img/missing.svg)' "$W/out.md"
     check "スクリプト: 存在しない PNG はそのまま" grep -qF '![無いPNG](img/missing.png)' "$W/out.md"
     check "スクリプト: URL の画像はそのまま" grep -qF '![遠い](https://example.com/e.png)' "$W/out.md"
+    check "スクリプト: 埋め込み済みの data URI はそのまま（長くても落ちない）" grep -qF "![埋め込み済み]($long_data)" "$W/out.md"
+    check "スクリプト: 絶対パスの画像はそのまま" grep -qF "![絶対]($W/images/c.jpg)" "$W/out.md"
     check "スクリプト: 画像でないファイルはそのまま" grep -qF '![添付](files/d.txt)' "$W/out.md"
+    check "スクリプト: 圧縮された画像（.svgz）はそのまま" grep -qF '![圧縮](img/z.svgz)' "$W/out.md"
 fi
 
 echo
