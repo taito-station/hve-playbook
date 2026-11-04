@@ -23,25 +23,29 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する
 
 起動したリポジトリ以外への書き込みも止める（ADR 0033。branching の「起動したリポジトリ以外には書き込まない」）:
-- 起動したリポジトリは `CLAUDE_PROJECT_DIR` の origin。比べるのはパスではなく origin の URL を
-  `host/owner/repo` にそろえたもの（同じ origin の worktree・並走 clone は同じとみなす）。
-  `CLAUDE_PROJECT_DIR` が無い・リポジトリでない・origin が無いときは判定しない。
-  host の無い宛先（`--repo OWNER/REPO`・`gh api repos/...`）は起動したリポジトリの host とみなす
+- 起動したリポジトリは `CLAUDE_PROJECT_DIR` の origin。比べるのはパスではなく、remote の URL などから host を除いた
+  `owner/repo`（同じ origin の worktree・並走 clone、ssh の別名ホスト・GHE の clone は同じとみなす）。
+  `CLAUDE_PROJECT_DIR` が無い・リポジトリでない・origin が無いときは判定しない
 - `git commit`: 判定するリポジトリ（上と同じく `git -C`・`cd`・`env -C` を追う。サブシェルの中の `cd` は
-  閉じ括弧で戻す）の origin が違えば止める。origin の無いリポジトリ（検証用の一時リポジトリ）は外に出せないので通す
+  閉じ括弧で戻す）の push の宛先の remote（無ければ最初の remote）が違えば止める。
+  remote の無いリポジトリ（検証用の一時リポジトリ）は外に出せないので通す
 - `git push`: 宛先の remote の push の URL（位置引数・`--repo`、無ければ git と同じく pushRemote → pushDefault →
   追跡先 → origin）か、URL そのものが違えば止める
-- `gh` の書き込み（`GH_WRITES` のサブコマンド。エイリアスの `new` を含む）: 宛先（引数の PR・Issue の URL、
-  `-R`・`--repo`、前置の `GH_REPO=`、`gh repo` の引数、`gh issue transfer` の移す先、無ければ gh の既定の宛先）が
-  違えば止める。gh の既定の宛先は `remote.<name>.gh-resolved` の remote（fork の clone で親へ向かうのを追う）、
-  無ければ origin。`gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める
+- `gh` の書き込み（`GH_WRITES` のサブコマンド。エイリアスの `new` を含む）: 宛先（位置引数の PR・Issue の URL、
+  `-R`・`--repo`、`GH_REPO`（前置の代入と、同じコマンド内の `export`）、`gh repo edit` などの位置引数、
+  無ければ gh の既定の宛先）が違えば止める。`gh issue transfer` は移す元と移す先の両方を見る。
+  gh の既定の宛先は gh と同じく、remote を upstream → github → origin → その他の順に並べて `gh-resolved` の
+  付いた remote、無ければ先頭の remote（fork の clone で親へ向かうのを追う）。
+  `gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める
 - `gh api`: `-X`・`--method` が GET 以外か、本文を送るオプションがあって GET の明示が無いとき、
-  パスの `repos/<owner>/<repo>`（完全な URL を含む）が違えば止める。`{owner}`・`{repo}` は gh の既定の宛先で
-  置き換える。`user/repos`・`orgs/<org>/repos` への POST（リポジトリの作成）も止める
+  パスの `repos/<owner>/<repo>`（完全な URL を含む）が違えば止める。`{owner}`・`{repo}` は `GH_REPO`、無ければ
+  gh の既定の宛先で置き換える。`user/repos`・`orgs/<org>/repos` への POST（リポジトリの作成）も止める
 - 読み取り（`gh pr view`・`gh api` の GET・`git log` など）と `-h`・`--help` は止めない。Edit・Write も止めない（ADR 0020）
 - 宛先にシェルの変数・コマンド置換（`$`・バッククォート）を含むときは、値が分からないので判定しない
+- この判定で例外が出ても main への commit の判定は続ける
 - 追わないもの: `gh api graphql` の mutation（パスにリポジトリが無い）、`git cherry-pick`・`merge`・`revert`・`am`
-  など commit 以外でコミットを作るサブコマンド（外へ出すのは push なので、そこで止まる）、`gh` 以外の手段（`curl` など）
+  など commit 以外でコミットを作るサブコマンド（外へ出すのは push なので、そこで止まる）、org・アカウントへの
+  書き込み（`gh secret set --org`・`gh gist create` など）、`gh` 以外の手段（`curl` など）
 
 bypass: コマンド中の本物のシェルコメント（クォートと heredoc の本文の外で、単語の先頭の `#`）に
 `# via:main-commit-ok: <理由>` があるとき（理由必須）。via はコマンド中のどのコメントにあっても、コメントの中で
@@ -108,10 +112,17 @@ GH_URL_RE = re.compile(r"^https?://([^/]+)/([^/]+)/([^/]+)/(?:pull|issues)/\d+")
 # 値を別トークンで取る gh api のオプションと、そのうち本文を送るもの（GET の明示が無ければ POST になる）
 GH_API_BODY_OPTS = {"-f", "-F", "--field", "--raw-field", "--input"}
 GH_API_VALUE_OPTS = GH_API_BODY_OPTS | {"-H", "--header", "-q", "--jq", "-t", "--template", "--hostname", "--cache", "-p", "--preview"}
+# 位置引数にリポジトリを取る gh repo のサブコマンド（rename の新しい名前、deploy-key の鍵のファイルなどは除く）
+GH_REPO_POSITIONAL = {"edit", "delete", "archive", "unarchive", "sync"}
+# 値を別トークンで取る gh の主なオプション（位置引数を数えるときと、値として書いた `-h` を除くときに使う）
+GH_VALUE_FLAGS = {
+    "-R", "--repo", "-t", "--title", "-b", "--body", "-F", "--body-file", "-B", "--base", "-H", "--head",
+    "-l", "--label", "-a", "--assignee", "-r", "--reviewer", "-m", "--milestone", "-p", "--project",
+    "-T", "--template", "-n", "--notes", "--notes-file", "-c", "--color", "-d", "--description",
+    "-q", "--jq", "--json", "--name", "--org", "--env",
+}
 # 新しいリポジトリの作成の宛先（起動したリポジトリと一致しない値）
 NEW_REPO = "<new>"
-# host の無い宛先（`--repo OWNER/REPO`・`gh api repos/...`）の接頭辞。host は起動したリポジトリの host で補う
-HOSTLESS = "*/"
 # サブシェルの括弧を _parse から _blocked へ伝える印（cd をサブシェルの外へ持ち出さないため）
 PAREN_MARK = "\x00"
 
@@ -259,16 +270,17 @@ def _dynamic(s: str) -> bool:
 
 
 def _norm_url(url: str) -> str | None:
-    """remote の URL を `host/owner/repo`（小文字、`.git` なし）にそろえる。ローカルのパスなど、形が分からなければ None。"""
+    """remote の URL を `owner/repo`（host を除いたパス。小文字、`.git` なし）にそろえる。
+    host は比べない（ssh の別名ホスト・GHE でも同じ owner/repo は同じリポジトリとみなす）。形が分からなければ None。"""
     u = url.strip()
     if _dynamic(u):
         return None
-    m = re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/]+@)?([^/:]+)(?::\d+)?/(.+?)(?:\.git)?/?$", u)
+    m = re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/]+@)?[^/:]+(?::\d+)?/(.+?)(?:\.git)?/?$", u)
     if m is None and not u.startswith(("/", ".", "~")):
-        m = re.match(r"^(?:[^@/]+@)?([^/:]+):(.+?)(?:\.git)?/?$", u)  # scp 形式（git@host:owner/repo）
-    if m is None:
+        m = re.match(r"^(?:[^@/]+@)?[^/:]+:(.+?)(?:\.git)?/?$", u)  # scp 形式（git@host:owner/repo）
+    if m is None or "/" not in m.group(1):
         return None
-    return f"{m.group(1)}/{m.group(2)}".lower()
+    return m.group(1).lower()
 
 
 def _git_out(d: str, *args: str) -> str | None:
@@ -281,30 +293,27 @@ def _git_out(d: str, *args: str) -> str | None:
     return r.stdout.strip() or None
 
 
-def _origin(d: str) -> str | None:
-    """d のリポジトリの origin を正規化したもの。リポジトリでない・origin が無い・git の失敗は None（判定しない側）。"""
-    url = _git_out(d, "remote", "get-url", "origin")
+def _remote_url(d: str, name: str, push: bool = False) -> str | None:
+    url = _git_out(d, "remote", "get-url", *(["--push"] if push else []), name)
     return _norm_url(url) if url else None
 
 
-def _same(target: str, launch: str) -> bool:
-    """宛先が起動したリポジトリか。host の無い宛先は owner/repo だけで比べる（host は起動したリポジトリのもの）。"""
-    if target.startswith(HOSTLESS):
-        return target[len(HOSTLESS) :] == launch.split("/", 1)[-1]
-    return target == launch
+def _origin(d: str) -> str | None:
+    """d のリポジトリの origin を正規化したもの。リポジトリでない・origin が無い・git の失敗は None（判定しない側）。"""
+    return _remote_url(d, "origin")
 
 
 def _gh_repo(value: str) -> str | None:
-    """`--repo` の値（OWNER/REPO・HOST/OWNER/REPO・URL）を宛先にそろえる。OWNER/REPO は host の無い宛先にする。"""
+    """`--repo`・`GH_REPO` などの値（OWNER/REPO・HOST/OWNER/REPO・URL）を `owner/repo` にそろえる。"""
     if _dynamic(value):
         return None
     if "://" in value:
         return _norm_url(value)
     parts = value.strip("/").split("/")
     if len(parts) == 2:
-        return HOSTLESS + "/".join(parts).lower()
-    if len(parts) == 3:
         return "/".join(parts).lower()
+    if len(parts) == 3:
+        return "/".join(parts[1:]).lower()
     return None
 
 
@@ -343,27 +352,59 @@ def _push_target(args: list[str], d: str) -> str | None:
     remote = positional or repo_opt or _push_remote(d)
     if _dynamic(remote):
         return None
-    url = _git_out(d, "remote", "get-url", "--push", remote)
-    return _norm_url(url) if url else _norm_url(remote)
+    return _remote_url(d, remote, push=True) or _norm_url(remote)
+
+
+def _commit_target(d: str) -> str | None:
+    """`git commit` を判定するリポジトリ。push の宛先の remote、無ければ最初の remote。
+    remote の無いリポジトリ（検証用の一時リポジトリ）は外に出せないので None（通す）。"""
+    t = _remote_url(d, _push_remote(d))
+    if t:
+        return t
+    for name in (_git_out(d, "remote") or "").splitlines():
+        t = _remote_url(d, name)
+        if t:
+            return t
+    return None
 
 
 def _gh_default(d: str) -> str | None:
-    """`--repo` の無い gh の宛先。`gh repo set-default`・`gh repo fork` が付ける `remote.<name>.gh-resolved` が
-    あればその remote、無ければ origin（fork の clone で gh が親へ向かうのを追う）。"""
-    out = _git_out(d, "config", "--get-regexp", r"^remote\..*\.gh-resolved$")
-    for line in (out or "").splitlines():
-        key, _, val = line.partition(" ")
-        name = key[len("remote.") : -len(".gh-resolved")]
+    """`--repo` の無い gh の宛先（gh の既定の宛先）。gh と同じく remote を upstream → github → origin → その他の順に
+    並べ、`remote.<name>.gh-resolved`（`gh repo clone`・`gh repo fork --clone`・`gh repo set-default` が付ける）が
+    あればそれを、無ければ先頭の remote を使う（端末に問い合わせられない Bash では、gh は先頭を選ぶ）。"""
+    names = (_git_out(d, "remote") or "").splitlines()
+    score = {"upstream": 3, "github": 2, "origin": 1}
+    names.sort(key=lambda n: -score.get(n, 0))
+    for n in names:
+        val = _git_out(d, "config", "--get", f"remote.{n}.gh-resolved")
         if val == "base":
-            url = _git_out(d, "remote", "get-url", name)
-            return _norm_url(url) if url else None
-        if "/" in val:
+            return _remote_url(d, n)
+        if val and "/" in val:
             return _gh_repo(val)
-    return _origin(d)
+    for n in names:
+        t = _remote_url(d, n)
+        if t:
+            return t
+    return None
 
 
-def _gh_api_target(args: list[str], d: str) -> tuple[str, str] | None:
-    """`gh api` が書き込みなら (宛先, 操作の表示) を、読み取り・リポジトリの外のパス（graphql を含む）なら None を返す。"""
+def _gh_positionals(args: list[str]) -> list[str]:
+    """gh のサブコマンドの後の位置引数（値を取るオプションの値を除く）。"""
+    pos = []
+    i = 0
+    while i < len(args):
+        t = args[i]
+        if t in GH_VALUE_FLAGS:
+            i += 2
+            continue
+        if not t.startswith("-"):
+            pos.append(t)
+        i += 1
+    return pos
+
+
+def _gh_api_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list[str], str] | None:
+    """`gh api` が書き込みなら ([宛先], 操作の表示) を、読み取り・リポジトリの外のパス（graphql を含む）なら None を返す。"""
     method = None
     body = False
     path = None
@@ -394,36 +435,36 @@ def _gh_api_target(args: list[str], d: str) -> tuple[str, str] | None:
     if method == "GET" or path is None or _dynamic(path):
         return None
     op = f"gh api {method} {path}"
-    host = None
-    m = re.match(r"^https?://([^/]+)/(?:api/v3/)?(.*)$", path)
+    m = re.match(r"^https?://[^/]+/(?:api/v3/)?(.*)$", path)
     if m:
-        host = "github.com" if m.group(1).lower() == "api.github.com" else m.group(1).lower()
-        path = m.group(2)
+        path = m.group(1)
     p = path.lstrip("/")
     if re.match(r"^(?:user|orgs/[^/]+)/repos/?$", p):
-        return (NEW_REPO, op) if method == "POST" else None
+        return ([NEW_REPO], op) if method == "POST" else None
     m = re.match(r"^repos/([^/]+)/([^/?]+)", p)
     if m is None:
         return None
     owner, repo = m.group(1), m.group(2)
     if owner == "{owner}" or repo == "{repo}":
-        # プレースホルダは gh の既定の宛先で、owner と repo を別々に置き換える
-        dflt = _gh_default(d)
-        if dflt is None:
+        # プレースホルダは GH_REPO、無ければ gh の既定の宛先で、owner と repo を別々に置き換える
+        dflt = _gh_repo(env["GH_REPO"]) if env.get("GH_REPO") else _gh_default(d)
+        if dflt is None or dflt.count("/") != 1:
             return None
-        h, d_owner, d_repo = dflt.split("/", 2)  # host の無い宛先は h が HOSTLESS の `*`
+        d_owner, d_repo = dflt.split("/")
         owner = d_owner if owner == "{owner}" else owner
         repo = d_repo if repo == "{repo}" else repo
-        return f"{h}/{owner}/{repo}".lower(), op
-    return (f"{host}/{owner}/{repo}" if host else f"{HOSTLESS}{owner}/{repo}").lower(), op
+    return [f"{owner}/{repo}".lower()], op
 
 
-def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[str, str] | None:
-    """gh の書き込みなら (宛先, 操作の表示) を（新しいリポジトリの作成は NEW_REPO）、読み取りなら None を返す。"""
-    if not args or "-h" in args or "--help" in args:
+def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list[str], str] | None:
+    """gh の書き込みなら ([宛先], 操作の表示) を（新しいリポジトリの作成は NEW_REPO）、読み取りなら None を返す。"""
+    if not args:
+        return None
+    # ヘルプ（値を取るオプションの値として書いた `-h` は除く）は読み取り
+    if any(t in ("-h", "--help") and (j == 0 or args[j - 1] not in GH_VALUE_FLAGS) for j, t in enumerate(args)):
         return None
     if args[0] == "api":
-        return _gh_api_target(args[1:], d)
+        return _gh_api_target(args[1:], d, env)
     group = args[0]
     repo = None
     # サブコマンドの前に置いたフラグ（`gh pr --repo X create`）を読み飛ばす
@@ -446,33 +487,33 @@ def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[str,
         op += f" {rest[0]}"
         rest = rest[1:]
     if group == "repo" and sub in GH_REPO_CREATES:
-        return NEW_REPO, op
-    url_target = None
+        return [NEW_REPO], op
     for j, t in enumerate(rest):
         if t in ("-R", "--repo") and j + 1 < len(rest):
             repo = rest[j + 1]
         elif t.startswith("--repo="):
             repo = t.split("=", 1)[1]
-        m = GH_URL_RE.match(t)
-        if m and url_target is None:
-            url_target = f"{m.group(1)}/{m.group(2)}/{m.group(3)}".lower()
-    if group == "issue" and sub == "transfer":
-        # 移す先のリポジトリに Issue を作る（`gh issue transfer <number> <destination-repo>`）
-        pos = [t for t in rest if not t.startswith("-")]
-        return (_gh_repo(pos[1]), op) if len(pos) >= 2 and _gh_repo(pos[1]) else None
-    if url_target:
-        return url_target, op
-    if repo is not None:
-        t = _gh_repo(repo)
-        return (t, op) if t else None
-    if env.get("GH_REPO"):
-        t = _gh_repo(env["GH_REPO"])
-        return (t, op) if t else None
-    if group == "repo" and rest and not rest[0].startswith("-"):
-        t = _gh_repo(rest[0])
-        return (t, op) if t else None
-    t = _gh_default(d)
-    return (t, op) if t else None
+    pos = _gh_positionals(rest)
+    # 操作するリポジトリ: 位置引数の PR・Issue の URL → --repo → GH_REPO → gh repo の位置引数 → gh の既定の宛先
+    target = None
+    m = next((GH_URL_RE.match(t) for t in pos if GH_URL_RE.match(t)), None)
+    if m:
+        target = f"{m.group(2)}/{m.group(3)}".lower()  # group(1) は host（比べない）
+    elif repo is not None:
+        target = _gh_repo(repo)
+    elif env.get("GH_REPO"):
+        target = _gh_repo(env["GH_REPO"])
+    elif group == "repo" and sub in GH_REPO_POSITIONAL and pos:
+        target = _gh_repo(pos[0])
+    if target is None and not (repo or env.get("GH_REPO")):
+        target = _gh_default(d)
+    targets = [target] if target else []
+    if group == "issue" and sub == "transfer" and len(pos) >= 2:
+        # 移す元（上の target）から Issue を消し、移す先に作る。両方を判定する
+        dest = _gh_repo(pos[1])
+        if dest:
+            targets.append(dest)
+    return (targets, op) if targets else None
 
 
 def _branch(d: str) -> str | None:
@@ -499,15 +540,38 @@ def _has_remote(d: str) -> bool:
     return r.returncode == 0 and bool(r.stdout.strip())
 
 
+def _other_hit(seg: list[str], base: str, env: dict[str, str]) -> tuple[list[str], str] | None:
+    """seg が書き込みなら ([宛先], 操作の表示) を返す。例外は飲み込んで None（main の判定を巻き込まない）。"""
+    try:
+        call = _git_call(seg, base)
+        if call is not None:
+            d, sub, rest = call
+            if sub == "commit":
+                t = _commit_target(d)
+            elif sub == "push":
+                t = _push_target(rest, d)
+            else:
+                return None
+            return ([t], f"git {sub}") if t else None
+        gh = _gh_call(seg, base)
+        if gh is not None:
+            return _gh_write_target(gh[1], gh[0], {**env, **gh[2]})
+    except Exception:
+        traceback.print_exc()
+    return None
+
+
 def _blocked(segs: list[list[str]], cwd: str, proj: str | None) -> tuple[tuple[str, str] | None, tuple[str, str, str] | None]:
     """(main への commit, 起動したリポジトリ以外への書き込み) をそれぞれ返す。
     前者は (ディレクトリ, ブランチ)、後者は (操作, 宛先のリポジトリ, 起動したリポジトリ)。
     起動したリポジトリ（proj の origin）は、書き込みの宛先が分かったときに 1 回だけ求める。
     proj が無い・origin が無ければ後者は判定しない。"""
     base = cwd
-    stack: list[str] = []
+    env: dict[str, str] = {}  # 同じコマンド内の `export VAR=val`
+    stack: list[tuple[str, dict[str, str]]] = []
     main_hit = None
     other_hit = None
+    check_other = bool(proj)
     launch_cache: list[str | None] = []
 
     def launch_repo() -> str | None:
@@ -517,37 +581,41 @@ def _blocked(segs: list[list[str]], cwd: str, proj: str | None) -> tuple[tuple[s
 
     for seg in segs:
         if seg[0].startswith(PAREN_MARK):
-            # サブシェルの中の cd は、閉じ括弧で元のディレクトリに戻す
+            # サブシェルの中の cd・export は、閉じ括弧で元に戻す
             for ch in seg[0][len(PAREN_MARK) :]:
                 if ch == "(":
-                    stack.append(base)
+                    stack.append((base, dict(env)))
                 elif ch == ")" and stack:
-                    base = stack.pop()
+                    base, env = stack.pop()
             continue
         if seg[0] == "cd":
             args = [a for a in seg[1:] if not a.startswith("-")]
             if len(args) == 1:
                 base = os.path.join(base, os.path.expanduser(args[0]))
             continue
-        hit = None
+        if seg[0] == "export":
+            for a in seg[1:]:
+                if ASSIGN_RE.match(a):
+                    k, _, v = a.partition("=")
+                    env[k] = v
+            continue
         call = _git_call(seg, base)
-        if call is not None:
-            d, sub, rest = call
-            if sub == "commit" and main_hit is None:
-                b = _branch(d)
-                if b in PROTECTED and _has_remote(d):
-                    main_hit = (d, b)
-            if other_hit is None and sub in ("commit", "push"):
-                target = _origin(d) if sub == "commit" else _push_target(rest, d)
-                hit = (target, f"git {sub}") if target else None
-        elif other_hit is None:
-            gh = _gh_call(seg, base)
-            if gh is not None:
-                hit = _gh_write_target(gh[1], gh[0], gh[2])
-        if hit is not None:
-            launch = launch_repo()
-            if launch is not None and not _same(hit[0], launch):
-                other_hit = (hit[1], hit[0], launch)
+        if call is not None and call[1] == "commit" and main_hit is None:
+            b = _branch(call[0])
+            if b in PROTECTED and _has_remote(call[0]):
+                main_hit = (call[0], b)
+        if not check_other or other_hit is not None:
+            continue
+        hit = _other_hit(seg, base, env)
+        if hit is None:
+            continue
+        launch = launch_repo()
+        if launch is None:
+            check_other = False  # 起動したリポジトリが分からないので、以降も判定しない
+            continue
+        bad = next((t for t in hit[0] if t != launch), None)
+        if bad is not None:
+            other_hit = (hit[1], bad, launch)
     return main_hit, other_hit
 
 
@@ -588,12 +656,7 @@ def main() -> int:
             return 2
         if other_hit is not None and not any(VIA_OTHER_RE.search(c) for c in comments):
             op, target, launch = other_hit
-            if target == NEW_REPO:
-                shown = "新しいリポジトリの作成（fork を含む）"
-            elif target.startswith(HOSTLESS):
-                shown = launch.split("/", 1)[0] + "/" + target[len(HOSTLESS) :]
-            else:
-                shown = target
+            shown = "新しいリポジトリの作成（fork を含む）" if target == NEW_REPO else target
             print(
                 "BLOCKED by main-commit-guard hook.\n"
                 f"reason: 起動したリポジトリ（{launch}）以外への書き込み: `{op}` → {shown}。\n"

@@ -39,18 +39,19 @@ PR は 2026-11-03 に上流のメンテナーが閉じた。閉じられたこ�
 
 選択した選択肢: **規則と hook の両方にし、止めるのは書き込みだけ。hook は main-commit-guard を拡張し、同じリポジトリは origin の URL で判定する**。強制の仕方と範囲は、ユーザーの回答による。
 
-- **規則**: 正本は `rules/global/git/branching.md` の「起動したリポジトリ以外には書き込まない」。CLAUDE.md の「進め方」に要約を 1 行置く（ADR 0023 の「両方に書く」）
+- **規則**: 正本は `rules/global/git/branching.md` の「起動したリポジトリ以外には書き込まない」。CLAUDE.md の「進め方」に要約を 1 行置く（CLAUDE.md は全セッションで読み込まれるので、branching.md の該当節を読む前の判断にも効かせるため。hook の message は正本の節を指す）
   - 起動したリポジトリ（同じ origin の worktree・並走 clone を含む）以外には、ユーザーの明示的な指示がない限り書き込まない
   - 書き込みに含むもの: PR・Issue・コメント・ラベル・リリースの作成と変更、commit・push、fork とリポジトリの作成、ファイルの編集。`~/.claude` の memory・plans・handoff と scratchpad は除く
   - 他のリポジトリに直すべき点を見つけたら、ユーザーに報告して委ねる
 - **hook**: `hooks/main-commit-guard.py`（PreToolUse、matcher `Bash`）に判定を足す
-  - 起動したリポジトリは `CLAUDE_PROJECT_DIR` の origin を `host/owner/repo` にそろえたもの。無い・リポジトリでない・origin が無いときは判定しない
-  - host の無い宛先（`--repo OWNER/REPO`・`gh api repos/...`）は、起動したリポジトリの host とみなす（ssh の別名ホストの clone や GHE で、自分のリポジトリを止めないため。セルフレビューの F5 でユーザーが決めた）
+  - 起動したリポジトリは `CLAUDE_PROJECT_DIR` の origin。無い・リポジトリでない・origin が無いときは判定しない
+  - 比べるのは host を除いた `owner/repo`（ssh の別名ホストの clone や GHE で、自分のリポジトリを止めないため）。セルフレビューでユーザーが決めた（F5: host の無い宛先は起動したリポジトリの host で補う、G4: host を含む宛先も owner/repo で比べる）。別の host に同じ owner/repo があるときは見分けない
   - 止めるもの:
     - `git commit`: 判定するリポジトリの origin が違うとき。判定するリポジトリは main の判定と同じく `git -C`・`cd`・`env -C` を追う（サブシェルの中の `cd` は外へ持ち出さない）。origin の無いリポジトリは通す
     - `git push`: 宛先の remote の push の URL が違うとき。remote は位置引数・`--repo`、無ければ git と同じく pushRemote → pushDefault → 追跡先 → origin の順で決める
     - `gh` の書き込み: 宛先が違うとき。対象は pr・issue・label・release・repo の作成と変更（エイリアスの `new` を含む）と、workflow・run・secret・variable・cache の書き込み。宛先は、引数の URL、`-R`・`--repo`、前置の `GH_REPO=`、`gh issue transfer` の移す先、無ければ gh の既定の宛先
-    - gh の既定の宛先は `remote.<name>.gh-resolved` の remote（`gh repo fork`・`gh repo set-default` が付ける）で、無ければ origin。fork の clone では親が既定の宛先になるので、親への `--repo` 無しの PR も止まる（セルフレビューの F6 でユーザーが決めた。今回の事例と同じ形を止めるため）
+    - gh の既定の宛先は gh と同じ決め方にする。remote を upstream → github → origin → その他の順に並べ、`remote.<name>.gh-resolved`（`gh repo clone`・`gh repo fork --clone`・`gh repo set-default` が付ける）の付いた remote、無ければ先頭の remote（端末に問い合わせられない Bash では、gh は先頭を選ぶ。cli/cli の `context/remote.go`・`context/context.go`）
+    - fork の clone や upstream の remote を足した clone では親が既定の宛先になるので、親への `--repo` 無しの PR も止まる（セルフレビューの F6 でユーザーが決めた。今回の事例と同じ形を止めるため）。upstream の remote を持つリポジトリで起動したときも、`--repo` 無しの PR の作成は止まる（gh が実際に upstream へ PR を出すため）
     - `gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める
     - `gh api` の書き込み: パスの `repos/<owner>/<repo>`（完全な URL を含む）が違うとき。`user/repos`・`orgs/<org>/repos` への POST も止める
   - 読み取りと `-h`・`--help` は通す。宛先にシェルの変数・コマンド置換を含むときは、値が分からないので判定しない
@@ -65,6 +66,8 @@ PR は 2026-11-03 に上流のメンテナーが閉じた。閉じられたこ�
   - 同じリポジトリの worktree・並走 clone・remote の無い一時リポジトリでの作業と、他のリポジトリの読み取りは止まらない
 - 悪い結果・既知の限界:
   - hook は Bash の `git` と `gh` だけを見る。他のリポジトリのファイルの Edit・Write と、`gh` 以外の手段（`curl` での API 呼び出しなど）は、規則の文面に頼る
+  - org・アカウントへの書き込み（`gh secret set --org`・`gh variable set --org`・`gh gist create` など）は、リポジトリを宛先にしないので追わない
+  - review-pr の fix モードで、他人の fork の PR のブランチに push するときも止まる（宛先が fork のため）。ユーザーが指示したときは via を付ける
   - `gh api graphql` の mutation は追わない（パスにリポジトリが無く、本文から宛先を決めるのは過剰。skill の手順にも graphql の書き込みは無い）
   - `git cherry-pick`・`merge`・`revert`・`am` など、commit 以外でコミットを作るサブコマンドは追わない。外へ出すのは push なので、そこで止まる（セルフレビューの F17 でユーザーが決めた）
   - main-commit-guard と同じ best-effort の静的判定で、Claude Code がふだん出す形を対象にする。変数・コマンド置換を介したパスやリポジトリ名は判定せずに通し、分割に失敗したコマンドも通す（ADR 0020 と同じく、限界は個別に列挙しない）

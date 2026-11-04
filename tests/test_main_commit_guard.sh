@@ -149,7 +149,9 @@ _repo_at() {
     git -C "$dir" switch -q -c feat/x
 }
 _repo_at "$TMP/ws/a" https://github.com/me/a.git
-git -C "$TMP/ws/a" remote add upstream https://github.com/up/b.git
+# a-up: A と同じ origin に、別のリポジトリを指す upstream を足した clone（gh-resolved は無い）
+_repo_at "$TMP/ws/a-up" https://github.com/me/a.git
+git -C "$TMP/ws/a-up" remote add upstream https://github.com/up/b.git
 git -C "$TMP/ws/a" worktree add -q -b feat/wt "$TMP/ws/a-wt"
 _repo_at "$TMP/ws/a-clone" git@github.com:Me/A
 _repo_at "$TMP/ws/b" https://github.com/up/b.git
@@ -179,7 +181,7 @@ run "R8: gh api -X POST で別のリポジトリ" oblocked 'gh api -X POST repos
 run "R9: gh api の -f だけ（POST になる）で別のリポジトリ" oblocked 'gh api repos/up/b/issues/1/comments -f body=x'
 run "R10: gh repo fork で別のリポジトリ" oblocked 'gh repo fork up/b --clone=false'
 run "R11: gh repo create" oblocked 'gh repo create me/new --private'
-run "R12: 起動したリポジトリから別のリポジトリを指す remote へ push" oblocked 'git push upstream feat/x'
+run "R12: 起動したリポジトリから別のリポジトリを指す remote へ push" oblocked 'git push upstream feat/x' "$TMP/ws/a-up"
 run "R13: 別のリポジトリの URL へ直接 push" oblocked 'git push https://github.com/up/b.git feat/x'
 run "R14: 今回の事例（cd で上流の clone に移り、ブランチを切って commit・push・PR）" oblocked "cd $TMP/ws/b && git switch -c fix/y && git commit -m fix && git push -u origin fix/y && gh pr create --fill"
 run "R15: 起動したリポジトリの worktree から起動しても別のリポジトリは止める" oblocked "git -C $TMP/ws/b commit -m x" "$TMP/ws/a-wt" "$TMP/ws/a-wt"
@@ -202,7 +204,6 @@ run "R40: 起動したディレクトリが git リポジトリでない" oallow
 run "R41: gh api の {owner}/{repo} は実行するディレクトリで解決（起動したリポジトリ）" oallowed 'gh api -X PATCH repos/{owner}/{repo}/pulls/1 -f body=x'
 run "R42: gh の書き込みでないサブコマンド（auth・run view）" oallowed 'gh auth setup-git && gh run view 1 -R up/b'
 
-# main の commit の判定は、CLAUDE_PROJECT_DIR があっても変わらない
 # エイリアスと書き込みのサブコマンド
 run "R60: gh pr new（create のエイリアス）" oblocked 'gh pr new --repo up/b --fill'
 run "R61: gh issue new" oblocked 'gh issue new --repo up/b --title t --body x'
@@ -229,8 +230,8 @@ git -C "$TMP/ws/a-pu" config remote.origin.pushurl https://github.com/up/b.git
 run "R73: remote.pushDefault が別のリポジトリを指す素の git push" oblocked 'git push' "$TMP/ws/a-pd"
 run "R74: 追跡先が別のリポジトリの素の git push" oblocked 'git push' "$TMP/ws/a-trk"
 run "R75: origin の pushurl が別のリポジトリ" oblocked 'git push origin feat/x' "$TMP/ws/a-pu"
-run "R76: git push --repo upstream" oblocked 'git push --repo upstream'
-run "R77: git push --repo=upstream" oblocked 'git push --repo=upstream'
+run "R76: git push --repo upstream" oblocked 'git push --repo upstream' "$TMP/ws/a-up"
+run "R77: git push --repo=upstream" oblocked 'git push --repo=upstream' "$TMP/ws/a-up"
 # fork の clone: gh の既定の宛先（gh-resolved=base）は親
 _repo_at "$TMP/ws/fork" https://github.com/me/b.git
 git -C "$TMP/ws/fork" remote add upstream https://github.com/up/b.git
@@ -256,6 +257,30 @@ run "R97: ssh の別名ホストの clone で、自分のリポジトリへの g
 run "R98: ssh の別名ホストの clone でも、別のリポジトリは止める" oblocked 'gh pr create --repo up/b --fill' "$TMP/ws/alias" "$TMP/ws/alias"
 run "R99: fork の clone で --repo に fork 自身を明示" oallowed 'gh pr edit 1 --repo me/b --body-file f' "$TMP/ws/fork" "$TMP/ws/fork"
 
+# 2 巡目の指摘（gh の既定の宛先・位置引数・transfer・help・export・GH_REPO と api・本文の URL・host）
+run "R100: upstream を持つ clone（gh-resolved なし）での --repo 無しの gh pr create（gh は upstream へ向かう）" oblocked 'gh pr create --fill' "$TMP/ws/a-up"
+run "R101: 別のリポジトリに移って gh repo rename（位置引数は新しい名前）" oblocked "cd $TMP/ws/b && gh repo rename newname --yes"
+run "R102: 別のリポジトリに移って gh repo deploy-key add（位置引数は鍵のファイル）" oblocked "cd $TMP/ws/b && gh repo deploy-key add k.pub"
+run "R103: gh issue transfer の -R の値を位置引数と数えない" oblocked 'gh issue transfer -R up/b 3 me/a'
+run "R104: gh issue transfer の移す元が別のリポジトリ" oblocked "cd $TMP/ws/b && gh issue transfer 3 me/a"
+run "R105: 値として書いた --help はヘルプとみなさない" oblocked 'gh pr comment 5 -R up/b --body --help'
+run "R106: 同じコマンド内の export GH_REPO" oblocked 'export GH_REPO=up/b; gh pr create --fill'
+run "R107: GH_REPO で置き換わる gh api の {owner}/{repo}" oblocked 'GH_REPO=up/b gh api -X POST repos/{owner}/{repo}/issues -f title=t'
+git init -q -b main "$TMP/ws/upstream-only" && git -C "$TMP/ws/upstream-only" remote add upstream https://github.com/up/b.git \
+    && git -C "$TMP/ws/upstream-only" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q --allow-empty -m init \
+    && git -C "$TMP/ws/upstream-only" switch -q -c feat/x
+run "R108: origin が無く upstream だけを持つリポジトリでの commit" oblocked "git -C $TMP/ws/upstream-only commit -m x"
+run "R110: 起動したリポジトリでの gh repo deploy-key add keys/k.pub（位置引数をリポジトリと読まない）" oallowed 'gh repo deploy-key add keys/k.pub'
+run "R111: サブシェルの中の export はサブシェルの外に効かない" oallowed '(export GH_REPO=up/b); gh pr create --fill'
+run "R112: 本文に書いた URL は宛先と読まない" oallowed 'gh pr comment 1 --body https://github.com/up/b/pull/4'
+run "R113: ssh の別名ホストの clone で、github.com の URL を指定した自分のリポジトリへの書き込み" oallowed 'gh pr comment https://github.com/me/a/pull/1 --body x && gh api -X POST https://api.github.com/repos/me/a/issues -f title=t' "$TMP/ws/alias" "$TMP/ws/alias"
+run "R114: 別名ホストの並走 clone での commit（起動したリポジトリは github.com）" oallowed "git -C $TMP/ws/alias commit -m x"
+# 他のリポジトリの判定で例外が出ても、main の判定は続ける
+_repo "$TMP/ws/one-level" main && git -C "$TMP/ws/one-level" remote set-url origin https://github.com/foo.git
+mainblocked_with_other() { [ "$(_rc_in "$1" "$2" "$3")" = "2" ] && grep -q "main-commit-ok" "$TMP/stderr"; }
+run "R115: パスが 1 段の origin で {owner}/{repo} を解決できなくても、main の commit は止める" mainblocked_with_other 'gh api -X POST repos/{owner}/{repo}/issues -f t=x && git commit -m x' "$TMP/ws/one-level" "$TMP/ws/one-level"
+
+# main の commit の判定は、CLAUDE_PROJECT_DIR があっても変わらない
 mblocked() { [ "$(_rc_in "$1" "$2" "$3")" = "2" ] && grep -q "main-commit-ok" "$TMP/stderr"; }
 run "R50: 起動したリポジトリの main 上の commit は main-commit として止める" mblocked 'git commit -m x' "$TMP/main" "$TMP/main"
 
