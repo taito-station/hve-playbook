@@ -296,6 +296,15 @@ run "R130: gh repo sync の宛先が別のリポジトリ" oblocked 'gh repo syn
 run "R131: 値を詰めた -R（-Rup/b）" oblocked 'gh pr create -Rup/b --fill'
 run "R132: 値を詰めた -R のコメント" oblocked 'gh issue comment 3 -Rup/b --body-file f'
 
+# 4 巡目の指摘: コメント本文・説明のフラグの値に書いた URL（サブコマンドごとに本文のフラグが違う）
+run "R133: pr close -c の本文の URL は宛先と読まない" oallowed 'gh pr close 5 -c "https://github.com/up/b/pull/7 に置き換え"'
+run "R134: label create --description の URL は宛先と読まない" oallowed 'gh label create x --description "https://github.com/up/b/issues/1"'
+run "R135: issue close --comment の本文の URL は宛先と読まない" oallowed 'gh issue close 12 --comment "https://github.com/up/b/issues/4 で対応済み"'
+run "R136: issue reopen --comment の本文の URL は宛先と読まない" oallowed 'gh issue reopen 3 --comment "https://github.com/up/b/issues/9 が再発"'
+run "R137: 本文の URL（起動したリポジトリ）があっても -R の別のリポジトリは止める" oblocked 'gh pr close -c "https://github.com/me/a/pull/5 に置き換え" 4 -R up/b'
+run "R138: 本文の URL（起動したリポジトリ）があっても、位置引数の別のリポジトリの URL は止める" oblocked 'gh pr close -c https://github.com/me/a/pull/5 https://github.com/up/b/pull/4'
+run "R139: issue close --comment の本文と、位置引数の別のリポジトリの URL" oblocked 'gh issue close --comment "https://github.com/me/a/issues/5 で対応" https://github.com/up/b/issues/4'
+
 # 他のリポジトリの判定で例外が出ても、main の判定は続ける
 _repo "$TMP/ws/one-level" main && git -C "$TMP/ws/one-level" remote set-url origin https://github.com/foo.git
 mainblocked_with_other() { [ "$(_rc_in "$1" "$2" "$3")" = "2" ] && grep -q "main-commit-ok" "$TMP/stderr"; }

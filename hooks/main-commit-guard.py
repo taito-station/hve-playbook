@@ -33,7 +33,9 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   追跡先 → origin）か、URL そのものが違えば止める
 - `gh` の書き込み（`GH_WRITES` のサブコマンド。エイリアスの `new` を含む）: 宛先（位置引数の PR・Issue の URL、
   `-R`・`--repo`、`GH_REPO`（前置の代入と、同じコマンド内の `export`）、`gh repo edit` などの位置引数、
-  無ければ gh の既定の宛先）が違えば止める。`gh issue transfer` は移す元と移す先の両方を見る。
+  無ければ gh の既定の宛先）が違えば止める。明示した URL と `--repo` はすべて判定し、どれか 1 つでも違えば止める。
+  本文などの値（`--body`、close・reopen の `--comment`、label・repo edit の `--description` など）に書いた URL は
+  宛先と読まない。`gh issue transfer` は移す元と移す先の両方を見る。
   gh の既定の宛先は gh と同じく、remote を upstream → github → origin → その他の順に並べて `gh-resolved` の
   付いた remote、無ければ先頭の remote（fork の clone で親へ向かうのを追う）。
   `gh repo create`・`new`・`fork` は新しいリポジトリを作るので常に止める。引数なしの `gh repo sync` は
@@ -109,7 +111,8 @@ GH_REPO_NESTED_WRITES = {"add", "create", "delete"}
 # 新しいリポジトリを作る操作（fork を含む）。起動したリポジトリとは常に別
 GH_REPO_CREATES = {"create", "new", "fork"}
 # gh pr / issue の引数に渡す URL（https://github.com/OWNER/REPO/pull/N）
-GH_URL_RE = re.compile(r"^https?://([^/]+)/([^/]+)/([^/]+)/(?:pull|issues)/\d+")
+# 末尾まで固定する（「URL で始まる本文」を URL と読まないため）
+GH_URL_RE = re.compile(r"^https?://([^/]+)/([^/]+)/([^/]+)/(?:pull|issues)/\d+(?:[/?#]\S*)?$")
 # 値を別トークンで取る gh api のオプションと、そのうち本文を送るもの（GET の明示が無ければ POST になる）
 GH_API_BODY_OPTS = {"-f", "-F", "--field", "--raw-field", "--input"}
 GH_API_VALUE_OPTS = GH_API_BODY_OPTS | {"-H", "--header", "-q", "--jq", "-t", "--template", "--hostname", "--cache", "-p", "--preview"}
@@ -124,6 +127,16 @@ GH_VALUE_FLAGS = {
 }
 # 本文などの文字列を値に取るオプション。PR・Issue の URL を探すとき、これらの値は宛先と読まない
 GH_TEXT_FLAGS = {"-b", "--body", "-t", "--title", "--subject", "-n", "--notes"}
+# サブコマンドによって本文を値に取るオプション（`gh pr review` の `-c` は真偽値なので、ここには入れない）
+GH_TEXT_FLAGS_BY_SUB = {
+    ("pr", "close"): {"-c", "--comment"},
+    ("pr", "reopen"): {"-c", "--comment"},
+    ("issue", "close"): {"-c", "--comment"},
+    ("issue", "reopen"): {"-c", "--comment"},
+    ("label", "create"): {"-d", "--description"},
+    ("label", "edit"): {"-d", "--description"},
+    ("repo", "edit"): {"-d", "--description"},
+}
 # 新しいリポジトリの作成の宛先（起動したリポジトリと一致しない値）
 NEW_REPO = "<new>"
 # サブシェルの括弧を _parse から _blocked へ伝える印（cd をサブシェルの外へ持ち出さないため）
@@ -505,25 +518,28 @@ def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list
     pos = _gh_positionals(rest)
     if group == "repo" and sub == "sync" and not pos:
         return None  # 引数なしの sync は親からローカルへ取り込むだけで、remote に書き込まない
-    # 操作するリポジトリ: PR・Issue の URL → --repo → GH_REPO → gh repo の位置引数 → gh の既定の宛先。
-    # URL は本文などの値（GH_TEXT_FLAGS の直後）を除いたトークンから探す。短いフラグはサブコマンドで
-    # 値を取るか真偽値かが変わる（`pr merge -d` は真偽値）ので、位置引数に限らずに探す
-    target = None
-    m = next(
-        (GH_URL_RE.match(t) for j, t in enumerate(rest) if GH_URL_RE.match(t) and not (j and rest[j - 1] in GH_TEXT_FLAGS)),
-        None,
-    )
-    if m:
-        target = f"{m.group(2)}/{m.group(3)}".lower()  # group(1) は host（比べない）
-    elif repo is not None:
-        target = _gh_repo(repo)
-    elif env.get("GH_REPO"):
-        target = _gh_repo(env["GH_REPO"])
-    elif group == "repo" and sub in GH_REPO_POSITIONAL and pos:
-        target = _gh_repo(pos[0])
-    if target is None and not (repo or env.get("GH_REPO")):
-        target = _gh_default(d)
-    targets = [target] if target else []
+    # 操作するリポジトリ: PR・Issue の URL と --repo（明示されたものはすべて判定する。どれか 1 つでも違えば止める）、
+    # 無ければ GH_REPO → gh repo の位置引数 → gh の既定の宛先。
+    # URL は本文などの値（GH_TEXT_FLAGS とサブコマンドごとの本文のフラグの直後）を除いたトークンから探す。
+    # 短いフラグはサブコマンドで値を取るか真偽値かが変わる（`pr merge -d` は真偽値）ので、位置引数に限らずに探す
+    text_flags = GH_TEXT_FLAGS | GH_TEXT_FLAGS_BY_SUB.get((group, sub), set())
+    targets = [
+        f"{m.group(2)}/{m.group(3)}".lower()  # group(1) は host（比べない）
+        for j, t in enumerate(rest)
+        if not (j and rest[j - 1] in text_flags) and (m := GH_URL_RE.match(t))
+    ]
+    if repo is not None and _gh_repo(repo):
+        targets.append(_gh_repo(repo))
+    if not targets and repo is None:
+        target = None
+        if env.get("GH_REPO"):
+            target = _gh_repo(env["GH_REPO"])
+        elif group == "repo" and sub in GH_REPO_POSITIONAL and pos:
+            target = _gh_repo(pos[0])
+        if target is None and not env.get("GH_REPO"):
+            target = _gh_default(d)
+        if target:
+            targets.append(target)
     if group == "issue" and sub == "transfer" and len(pos) >= 2:
         # 移す元（上の target）から Issue を消し、移す先に作る。両方を判定する
         dest = _gh_repo(pos[1])
