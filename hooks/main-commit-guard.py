@@ -32,7 +32,8 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
 - `git push`: 宛先の remote の push の URL（位置引数・`--repo`、無ければ git と同じく pushRemote → pushDefault →
   追跡先 → origin）か、URL そのものが違えば止める
 - `gh` の書き込み（`GH_WRITES` のサブコマンド。エイリアスの `new` を含む）: 宛先（位置引数の PR・Issue の URL、
-  `-R`・`--repo`、`GH_REPO`（前置の代入と、同じコマンド内の `export`）、`gh repo edit` などの位置引数、
+  `-R`・`--repo`（空の値は指定なしと同じ）、`gh repo edit` などの位置引数、`GH_REPO`（前置の代入と、
+  同じコマンド内の `export`）、
   無ければ gh の既定の宛先）が違えば止める。明示した URL と `--repo` はすべて判定し、どれか 1 つでも違えば止める。
   本文などの値（`--body`、close・reopen の `--comment`、label・repo edit の `--description` など）に書いた URL は
   宛先と読まない。`gh issue transfer` は移す元と移す先の両方を見る。
@@ -406,13 +407,13 @@ def _gh_default(d: str) -> str | None:
     return None
 
 
-def _gh_positionals(args: list[str]) -> list[str]:
+def _gh_positionals(args: list[str], extra_value_flags: set[str] = frozenset()) -> list[str]:
     """gh のサブコマンドの後の位置引数（値を取るオプションの値を除く）。"""
     pos = []
     i = 0
     while i < len(args):
         t = args[i]
-        if t in GH_VALUE_FLAGS:
+        if t in GH_VALUE_FLAGS or t in extra_value_flags:
             i += 2
             continue
         if not t.startswith("-"):
@@ -478,8 +479,11 @@ def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list
     """gh の書き込みなら ([宛先], 操作の表示) を（新しいリポジトリの作成は NEW_REPO）、読み取りなら None を返す。"""
     if not args:
         return None
-    # ヘルプ（値を取るオプションの値として書いた `-h` は除く）は読み取り
-    if any(t in ("-h", "--help") and (j == 0 or args[j - 1] not in GH_VALUE_FLAGS) for j, t in enumerate(args)):
+    # ヘルプ（値を取るオプションの値として書いた `-h` は除く）は読み取り。
+    # `gh repo edit`・`create`・`new` の `-h` は `--homepage <URL>` なので、そこでは `--help` だけをヘルプとみなす
+    homepage = args[0] == "repo" and next((a for a in args[1:] if not a.startswith("-")), None) in ("edit", "create", "new")
+    helps = ("--help",) if homepage else ("-h", "--help")
+    if any(t in helps and (j == 0 or args[j - 1] not in GH_VALUE_FLAGS) for j, t in enumerate(args)):
         return None
     if args[0] == "api":
         return _gh_api_target(args[1:], d, env)
@@ -515,11 +519,13 @@ def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list
             repo = t.split("=", 1)[1]
         elif t.startswith("-R") and len(t) > 2:
             repo = t[2:].lstrip("=")
-    pos = _gh_positionals(rest)
+    if repo == "":
+        repo = None  # 空の `--repo ""`・`--repo=` は指定なしと同じ（実行するディレクトリの既定の宛先）
+    pos = _gh_positionals(rest, {"-h"} if homepage else set())
     if group == "repo" and sub == "sync" and not pos:
         return None  # 引数なしの sync は親からローカルへ取り込むだけで、remote に書き込まない
     # 操作するリポジトリ: PR・Issue の URL と --repo（明示されたものはすべて判定する。どれか 1 つでも違えば止める）、
-    # 無ければ GH_REPO → gh repo の位置引数 → gh の既定の宛先。
+    # 無ければ gh repo の位置引数 → GH_REPO → gh の既定の宛先（gh repo の位置引数は GH_REPO より優先する。gh と同じ）。
     # URL は本文などの値（GH_TEXT_FLAGS とサブコマンドごとの本文のフラグの直後）を除いたトークンから探す。
     # 短いフラグはサブコマンドで値を取るか真偽値かが変わる（`pr merge -d` は真偽値）ので、位置引数に限らずに探す
     text_flags = GH_TEXT_FLAGS | GH_TEXT_FLAGS_BY_SUB.get((group, sub), set())
@@ -532,11 +538,12 @@ def _gh_write_target(args: list[str], d: str, env: dict[str, str]) -> tuple[list
         targets.append(_gh_repo(repo))
     if not targets and repo is None:
         target = None
-        if env.get("GH_REPO"):
-            target = _gh_repo(env["GH_REPO"])
-        elif group == "repo" and sub in GH_REPO_POSITIONAL and pos:
+        repo_pos = group == "repo" and sub in GH_REPO_POSITIONAL and bool(pos)
+        if repo_pos:
             target = _gh_repo(pos[0])
-        if target is None and not env.get("GH_REPO"):
+        elif env.get("GH_REPO"):
+            target = _gh_repo(env["GH_REPO"])
+        if target is None and not repo_pos and not env.get("GH_REPO"):
             target = _gh_default(d)
         if target:
             targets.append(target)

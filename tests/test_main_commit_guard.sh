@@ -305,6 +305,16 @@ run "R137: 本文の URL（起動したリポジトリ）があっても -R の�
 run "R138: 本文の URL（起動したリポジトリ）があっても、位置引数の別のリポジトリの URL は止める" oblocked 'gh pr close -c https://github.com/me/a/pull/5 https://github.com/up/b/pull/4'
 run "R139: issue close --comment の本文と、位置引数の別のリポジトリの URL" oblocked 'gh issue close --comment "https://github.com/me/a/issues/5 で対応" https://github.com/up/b/issues/4'
 
+# 5 巡目の指摘
+run "R140: gh repo delete は位置引数を GH_REPO より先に見る" oblocked 'GH_REPO=me/a gh repo delete up/b --yes'
+run "R141: gh repo edit は位置引数を GH_REPO より先に見る" oblocked 'GH_REPO=me/a gh repo edit up/b --description x'
+run "R142: gh repo edit の -h は --homepage（ヘルプではない）" oblocked 'gh repo edit up/b -h https://example.com'
+run "R143: gh repo create の -h は --homepage（ヘルプではない）" oblocked 'gh repo create up/new --public -h https://example.com'
+run "R144: 空の --repo は指定なしと同じ（実行するディレクトリの既定の宛先）" oblocked "cd $TMP/ws/b && gh pr create --repo \"\" --title t --body b"
+run "R145: 空の --repo= は指定なしと同じ" oblocked "cd $TMP/ws/b && gh pr merge --repo= 5"
+run "R146: 空の -R は指定なしと同じ" oblocked "cd $TMP/ws/b && gh pr create -R \"\" --title t"
+run "R147: gh repo edit --help はヘルプ" oallowed 'gh repo edit --help'
+
 # 他のリポジトリの判定で例外が出ても、main の判定は続ける
 _repo "$TMP/ws/one-level" main && git -C "$TMP/ws/one-level" remote set-url origin https://github.com/foo.git
 mainblocked_with_other() { [ "$(_rc_in "$1" "$2" "$3")" = "2" ] && grep -q "main-commit-ok" "$TMP/stderr"; }
