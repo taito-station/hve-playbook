@@ -302,7 +302,7 @@ git diff --name-only "origin/$BASE"...HEAD | grep -E '\.(blade\.php|vue|tsx|jsx)
    完了報告では未実行のパスが無いことを確かめ、実行できないパスがある場合は、そのパスと実行できない理由を明示する
 6. **失敗時のリトライ**:
    - 1 件でも失敗したら **修正してリトライ**
-   - **同一ケースが** 3 回連続失敗したら、`rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/review-"*.diff "$REPO_ROOT/docs/temp/.cost-snapshot"` で中間ファイルを掃除してから **ユーザーに報告して停止** (別ケースの失敗とは合算しない)
+   - **同一ケースが** 3 回連続失敗したら、`: "${REPO_ROOT:?REPO_ROOT が空。Step 1 と同じく解決し直してから実行する}"` で REPO_ROOT が空でないことを確かめ、`rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/.cost-snapshot"` と `REPO_ROOT="$REPO_ROOT" bash -c 'rm -f "$REPO_ROOT"/docs/temp/review-*.diff'` で中間ファイルを掃除してから（glob を bash に渡す理由は Step 9） **ユーザーに報告して停止** (別ケースの失敗とは合算しない)
 7. **テスト網羅性の敵対的レビュー**: ブラウザテスト完了後、独立エージェントで
    テストの網羅性を検証する。テスト実行者自身は「やった」バイアスがかかるため、
    別の視点で「本当に全パスを通したか」を突く。
@@ -656,11 +656,20 @@ fi
 ### Step 9: クリーンアップ
 
 ```bash
-rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/review-"*.diff "$REPO_ROOT/docs/temp/.cost-snapshot" "$REPO_ROOT/docs/temp/.follow.log" "$REPO_ROOT/docs/temp/squash-msg.txt"
+: "${REPO_ROOT:?REPO_ROOT が空。Step 1 と同じく解決し直してから実行する}"
+rm -f "$REPO_ROOT/docs/temp/pr-body.md" "$REPO_ROOT/docs/temp/.pr-body.owner" "$REPO_ROOT/docs/temp/.cost-snapshot" "$REPO_ROOT/docs/temp/.follow.log" "$REPO_ROOT/docs/temp/squash-msg.txt"
+REPO_ROOT="$REPO_ROOT" bash -c 'rm -f "$REPO_ROOT"/docs/temp/review-*.diff'
 # -f で冪等性確保 (review-pr 経路 B 起動時など別 skill が先に消すケースに
 # 耐える)。sidecar (.pr-body.owner) も同時に消すことで、次回 PR 作成時の
 # 所有権判定が確実に「経路 A の新規作成」として始まる。
-# review-*.diff はレビュー各巡で生成された diff ファイル。
+# review-*.diff はレビュー各巡で生成された diff ファイル。glob は上の rm -f に並べず、
+# bash -c に渡す: Bash ツールのシェルが zsh のとき、一致しない glob（review-pr Step 8 が
+# 先に消している）で zsh がその行を実行せず、同じ行のほかのファイルが残るため。
+# find -delete は destructive-guard が止める。ディレクトリは位置引数でなく環境変数で渡す
+# (SKILL.md の本文の位置引数の記法は skill の引数に置き換えられる)。
+# 先頭の行は、Bash ツールの呼び出しをまたいで REPO_ROOT が空になったとき、以降の rm を
+# 実行せずに止める (空のまま進むと /docs/temp/... を消そうとする)。止まったら Step 1 と
+# 同じく REPO_ROOT を解決し直して、このブロックを実行し直す。
 ```
 
 `docs/temp/` に他のファイルがある場合があるため、**ディレクトリごと削除しない**。
