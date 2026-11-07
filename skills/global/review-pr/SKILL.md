@@ -1019,8 +1019,10 @@ browser-regression escalate / review-only 投稿完了) でも、Step 7 完了�
 
 ```bash
 # 全モード共通: レビュー diff ファイルを削除 (経路A は create-pr Step 9 でも
-# 削除するが、経路B / review-only ではここが唯一のクリーンアップポイント)
-rm -f "$REPO_ROOT"/docs/temp/review-*.diff
+# 削除するが、経路B / review-only ではここが唯一のクリーンアップポイント)。
+# glob は bash -c に渡す (Bash ツールのシェルが zsh のとき、diff が 1 つも無いと
+# 「no matches found」で止まるため。create-pr Step 9 と同じ。find -delete は destructive-guard が止める)
+REPO_ROOT="$REPO_ROOT" bash -c 'rm -f "$REPO_ROOT"/docs/temp/review-*.diff'
 # 経路 B の sha 追従（Step 6.5）のログ。経路 A では create-pr Step 9 が消す
 if [ "$OWNED_BODY_FILE" = "True" ]:
     rm -f "$REPO_ROOT/docs/temp/.follow.log"
