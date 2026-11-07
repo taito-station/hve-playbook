@@ -481,9 +481,10 @@ STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 では�
      （最大 3 回。超過時は PO にエスカレーション）
 
 7. 設計資料にフロー図や構成図を含める場合は drawio 形式で作成:
-   - **SVG への変換は `~/.claude/hooks/run-drawio-export.sh <入力.drawio> <出力.svg>` を使う**
+   - **SVG への変換は `~/.claude/hooks/run-drawio-export.sh "<入力.drawio>" "<出力.svg>"` を使う**
      (settings.json で許可済み。利用リポに project skill `/export-drawio` があればそれ経由でも
      よい = 同じスクリプトを呼ぶ)。`Bash` で `drawio --export` / `Xvfb` を直接呼ばない
+   - 上のコマンドの `<…>` は pdf skill の「手順」冒頭の規則に従って置き換える（パスの `$`・`` ` ``・`"`・`\` の前に `\` を付け、相対パスは `./` で始める）
    - drawio / SVG の配置先は利用リポの `documentation-standards` skill (無ければリポの慣例) に従う
 
 ### Step 4: ブラウザテスト
