@@ -3,8 +3,21 @@ import base64, html, mimetypes, re, sys
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-# 括弧の中身の末尾のタイトル（"title" か 'title'）。タイトルが無ければ中身全体をパスとして扱う
-TITLE = re.compile(r'^(.*?)\s+(?:"[^"]*"|\'[^\']*\')\s*$')
+# 括弧の中身の末尾にタイトル（"title" か 'title'）があれば、group(1) がタイトルを外したパス。
+# タイトルが無ければ中身全体をパスとして扱う。(.*\S) は長い空白の並びで後戻りが増えない形にしている
+TITLE = re.compile(r'^(.*\S)\s+(?:"[^"]*"|\'[^\']*\')\s*$')
+
+
+def hides_path_parts(raw, decoded):
+    """デコードで初めて現れる区切り（/）・親ディレクトリ（..）・NUL を持つ候補か。
+
+    見えるとおりの ../ は辿るが、..%2F や %2E%2E%2F のようにエンコードで隠した参照は読まない（Issue #112）。
+    %2F で始まる参照がデコードで絶対パスになるのも、区切りが増えるのでここで防ぐ。
+    """
+    if '\x00' in decoded or decoded.count('/') != raw.count('/'):
+        return True
+    return any(d == '..' and r != '..' for r, d in zip(raw.split('/'), decoded.split('/')))
+
 
 def main():
     md_path = Path(sys.argv[1])
@@ -28,14 +41,14 @@ def main():
             return match.group(0)
         data = None
         for candidate in dict.fromkeys((unquote(src), src)):
-            if Path(candidate).is_absolute():  # %2F で始まる参照がデコードで絶対パスになるのを防ぐ
+            if candidate != src and hides_path_parts(src, candidate):
                 continue
-            img_path = (md_dir / candidate).resolve()
             try:
+                img_path = (md_dir / candidate).resolve()
                 if img_path.is_file():
                     data = img_path.read_bytes()
                     break
-            except OSError:
+            except (OSError, ValueError):  # ValueError: パスに NUL が含まれるとき
                 continue
         if data is None:
             return match.group(0)
