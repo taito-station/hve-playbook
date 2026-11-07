@@ -4,6 +4,8 @@
 
 Accepted — 2026-10-12
 
+結果（Consequences）の「main-commit-guard は `commit` を含まないコマンドではすぐ終わる」は、[0033-block-writes-outside-launched-repository](0033-block-writes-outside-launched-repository.md) で main-commit-guard が起動したリポジトリ以外への書き込みも止めるようになり、`push`・`gh` を含むコマンドも解析するので、現状を表さない。決定内容は変わらない。
+
 ## 背景と課題
 
 開発ルール（Plan モード必須、implement-flow の Step 2〜4、ブランチ必須、ルール準拠表）は rules・skill の文面とメモリに頼っており、計画の段階で「ルール遵守の確認」による差し戻しが続いた（2026-09-27、10-03、10-04 に 2 件）。ADR 0016 も、hve-implement の順序を実行時に守らせる仕組みは同梱していないと書いている。
