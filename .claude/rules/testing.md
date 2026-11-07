@@ -17,7 +17,7 @@ hve-playbook の `tests/`（hook・skill・規則の契約テストなど）は�
 bash tests/run-all.sh
 ```
 
-- HOME を、全件で共有する一時ディレクトリに向けて `tests/test_*.sh` を順に実行し、本ごとの PASS / FAIL と SKIP の有無を出す。FAIL が 1 本でもあれば exit 1
+- HOME を、全件で共有する一時ディレクトリに向けて `tests/test_*.sh` を順に実行し、本ごとの PASS / FAIL と SKIP の有無を出す。SKIP を出したテストは、理由の行を `SKIP: <テスト名> — <理由>` の形で `結果:` 行の前にまとめて出す（Test plan にそのまま写せる。理由の行が無いテストは、理由の代わりにログの場所が出るので、ログを見て理由を書く）。FAIL が 1 本でもあれば exit 1
 - 全件で約 7 分かかる。Bash の既定のタイムアウト（120 秒）では打ち切られるので、`run_in_background` で流す（`timeout` を 600000 にしても流せるが、Bash の上限で余裕が小さい）。サブエージェントに任せるときは worktree を分けない（`isolation: "worktree"` の worktree は親 HEAD から作られ、未コミットの変更を見ない）
 - worktree で作業しているときも worktree の中で流す。ただし `tests/test_review_pr_contracts.sh` だけは、worktree から実行してもメインの checkout の手順書を検査する（ファイル冒頭のコメント参照）。review-pr の手順書を変えたときは、この 1 本がブランチの変更を検査していないことを Test plan に書く
 
