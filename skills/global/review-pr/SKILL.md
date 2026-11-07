@@ -1018,6 +1018,9 @@ browser-regression escalate / review-only 投稿完了) でも、Step 7 完了�
 が残置される。
 
 ```bash
+# Bash ツールの呼び出しをまたぐと REPO_ROOT は空になる。空なら以降の rm を実行せずに止め、
+# Step 0.2 と同じく解決し直してから実行し直す (空のまま進むと /docs/temp/... を消そうとする)
+: "${REPO_ROOT:?REPO_ROOT が空。Step 0.2 と同じく解決し直してから実行する}"
 # 全モード共通: レビュー diff ファイルを削除 (経路A は create-pr Step 9 でも
 # 削除するが、経路B / review-only ではここが唯一のクリーンアップポイント)。
 # glob は bash -c に渡す (Bash ツールのシェルが zsh のとき、diff が 1 つも無いと
