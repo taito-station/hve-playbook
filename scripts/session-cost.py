@@ -32,6 +32,8 @@ PRICING = {
 DEFAULT_PRICING_KEY = "claude-opus-5"
 
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
+# glob に渡すので、.. や * を含む値は使わない
+SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9-]+")
 
 
 def encode_project_dir(cwd: str) -> str:
@@ -46,7 +48,7 @@ def latest_file(paths: List[Path]) -> Optional[Path]:
 
 def find_session_file_by_id(session_id: str) -> Optional[Path]:
     # EnterWorktree で入ったセッションの JSONL は cwd と別の project ディレクトリにもありうるので、全体から探す
-    if not re.fullmatch(r"[A-Za-z0-9-]+", session_id):
+    if not SESSION_ID_PATTERN.fullmatch(session_id):
         return None
     return latest_file(list(PROJECTS_DIR.glob(f"*/{session_id}.jsonl")))
 
@@ -145,7 +147,11 @@ def resolve_target(args: argparse.Namespace) -> Tuple[Optional[Path], List[str]]
         target = find_session_file_by_id(session_id)
         if target:
             return target, []
-        searched.append(str(PROJECTS_DIR / "*" / f"{session_id}.jsonl"))
+        if SESSION_ID_PATTERN.fullmatch(session_id):
+            searched.append(str(PROJECTS_DIR / "*" / f"{session_id}.jsonl"))
+        else:
+            # 値はそのまま出さない（改行や制御文字が端末に出るため）
+            searched.append("（CLAUDE_CODE_SESSION_ID は形式が不正なため使わなかった）")
     cwd = os.getcwd()
     searched.append(str(PROJECTS_DIR / encode_project_dir(cwd) / "*.jsonl"))
     return find_latest_session_file(cwd), searched

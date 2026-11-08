@@ -147,6 +147,25 @@ with tempfile.TemporaryDirectory() as tmp:
           and str(projects / enc(str(lost))) in r.stderr)
     check("見つからないときは探した場所を警告に出す", ok, f"rc={r.returncode} stderr={r.stderr.strip()}")
 
+    # 7. 形式が不正な session ID は glob に使わず、cwd のディレクトリに戻る
+    r, lines = run(home, worktree, "*")
+    check("session ID が * だと他のセッションの JSONL を選ばずに cwd のディレクトリに戻る", lines == 3, r.stderr.strip())
+
+    # 8. 形式が不正な session ID は警告にそのまま出さない (改行や ESC を端末に出さない)
+    r, lines = run(home, lost, "x\n  FAKE\x1b[31m")
+    ok = (r.returncode == 0 and lines is None and "FAKE" not in r.stderr and "\x1b" not in r.stderr
+          and "形式が不正" in r.stderr)
+    check("形式が不正な session ID を警告にそのまま出さない", ok, f"stderr={r.stderr!r}")
+
+# 9. 命名規則を実データの形で固定する (worktree は <primary>--claude-worktrees-<name>)
+import importlib.util
+spec = importlib.util.spec_from_file_location("session_cost", script)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+got = m.encode_project_dir("/Users/x/my_repo/.claude/worktrees/issue-1")
+check("worktree のパスを Claude Code と同じ project ディレクトリ名にする",
+      got == "-Users-x-my-repo--claude-worktrees-issue-1", got)
+
 sys.exit(1 if fail else 0)
 EOF
 rc_detect=$?
