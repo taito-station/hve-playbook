@@ -1,5 +1,6 @@
 #!/bin/bash
 # pdf skill のコマンド例で、パスのプレースホルダがクォートされていることの検査（Issue #100）
+# resolve-issue skill の同じ drawio の例も検査する（Issue #109）
 #
 # 実行: bash tests/test_pdf_quoted_paths.sh
 #
@@ -10,10 +11,12 @@
 #   - ダブルクォートの中で解釈される文字（$・`・"・\）のエスケープと、相対パスを ./ で始める規則が書いてある
 #   - 手順 2 を通ったときは 3-1 の形で生成する（3-2・3-3 は入力の隣に PDF を書くため）
 #   - フォントの確認コマンドが、出力のパスを Python の文字列に埋め込まず argv で渡す
+#   - resolve-issue の drawio の例がクォートされ、pdf skill の置き換えの規則を参照している
 
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL="$ROOT/skills/global/pdf/SKILL.md"
+RESOLVE="$ROOT/skills/global/resolve-issue/SKILL.md"
 pass=0
 fail=0
 check() {
@@ -22,6 +25,8 @@ check() {
 }
 has() { grep -qF -- "$1" "$SKILL"; }
 lacks() { ! grep -qF -- "$1" "$SKILL"; }
+has_r() { grep -qF -- "$1" "$RESOLVE"; }
+lacks_r() { ! grep -qF -- "$1" "$RESOLVE"; }
 
 check "手順 1: 入力と出力をクォートする" has '~/.claude/hooks/run-drawio-export.sh "<入力.drawio>" "<出力.svg>"'
 check "手順 3-2: ディレクトリと入力をクォートし、入力を ./ で始める" has 'cd "<md があるディレクトリ>" && npx --yes md-to-pdf "./<入力.md>" \'
@@ -43,6 +48,11 @@ check "手順 3-2: cd のディレクトリがクォートなしで残ってい�
 check "手順 3-3: 入力がクォートなしで残っていない" lacks 'md-to-pdf <md>'
 check "手順 3-2・3-3: 入力がクォートなしで残っていない" lacks 'md-to-pdf <入力.md>'
 check "手順 3-2・3-3: --basedir がクォートなしで残っていない" lacks '--basedir <共通ルート>'
+check "resolve-issue: drawio の入力と出力をクォートする" has_r '~/.claude/hooks/run-drawio-export.sh "<入力.drawio>" "<出力.svg>"'
+check "resolve-issue: drawio のクォートなしの形が残っていない（プレースホルダ名を問わない）" lacks_r 'run-drawio-export.sh <'
+check "pdf: resolve-issue が参照する「手順」の節がある" grep -qx '## 手順' "$SKILL"
+check "resolve-issue: pdf skill の置き換えの規則を参照する" has_r 'pdf skill の「手順」冒頭の規則に従って置き換える'
+check "resolve-issue: 規則の要点（エスケープと ./）が読める" has_r '`$`・`` ` ``・`"`・`\` の前に `\` を付け、相対パスは `./` で始める'
 
 echo
 echo "passed: $pass, failed: $fail"
