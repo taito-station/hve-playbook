@@ -47,7 +47,7 @@
 
 - 導入先が user-level の場所でないことを確かめる。`[ <target>/.claude -ef ~/.claude ] || [ <target> -ef ~/.claude ] || [ <target> -ef ~ ] || [ <target>/.claude -ef ~ ]` が真なら、何もせずにここで止めて報告する（setup.sh も `[ERROR]` で止まる。手順 2 の `git init`・退避や手順 3 のブランチを残さないため）。
 - git 管理下でなければ、`git init` してよいかユーザーに確認する。
-- 追跡済みファイルに未コミットの変更（`git -C <target> status --short --untracked-files=no`）があれば、先にコミットか stash をしてもらう。setup.sh は未コミットの編集を上書きし、git では復元できないので、そのままでは進めない。
+- 追跡済みファイルに未コミットの変更（`git -C <target> status --short --untracked-files=no`）があれば、先に退避してもらう（リモートがあれば stash するか、作業ブランチにコミットして push 済みにしてもらう。デフォルトブランチへの未 push のコミットは手順 3 で止まる）。setup.sh は未コミットの編集を上書きし、git では復元できないので、そのままでは進めない。
 - 次のものがあるかを確かめる。
   - `.claude/rules/hve/`（あれば再適用。その旨をユーザーに伝えてから進める）
   - `.claude/CLAUDE.md`・`.claude/CLAUDE.hve.md`・ルートの `CLAUDE.md`
@@ -60,7 +60,12 @@
 
 ### 3. 作業ブランチを切る
 
-- コミットがあれば、`chore/apply-hve-playbook` を切る（リモートの有無は問わない）。リモートがあれば、先にデフォルトブランチを pull して最新にする。同名のブランチがあれば、末尾に日付を付ける。ブランチ運用規約があればそれに従う。
+- コミットがあれば、`chore/apply-hve-playbook` を切る（リモートの有無は問わない）。同名のブランチがあれば、末尾に日付を付ける。ブランチ運用規約があればそれに従う。
+  - リモートがあれば、`<target>` のブランチは切り替えず、worktree に切る（user-level の branching.md の「作業開始時の手順」。primary の checkout での `git switch -c` は hook が止める）。`git -C <target> fetch origin` のあと `git -C <target> worktree add --no-track -b chore/apply-hve-playbook .claude/worktrees/apply-hve-playbook origin/<デフォルトブランチ>` で作り（`<target>` の `.gitignore` が `.claude/worktrees/` を除外していなければ、先に `<target>/.git/info/exclude` に `.claude/worktrees/` を足す。primary の `git status` に worktree が未追跡として出続けないように）、EnterWorktree の `path` にそのパスを渡して移る。手順 4 以降の `<target>` は、この worktree のパスに読み替える（手順 2 で退避したファイルは `<target>` の元の場所の `work/hve-backup-<日時>/` にある）。`<target>` の `.gitignore` が `.claude/worktrees/` を除外していなければ、作業ブランチで足す
+  - worktree は `origin/<デフォルトブランチ>` から作るので、`<target>` の未追跡・ignore のファイルと、push していないローカルのコミットは入らない。setup.sh の前に次をする
+    - `git -C <target> log --oneline origin/<デフォルトブランチ>..<デフォルトブランチ>` が空でなければ（push していないコミットがある）、ここで止めてユーザーに確認する
+    - 手順 2 の `git -C <target> ls-files --others -- .claude` で出た未追跡・ignore のファイルのうち、`.claude/CLAUDE.md`・`.claude/CLAUDE.hve.md`・`.claude/rules/hve-local/` を、worktree の同じ相対パスへコピーする（手順 4・5 の分岐・差分の確認・hve-local の突き合わせがその前提で動く。手順 2 の削除対象は退避したコピーと比べる）。元の `<target>` のファイルは消さない（ignore されていない原本は、PR をマージしたあと primary の `git pull` が「untracked working tree files would be overwritten」で止まる原因になるので、手順 9 で後始末を伝える）
+  - リモートが無ければ、`<target>` で `git switch -c` してよい
 - `git init` した直後などでコミットが無い場合は、ブランチは切らずにデフォルトブランチ上で進める。
 
 ### 4. setup.sh を実行する
@@ -71,7 +76,7 @@ bash <hve-playbook>/setup.sh <target>
 
 出力を確認する。
 
-- `[ERROR] user-level の場所（~/.claude・$HOME）に配置する指定です` で止まったら（手順 2 の確認をすり抜けた場合。setup.sh は何も書いていない）、手順 3 でブランチを切っていれば元のブランチに戻してから消し、ユーザーに報告して終える。
+- `[ERROR] user-level の場所（~/.claude・$HOME）に配置する指定です` で止まったら（手順 2 の確認をすり抜けた場合。setup.sh は何も書いていない）、手順 3 で worktree を作っていれば、元の `<target>` に戻って worktree とブランチを消し（`git -C <target> worktree remove <worktree のパス>` → `git -C <target> branch -D <ブランチ>`）、`<target>` でブランチを切っていれば元のブランチに戻してから消し、ユーザーに報告して終える。
 - 出力で CLAUDE.md の扱いを確かめる（手順 5 の分岐に使う）。
   - `[INFO] CLAUDE.md を配置しました`: `.claude/CLAUDE.md` を新しく作った
   - `[WARN] ... CLAUDE.hve.md として配置しました`: `.claude/CLAUDE.hve.md` を新しく作った
@@ -152,6 +157,8 @@ bash <hve-playbook>/setup.sh <target>
   - 手順 2 の退避・質問票で確認した事項
 
 ### 9. 次の一手を伝える
+
+- 手順 3 で worktree に作業し、ignore されていない未追跡の原本（`.claude/CLAUDE.md`・`.claude/rules/hve-local/` など）を `<target>` に残したときは、PR をマージしたあと、追跡された版と `diff` を取って同じなら原本を消す（違えばユーザーに確認する）よう伝える。消すまでは primary の `git pull` が止まる
 
 - 新規プロジェクトや要件定義から始める場合は、`/hve-ard` で ARD（要件定義）を始める。
   - 引数: 企業名、対象事業（任意）

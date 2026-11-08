@@ -2,12 +2,12 @@
 """
 main-commit-guard.py
 
-Claude Code PreToolUse (matcher: Bash) hook。
+Claude Code PreToolUse (matcher: Bash) と SessionStart の hook。
 
 main / master 上の `git commit` を止める（ADR 0020。branching の「main で直接 commit しない」）。
-Edit / Write は止めない。main 上で作った変更は `git switch -c <branch>` で作業ブランチへ
-退避してから commit するのが正規の手順（rules/global/git/branching.md）なので、
-実害であるコミットの時点で止める。
+Edit / Write は止めない。main 上で作った変更は作業ブランチへ退避してから commit するのが正規の手順
+（rules/global/git/branching.md。primary の checkout ではタグ付きの stash で worktree へ移し、worktree の中なら
+`git switch -c <branch>`）なので、実害であるコミットの時点で止める。
 
 判定:
 - heredoc の本文とコメントを除いてから shlex で分割し、`;` `&&` `||` `|` `&` 括弧・改行で区切ったセグメントごとに見る
@@ -20,7 +20,7 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   （unborn のブランチも含む）。remote の無いリポジトリ（`git init` 直後や検証用の一時リポジトリ）は PR を作れず、
   main を PR で守る branching の目的が当てはまらないので通す。
   detached HEAD・リポジトリ外・git の失敗は通す。同じコマンド内のブランチの切り替えは追わないので、
-  作業ブランチへの退避（`git switch -c`）と commit は別の Bash 呼び出しで実行する
+  作業ブランチへの退避と commit は別の Bash 呼び出しで実行する
 
 起動したリポジトリ以外への書き込みも止める（ADR 0033。branching の「起動したリポジトリ以外には書き込まない」）:
 - 起動したリポジトリは `CLAUDE_PROJECT_DIR` の origin。比べるのはパスではなく、remote の URL などから host を除いた
@@ -51,17 +51,34 @@ Edit / Write は止めない。main 上で作った変更は `git switch -c <bra
   など commit 以外でコミットを作るサブコマンド（外へ出すのは push なので、そこで止まる）、org・アカウントへの
   書き込み（`gh secret set --org`・`gh gist create` など）、`gh` 以外の手段（`curl` など）
 
+primary の checkout での作業ブランチの作成も止める（ADR 0034。branching の「作業開始時の手順」）:
+- primary の checkout は、`git rev-parse --path-format=absolute --git-dir --git-common-dir` の 2 つが同じ作業ツリー。
+  並走するセッションや `~/.claude` の symlink 先と共有されうるので、デフォルトブランチのまま使い、作業は worktree で始める
+- 止めるのは、判定するリポジトリ（main への commit と同じく `git -C`・`cd`・`env -C` を追う）が remote を持つ primary の
+  checkout で、HEAD がコミットを指すときの、新しいブランチを作るオプション（`git switch` の `-c`・`-C`・`--create`・
+  `--force-create`・`--orphan`、`git checkout` の `-b`・`-B`・`--orphan`。短いオプションをまとめた形・値を詰めた形を含む）だけ。
+  既存ブランチへの切り替え（`gh pr checkout`、origin にだけあるブランチの名前での `git switch`、`--track` も）、
+  デフォルトブランチへの切り替え、ファイルの復元、`--detach`、`git worktree add`、worktree の中、remote の無いリポジトリ、
+  unborn の HEAD（worktree を作る基点が無い）は止めない
+- 止める理由が重なったら、main への commit → 起動したリポジトリ以外への書き込み → primary でのブランチの作成の順に示す
+- SessionStart では止めない。起動したリポジトリ（`CLAUDE_PROJECT_DIR`、無ければ payload の `cwd`）の primary の checkout
+  （`git worktree list --porcelain` の先頭。worktree のセッションでも primary を見る）が remote を持ち、デフォルトブランチ
+  （`refs/remotes/origin/HEAD` の先、無ければ main と master）以外のブランチにいれば、標準出力に警告を出す（モデルの文脈に入る）
+
 bypass: コマンド中の本物のシェルコメント（クォートと heredoc の本文の外で、単語の先頭の `#`）に
 `# via:main-commit-ok: <理由>` があるとき（理由必須）。via はコマンド中のどのコメントにあっても、コメントの中で
 他の via（`# via:create-pr` など）と並べてもよく、そのコマンドのすべての commit を通す。起動したリポジトリ以外への書き込みは、別の
-`# via:other-repo-ok: <理由>` で通す（ユーザーが指示したときだけ）。片方の via でもう片方は通らない。
+`# via:other-repo-ok: <理由>` で、primary の checkout での作業ブランチの作成は `# via:primary-branch-ok: <理由>` で通す
+（ユーザーが指示したときだけ）。via はそれぞれの判定にだけ効き、他の判定は通らない。
 
 限界: シェルの構文を完全には解釈しない best-effort の静的判定で、Claude Code がふだん出す形
-（`git commit` / `git -C <リテラルのパス>` / `&&`・`;`・改行での連結 / `<<'EOF'` の heredoc）を対象にする。
+（`git commit` / `git switch -c` / `git -C <リテラルのパス>` / `&&`・`;`・改行での連結 / `<<'EOF'` の heredoc）を対象にする。
 変数・コマンド置換・前置コマンド・予約語の中の `cd` など、それ以外の形は見逃すことがあり、
 分割に失敗したコマンドは通す（fail-open）。逆に、同じコマンド内で作業ブランチへ退避してからの commit
 （`git switch -c x && git commit`。切り替えは追わない）と、`git commit --dry-run` / `-h` は main 上では止める
-（別の Bash 呼び出しにすれば回復できる）。
+（別の Bash 呼び出しにすれば回復できる）。primary でのブランチの作成はオプションだけで判定するので、
+`git branch x` と `git switch x` の 2 手に分けた形、長いオプションの省略形（`--cre`）、git の alias（`git co -b`）は止めない。
+submodule の作業ツリーは primary と判定されて止まる（誤操作の防止が目的で、迂回への防御ではない。ADR 0020）。
 
 例外は飲み込み、hook 失敗で Claude Code を止めない（exit 0）。
 """
@@ -90,6 +107,10 @@ HEREDOC_RE = re.compile(r"""(?<!<)<<(-?)\s*\\?(?:'([^']+)'|"([^"]+)"|([^\s;&|<>(
 # via はコメントの中のどこにあってもよい（`# via:create-pr # via:other-repo-ok: x` のように並べられる）
 VIA_RE = re.compile(r"(?:^|\s)#\s*via:main-commit-ok\s*:\s*\S")
 VIA_OTHER_RE = re.compile(r"(?:^|\s)#\s*via:other-repo-ok\s*:\s*\S")
+VIA_PRIMARY_RE = re.compile(r"(?:^|\s)#\s*via:primary-branch-ok\s*:\s*\S")
+# 新しいブランチを作って切り替えるオプション（短いオプションは文字、長いオプションは `=` の前の名前）
+CREATE_SHORT = {"switch": "cC", "checkout": "bB"}
+CREATE_LONG = {"switch": {"--create", "--force-create", "--orphan"}, "checkout": {"--orphan"}}
 # 値を別トークンで取る git のグローバルオプション（-C は別に扱う）
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 # 値を別トークンで取る git push のオプション（`--repo` は宛先なので別に扱う）
@@ -579,6 +600,93 @@ def _has_remote(d: str) -> bool:
     return r.returncode == 0 and bool(r.stdout.strip())
 
 
+def _creates_branch(sub: str, args: list[str]) -> bool:
+    """`git switch` / `git checkout` の引数が新しいブランチを作るオプションを含むか。`--` の後ろはパスなので見ない。
+    switch・checkout の短いオプションで値を取るのは、作成のもの（-c・-C・-b・-B）のほかは checkout の -U（数値）だけで、
+    その値は作成の文字を含まない。そのため、まとめた形（`-qb`）や値を詰めた形（`-cfeat/x`）も、文字のどれかが作成の
+    オプションなら作成とみなす。長いオプションの省略形（`--cre`）と alias（`git co -b`）は追わない。"""
+    if sub not in CREATE_SHORT:
+        return False
+    for a in args:
+        if a == "--":
+            return False
+        if a.startswith("--"):
+            if a.split("=", 1)[0] in CREATE_LONG[sub]:
+                return True
+        elif a.startswith("-") and any(c in CREATE_SHORT[sub] for c in a[1:]):
+            return True
+    return False
+
+
+def _is_primary(d: str) -> bool:
+    """d が primary の checkout（git-dir と git-common-dir が同じ作業ツリー）か。git が失敗したときは False（通す側）。"""
+    out = _git_out(d, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir")
+    if not out:
+        return False
+    dirs = out.splitlines()
+    return len(dirs) == 2 and dirs[0] == dirs[1]
+
+
+def _has_commit(d: str) -> bool:
+    """HEAD がコミットを指すか（unborn でないか）。"""
+    return _git_out(d, "rev-parse", "-q", "--verify", "HEAD") is not None
+
+
+def _guarded_primary(d: str) -> bool:
+    """d が remote を持つリポジトリの primary の checkout で、HEAD がコミットを指すか。
+    remote の無いリポジトリ（一時リポジトリ）と unborn（worktree を作る基点が無い）は対象外。"""
+    return _is_primary(d) and _has_remote(d) and _has_commit(d)
+
+
+def _toplevel(d: str) -> str:
+    """d のリポジトリのトップレベル（worktree の置き場所の基準）。求められなければ d のまま。"""
+    return _git_out(d, "rev-parse", "--show-toplevel") or d
+
+
+def _home_tilde(path: str) -> str:
+    """ホームの下のパスを ~ で始まる形にする。"""
+    home = os.path.expanduser("~")
+    return "~" + path[len(home) :] if home and home != "/" and (path == home or path.startswith(home + "/")) else path
+
+
+def _default_branches(d: str) -> set[str]:
+    """デフォルトブランチの名前。`refs/remotes/origin/HEAD` があればその先、無ければ main と master。"""
+    ref = _git_out(d, "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD")
+    if ref and ref.startswith("origin/"):
+        return {ref[len("origin/") :]}
+    return {"main", "master"}
+
+
+def _session_start_warning(payload: dict) -> str | None:
+    """起動したリポジトリの primary の checkout が、デフォルトブランチ以外のブランチにいれば警告文を返す。
+    worktree のセッションでも primary を見る（`git worktree list --porcelain` の先頭が primary）。"""
+    d = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd()
+    if not isinstance(d, str):
+        return None
+    out = _git_out(d, "worktree", "list", "--porcelain")
+    if not out:
+        return None
+    first = out.split("\n\n", 1)[0].splitlines()
+    primary = next((l[len("worktree ") :] for l in first if l.startswith("worktree ")), None)
+    branch = next((l[len("branch refs/heads/") :] for l in first if l.startswith("branch refs/heads/")), None)
+    if primary is None or branch is None or not _has_remote(primary):
+        return None  # bare・detached・remote の無いリポジトリは対象外
+    defaults = _default_branches(primary)
+    if branch in defaults:
+        return None
+    # ブランチ名は fork の PR などリポジトリの外から決まりうるので、モデルの文脈に入れる前に
+    # JSON の文字列として埋め込む（非 ASCII・引用符・バックスラッシュ・制御文字をエスケープし、長さも抑える）。
+    # パスはホームを ~ に置き換える（ローカルのユーザー名を文脈に出さない）
+    shown = json.dumps(branch[:100] + ("…" if len(branch) > 100 else ""))
+    return (
+        "[main-commit-guard] primary の checkout（" + json.dumps(_home_tilde(primary), ensure_ascii=False) + "）が、デフォルトブランチ（"
+        + " / ".join(sorted(defaults)) + "）ではなく作業ブランチ " + shown + " にある。"
+        "並走するセッションの作業かもしれないので、primary のブランチを自分の判断で戻したり切り替えたりしない。"
+        "作業は worktree で行う（rules/global/git/branching.md の「作業開始時の手順」）。"
+        "戻す必要があれば、他のセッションが使っていないかをユーザーに確かめてから戻す。"
+    )
+
+
 def _other_hit(seg: list[str], base: str, env: dict[str, str]) -> tuple[list[str], str] | None:
     """seg が書き込みなら ([宛先], 操作の表示) を返す。例外は飲み込んで None（main の判定を巻き込まない）。"""
     try:
@@ -600,9 +708,11 @@ def _other_hit(seg: list[str], base: str, env: dict[str, str]) -> tuple[list[str
     return None
 
 
-def _blocked(segs: list[list[str]], cwd: str, proj: str | None) -> tuple[tuple[str, str] | None, tuple[str, str, str] | None]:
-    """(main への commit, 起動したリポジトリ以外への書き込み) をそれぞれ返す。
-    前者は (ディレクトリ, ブランチ)、後者は (操作, 宛先のリポジトリ, 起動したリポジトリ)。
+def _blocked(
+    segs: list[list[str]], cwd: str, proj: str | None
+) -> tuple[tuple[str, str] | None, tuple[str, str, str] | None, str | None]:
+    """(main への commit, 起動したリポジトリ以外への書き込み, primary の checkout でのブランチの作成) をそれぞれ返す。
+    1 つ目は (ディレクトリ, ブランチ)、2 つ目は (操作, 宛先のリポジトリ, 起動したリポジトリ)、3 つ目は primary のディレクトリ。
     起動したリポジトリ（proj の origin）は、書き込みの宛先が分かったときに 1 回だけ求める。
     proj が無い・origin が無ければ後者は判定しない。"""
     base = cwd
@@ -610,6 +720,7 @@ def _blocked(segs: list[list[str]], cwd: str, proj: str | None) -> tuple[tuple[s
     stack: list[tuple[str, dict[str, str]]] = []
     main_hit = None
     other_hit = None
+    primary_hit = None
     check_other = bool(proj)
     launch_cache: list[str | None] = []
 
@@ -643,6 +754,8 @@ def _blocked(segs: list[list[str]], cwd: str, proj: str | None) -> tuple[tuple[s
             b = _branch(call[0])
             if b in PROTECTED and _has_remote(call[0]):
                 main_hit = (call[0], b)
+        if call is not None and primary_hit is None and _creates_branch(call[1], call[2]) and _guarded_primary(call[0]):
+            primary_hit = _toplevel(call[0])
         if not check_other or other_hit is not None:
             continue
         hit = _other_hit(seg, base, env)
@@ -655,7 +768,7 @@ def _blocked(segs: list[list[str]], cwd: str, proj: str | None) -> tuple[tuple[s
         bad = next((t for t in hit[0] if t != launch), None)
         if bad is not None:
             other_hit = (hit[1], bad, launch)
-    return main_hit, other_hit
+    return main_hit, other_hit, primary_hit
 
 
 def main() -> int:
@@ -666,28 +779,48 @@ def main() -> int:
             return 0
         if not isinstance(payload, dict):
             return 0
+        if payload.get("hook_event_name") == "SessionStart":
+            # 止めない。標準出力はモデルの文脈に入る
+            warning = _session_start_warning(payload)
+            if warning:
+                print(warning)
+            return 0
         if payload.get("tool_name") != "Bash":
             return 0
         ti = payload.get("tool_input") or {}
         cmd = ti.get("command", "") if isinstance(ti, dict) else ""
-        if not isinstance(cmd, str) or not ("commit" in cmd or "push" in cmd or re.search(r"\bgh\b", cmd)):
+        if not isinstance(cmd, str) or not ("commit" in cmd or "push" in cmd or "switch" in cmd or "checkout" in cmd or re.search(r"\bgh\b", cmd)):
             return 0
         cwd = payload.get("cwd")
         if not isinstance(cwd, str) or not cwd:
             cwd = os.getcwd()
         segs, comments = _parse(cmd)
-        main_hit, other_hit = _blocked(segs, cwd, os.environ.get("CLAUDE_PROJECT_DIR"))
+        main_hit, other_hit, primary_hit = _blocked(segs, cwd, os.environ.get("CLAUDE_PROJECT_DIR"))
 
         # bypass: 分割のときに除いた本物のコメントの中だけで via を探す（判定ごとに別の via）
+        # 止める理由が重なったら、main への commit → 起動したリポジトリ以外への書き込み → primary でのブランチの作成の順に示す
         if main_hit is not None and not any(VIA_RE.search(c) for c in comments):
             d, b = main_hit
             b = b[len("refs/heads/") :]
+            if _guarded_primary(d):
+                top = shlex.quote(_toplevel(d))
+                how = (
+                    "primary の checkout なので、rules/global/git/branching.md の「作業開始時の手順」の退避手順で、"
+                    "自分の未コミットの変更だけを worktree へ移してから commit する（自分が作ったと言い切れない変更は移さずにユーザーに確認する。"
+                    "`git stash push -u -m <固有のタグ> -- <自分が変えたパス>` → "
+                    f"`git -C {top} worktree add --no-track -b <type>/<short-kebab-description> .claude/worktrees/<名前> origin/<default>` → "
+                    "worktree で `git stash apply <その stash の SHA>` → 自分の stash を drop。素の `git stash pop` は使わない）。\n"
+                )
+            else:
+                how = (
+                    "`git switch -c <type>/<short-kebab-description>` で作業ブランチへ退避してから commit する"
+                    "（未コミットの変更はそのまま持ち越せる）。退避と commit は別の Bash 呼び出しで実行する"
+                    "（この hook は実行前の HEAD で判定するので、1 つのコマンドにつなぐと止まる）。\n"
+                )
             print(
                 "BLOCKED by main-commit-guard hook.\n"
-                f"reason: `{b}` ブランチ上での git commit（{d}）。main / master へは直接 commit しない。\n"
-                "`git switch -c <type>/<short-kebab-description>` で作業ブランチへ退避してから commit する"
-                "（未コミットの変更はそのまま持ち越せる）。退避と commit は別の Bash 呼び出しで実行する"
-                "（この hook は実行前の HEAD で判定するので、1 つのコマンドにつなぐと止まる）。\n"
+                f"reason: `{b}` ブランチ上での git commit（{shlex.quote(d)}）。main / master へは直接 commit しない。\n"
+                + how +
                 "ユーザーが main への commit を明示的に指示した場合のみ、コマンド中のコメントで "
                 "`# via:main-commit-ok: <理由>` を付ける（理由は非空必須）。",
                 file=sys.stderr,
@@ -704,6 +837,21 @@ def main() -> int:
                 "直すべき点を見つけたなら、自分で PR・Issue・push をせず、ユーザーに報告して判断を委ねる。\n"
                 "ユーザーがこのリポジトリへの書き込みを明示的に指示した場合のみ、コマンド中のコメントで "
                 "`# via:other-repo-ok: <理由>` を付ける（理由は非空必須）。",
+                file=sys.stderr,
+            )
+            return 2
+        if primary_hit is not None and not any(VIA_PRIMARY_RE.search(c) for c in comments):
+            print(
+                "BLOCKED by main-commit-guard hook.\n"
+                f"reason: primary の checkout（{shlex.quote(primary_hit)}）で新しいブランチを作って切り替えようとしている。"
+                "primary は並走するセッションと共有されうるので、デフォルトブランチのまま使い、"
+                "作業は worktree で始める（rules/global/git/branching.md の「作業開始時の手順」、ADR 0034）。\n"
+                f"`git -C {shlex.quote(primary_hit)} worktree add --no-track -b <type>/<short-kebab-description> .claude/worktrees/<名前> origin/<default>` "
+                "で worktree を作り、EnterWorktree の `path` にそのパスを渡して移る。"
+                "main 上に未コミットの変更があれば、branching.md の退避手順（タグ付きの stash → worktree で SHA を指定して apply）で移す。"
+                "`git branch <名前>` と `git switch <名前>` の 2 手に分けて回避しない。\n"
+                "ユーザーが primary での作業を明示的に指示した場合のみ、コマンド中のコメントで "
+                "`# via:primary-branch-ok: <理由>` を付ける（理由は非空必須）。",
                 file=sys.stderr,
             )
             return 2

@@ -181,6 +181,16 @@
             "command": "sh ~/.claude/hooks/tmux-pane-awaiting.sh"
           }
         ]
+      },
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/main-commit-guard.py",
+            "timeout": 30
+          }
+        ]
       }
     ]
   },
