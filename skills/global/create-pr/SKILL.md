@@ -288,7 +288,7 @@ git diff --name-only "origin/$BASE"...HEAD | grep -E '\.(blade\.php|vue|tsx|jsx)
 
 #### 実行
 
-1. **dev server 起動確認**: 多くは `./vendor/bin/sail` で稼働中。プロジェクト固有の起動コマンドは CLAUDE.md / `.env` / `docker-compose.yml` を確認して判断。停止していたら起動する
+1. **dev server 起動確認**: 多くは `./vendor/bin/sail` で稼働中。プロジェクト固有の起動コマンドは CLAUDE.md / `.env` / `docker-compose.yml` を確認して判断。停止していたら起動する。worktree で作業しているときは、worktree に立てた stack を使う（primary の stack は primary の作業ツリーを見ている。branching.md の「worktree で Docker Compose の stack を立てる」）
    - 起動コマンドが特定できない / 3 回試行しても URL に到達できない場合は、**Step 4 全体を skip し、その旨を Step 8 の最終報告で明示**。skill 全体は escalate せず通常フローを継続。あわせて `docs/temp/pr-body.md` の Test plan に `- [ ] ブラウザテスト: skip ({理由})` を残す (未チェックのままにして実施済と誤認させない。`## ブラウザテスト` セクションは書かない)
 2. **URL 推測 → 検証**: test plan 項目 + 変更画面 (route から逆引き) で `mcp__playwright__browser_navigate`
 3. **操作・検証**: 必要に応じて `mcp__playwright__browser_click` / `browser_type` / `browser_snapshot`

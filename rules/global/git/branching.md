@@ -13,16 +13,56 @@
 
 `main` で直接コミット・push しない（`main` を常にデプロイ可能に保つため、変更は PR でレビューしてからマージする）。開発業務で git を使うときは、コードを書き始める前に作業ブランチを切る。
 
+作業ブランチは worktree に切る。primary の checkout（clone の本体の作業ツリー。`git rev-parse --git-dir` と `--git-common-dir` が同じもの）のブランチは切り替えず、デフォルトブランチのまま使う。primary は並走するセッション（同じ clone の worktree で動くものを含む）と共有されうるうえ、`~/.claude` の symlink 先にもなっているので、ブランチを切り替えると他のセッションの作業ツリーや設定を書き換えてしまう。並走 clone（parallel-setup）も、それぞれの clone の primary として同じに扱う。空いているように見えても、自分の判断で例外にしない（ADR 0034）。
+
 ```sh
-# 作業開始の標準手順
-git switch main
-git pull --ff-only
-git switch -c <type>/<short-kebab-description>
+# primary の checkout から始めるとき（リポジトリのトップレベルで実行する）
+git fetch origin
+git worktree add --no-track -b <type>/<short-kebab-description> .claude/worktrees/<名前> origin/<default>
+# Claude Code では、続けて EnterWorktree の path にこのパスを渡して移る
+
+# すでに worktree の中にいるとき（EnterWorktree の name で作った worktree など）
+git fetch origin
+git switch --no-track -c <type>/<short-kebab-description> origin/<default>
 ```
 
-すでに `main` で変更を作ってしまった場合は、`git switch -c <branch>` で作業ブランチへ退避してから commit する（`main` には残さない）。
+- `<default>` はデフォルトブランチ（`git rev-parse --abbrev-ref origin/HEAD` の `origin/` を外したもの。無ければ main / master）。worktree は `origin/<default>` を基点にするので、着手のために primary を切り替えたり pull したりしない。primary の更新は post-merge-cleanup skill の条件（primary が `<default>` にいて変更が無く、同じリポジトリを扱う他のセッションがいない）に委ねる
+- `--no-track` を付ける。付けないと作業ブランチの追跡先が `origin/<default>` になり、素の `git push` が名前の不一致で失敗する（`push.default=upstream` ではデフォルトブランチへ push される）
+- worktree の置き場所は、リポジトリのトップレベルの `.claude/worktrees/<名前>`（EnterWorktree と同じ）。`.claude/worktrees/` を `.gitignore` に入れる
+- 既存ブランチの確認（他人の PR など）は、worktree か `git show` / `git diff` で行うのが望ましい。primary で切り替えた場合は、自分の作業が終わったら戻す。他のセッションが切り替えた primary は自分の判断で戻さず（自分は worktree で続ける）、戻す必要があれば、他のセッションが使っていないかをユーザーに確かめてから戻す
+- Docker Compose（Laravel Sail を含む）で動かすリポジトリでは、primary で立ち上げた stack は primary の作業ツリーを見ているので、worktree の変更を検証しない。テスト・ブラウザテストは worktree に立てた stack で行う（下の「worktree で Docker Compose の stack を立てる」）
+- remote の無いリポジトリ（`git init` 直後や検証用の一時リポジトリ）と、コミットの無いリポジトリ（worktree を作る基点が無い）は、この節の対象外で、従来どおり `git switch -c` でよい
 
-`main` / `master` 上の `git commit` は hook（main-commit-guard）が止める（remote の無いリポジトリは対象外）。ユーザーが `main` への commit を明示的に指示したときだけ、コマンド中のコメントで `# via:main-commit-ok: <理由>` を付ける。「コミットして」だけでは `main` への明示的な指示に当たらないので、remote を持つリポジトリでは作業ブランチへ退避してから commit し、切ったブランチ名を報告する。作業ブランチへの退避（`git switch -c <branch>`）と commit は別の Bash 呼び出しで実行する（hook は実行前の HEAD で判定するので、1 つのコマンドにつなぐと止まる）。
+primary の checkout での `git switch -c|-C|--create|--force-create|--orphan` と `git checkout -b|-B|--orphan` は hook（main-commit-guard）が止める（remote が無い・コミットが無いリポジトリは対象外）。ユーザーが primary での作業を明示的に指示したときだけ、コマンド中のコメントで `# via:primary-branch-ok: <理由>` を付ける。hook はオプションだけで判定するので、`git branch <名前>` と `git switch <名前>` の 2 手に分けて回避しない。セッションの開始時に primary がデフォルトブランチ以外にあれば、同じ hook が警告を出す。
+
+すでに `main` で変更を作ってしまった場合は、作業ブランチへ退避してから commit する（`main` には残さない）。
+
+- primary の checkout では、自分の未コミットの変更だけを stash で worktree へ移す。primary は並走するセッションやユーザーと共有されうるので、先に `git status --porcelain` で変更を確かめ、自分が作ったと言い切れない変更は移さずにユーザーに確認する。stash は全 worktree と並走するセッションで共有されるので、タグを付けて自分の stash だけを扱い、素の `git stash pop` は使わない
+
+  ```sh
+  # リポジトリのトップレベルで実行する
+  git stash push -u -m "<固有のタグ>" -- <自分が変えたパス>...
+  git stash list --format='%H %gs' | grep "<固有のタグ>"   # 自分の stash の SHA を控える
+  git worktree add --no-track -b <type>/<short-kebab-description> .claude/worktrees/<名前> origin/<default>
+  git -C .claude/worktrees/<名前> stash apply <控えた SHA>
+  # apply が成功したら、タグで今の stash@{n} を探し直して git stash drop stash@{n}
+  ```
+
+  apply が衝突したら（ローカルの `main` が origin より遅れていたときなど）、解消を試みずに止まってユーザーに報告する（stash は drop せずに残す）
+- worktree の中・remote の無いリポジトリ・コミットの無いリポジトリでは、`git switch -c <branch>` で退避してよい
+
+#### worktree で Docker Compose の stack を立てる
+
+Docker Compose（Laravel Sail を含む）で動かすリポジトリで worktree に着手したら、テストの前に worktree に stack を立てる（手順は未検証の雛形。プロジェクトの README・CLAUDE.md に起動の手順があればそれに合わせる）。
+
+- worktree には ignore された `.env`・`vendor/`・`node_modules/` が無い。`.env` は primary からコピーし（秘密情報を含むのでコミットしない）、依存は worktree で入れ直す（`composer install`・`npm ci` など。Sail なら `vendor/bin/sail` が入るまではコンテナの外で入れる）
+- worktree の stack は、primary の stack を止めているときも含めて常に primary と別の project 名にする。名前は `<リポジトリ名>-<worktree の名前>` とし、compose を叩くたびに `docker compose -p <名前>` で渡す（Sail は `.env` を読むので、worktree の `.env` の `COMPOSE_PROJECT_NAME` に書く）。コピーした `.env` の `COMPOSE_PROJECT_NAME`、compose ファイルの `name:`、セッションの環境変数（parallel-setup の `settings.local.json` の env。`.env` より優先される）は primary と同じ名前になるので、`-p` の無い素の `docker compose` は使わない（インラインの `COMPOSE_PROJECT_NAME=… docker compose` は sail-env-inline-block hook が止める）
+- `up` の前に `docker compose -p <名前> config | grep '^name:'` で、project 名が primary の名前（primary で `docker compose config` が返す名前）と違うことを確かめる。同じなら実行せずに止まる
+- primary の stack と同時に立てるときは、ホストに公開するポート（Sail なら `APP_PORT`・`FORWARD_DB_PORT` など）をずらす。DB の volume は project 名ごとに分かれるので、migrate・seed をやり直す
+- テスト（`docker compose exec` / `sail test` など）とブラウザテストは worktree の stack に対して行う。primary の stack のコンテナで `docker exec` すると、primary の作業ツリーを検証してしまう
+- 作業が終わったら、worktree を片付ける前に worktree の stack を止めて消す（`docker compose -p <名前> down`。parallel-setup のとおり `-v` は付けない）。残った volume は `docker volume ls --filter label=com.docker.compose.project=<名前>` で worktree の project のものだけであることを確かめてから、`docker volume rm` で消す
+
+`main` / `master` 上の `git commit` は hook（main-commit-guard）が止める（remote の無いリポジトリは対象外）。ユーザーが `main` への commit を明示的に指示したときだけ、コマンド中のコメントで `# via:main-commit-ok: <理由>` を付ける。「コミットして」だけでは `main` への明示的な指示に当たらないので、remote を持つリポジトリでは作業ブランチへ退避してから commit し、切ったブランチ名を報告する。作業ブランチへの退避と commit は別の Bash 呼び出しで実行する（hook は実行前の HEAD で判定するので、1 つのコマンドにつなぐと止まる）。
 
 ## ブランチ命名規則
 
@@ -71,13 +111,7 @@ Issue 番号と紐づける場合は `feat/123-user-login` の形にする。
 
 ### マージ後の同期
 
-ローカルの `main` を最新化してから次の作業ブランチを切る:
-
-```sh
-git switch main
-git pull --ff-only
-git switch -c feat/<next-task>
-```
+作業ブランチと worktree を片付け、ローカルの `main` を最新化する（post-merge-cleanup skill の手順）。次の作業ブランチは、「作業開始時の手順」のとおり worktree に切る。
 
 ## PR とコミットの粒度
 

@@ -324,6 +324,108 @@ run "R115: パスが 1 段の origin で {owner}/{repo} を解決できなくて
 mblocked() { [ "$(_rc_in "$1" "$2" "$3")" = "2" ] && grep -q "main-commit-ok" "$TMP/stderr"; }
 run "R50: 起動したリポジトリの main 上の commit は main-commit として止める" mblocked 'git commit -m x' "$TMP/main" "$TMP/main"
 
+# ---------- primary の checkout での作業ブランチの作成（ADR 0034） ----------
+# primary の checkout（git-dir と git-common-dir が同じ作業ツリー）で、新しいブランチを作って切り替える操作を止める。
+# 既存ブランチへの切り替え・デフォルトブランチへの切り替え・worktree の中・remote の無いリポジトリ・unborn は止めない
+git -C "$TMP/main" worktree add -q -b feat/pw "$TMP/main-wt"
+_repo "$TMP/noremote-c" main && git -C "$TMP/noremote-c" remote remove origin && git -C "$TMP/noremote-c" switch -q -c feat/x
+pblocked() { [ "$(_rc "$1" "$2")" = "2" ] && grep -q "primary-branch-ok" "$TMP/stderr"; }
+
+# 止める
+run "P1: primary で git switch -c" pblocked 'git switch -c feat/y' "$TMP/main"
+run "P2: primary で git checkout -b" pblocked 'git checkout -b feat/y' "$TMP/main"
+run "P3: git switch -C" pblocked 'git switch -C feat/y' "$TMP/main"
+run "P4: git switch --create" pblocked 'git switch --create feat/y' "$TMP/main"
+run "P5: git switch --create=（= でつなぐ形）" pblocked 'git switch --create=feat/y' "$TMP/main"
+run "P6: git switch -c の値を詰めた形" pblocked 'git switch -cfeat/y' "$TMP/main"
+run "P7: git checkout -B と基点" pblocked 'git checkout -B feat/y origin/main' "$TMP/main"
+run "P8: git checkout --orphan" pblocked 'git checkout --orphan gh-pages' "$TMP/main"
+run "P9: git switch --orphan" pblocked 'git switch --orphan gh-pages' "$TMP/main"
+run "P10: git switch --force-create" pblocked 'git switch --force-create feat/y' "$TMP/main"
+run "P11: 他のオプションの後ろの -c" pblocked 'git switch -q -c feat/y' "$TMP/main"
+run "P12: 短いオプションをまとめた -qb" pblocked 'git checkout -qb feat/y' "$TMP/main"
+run "P13: git -C で primary を指す" pblocked "git -C $TMP/main switch -c feat/y" "$TMP/norepo"
+run "P14: cd で primary に移ってから" pblocked "cd $TMP/main && git switch -c feat/y" "$TMP/norepo"
+run "P15: env -C で primary を指す" pblocked "env -C $TMP/main git switch -c feat/y" "$TMP/norepo"
+run "P16: グローバルオプションの後ろの checkout -b" pblocked 'git -c core.x=y checkout -b feat/y' "$TMP/main"
+run "P17: primary が作業ブランチにいても止める" pblocked 'git switch -c feat/z' "$TMP/feature"
+run "P18: 理由の無い via は通さない" pblocked 'git switch -c feat/y # via:primary-branch-ok:' "$TMP/main"
+run "P19: クォート内の via は通さない" pblocked "git switch -c feat/y -- '# via:primary-branch-ok: x'" "$TMP/main"
+run "P20: main-commit-ok の via では通さない" pblocked 'git switch -c feat/y # via:main-commit-ok: x' "$TMP/main"
+
+# 通す
+pallowed() { [ "$(_rc "$1" "$2")" = "0" ] && [ ! -s "$TMP/stderr" ]; }
+run "P30: デフォルトブランチへの切り替え" pallowed 'git switch main && git pull --ff-only' "$TMP/feature"
+run "P31: 既存ブランチへの git switch（Q2）" pallowed 'git switch feat/x' "$TMP/main"
+run "P32: 既存ブランチへの git checkout（Q2）" pallowed 'git checkout feat/x' "$TMP/main"
+run "P33: git checkout -- <path>（ファイルの復元は destructive-guard の担当）" pallowed 'git checkout -- README.md' "$TMP/main"
+run "P34: git switch --detach" pallowed 'git switch --detach' "$TMP/main"
+run "P35: git worktree add -b（primary の HEAD は動かない）" pallowed 'git worktree add .claude/worktrees/x -b feat/x origin/main' "$TMP/main"
+run "P36: gh pr checkout（Q2: 既存ブランチの確認は止めない）" pallowed 'gh pr checkout 12' "$TMP/main"
+run "P37: worktree の中での git switch -c" pallowed 'git switch -c feat/y' "$TMP/main-wt"
+run "P38: cd で worktree に移ってから git switch -c" pallowed "cd $TMP/main-wt && git switch -c feat/y" "$TMP/main"
+run "P39: git -C で worktree を指す" pallowed "git -C $TMP/main-wt checkout -b feat/y" "$TMP/main"
+run "P40: remote の無いリポジトリ" pallowed 'git switch -c feat/y' "$TMP/noremote-c"
+run "P41: unborn の HEAD（基点が無い）" pallowed 'git switch -c feat/y' "$TMP/unborn"
+run "P42: 理由付きの via" pallowed 'git switch -c feat/y # via:primary-branch-ok: ユーザーが primary での作業を指示' "$TMP/main"
+run "P43: 他の via と並べた via" pallowed 'git switch -c feat/y # via:create-pr # via:primary-branch-ok: 指示あり' "$TMP/main"
+run "P44: commit のメッセージの中の switch -c" pallowed 'git commit -m "git switch -c x"' "$TMP/feature"
+run "P45: git branch -c（ブランチの複製。HEAD は動かない）" pallowed 'git branch -c feat/x feat/copy' "$TMP/main"
+run "P46: リポジトリ外" pallowed 'git switch -c feat/y' "$TMP/norepo"
+run "P47: -- の後ろの -b はパス" pallowed 'git checkout feat/x -- -b' "$TMP/main"
+run "P48: 直前のブランチへの切り替え（git switch - / git checkout -）" pallowed 'git switch - && git checkout -' "$TMP/main"
+
+# 止める理由が重なったときは main への commit → 起動したリポジトリ以外 → primary の順（B46・R14 も参照）
+run "P50: main 上の switch -c と commit は main-commit として止める" mblocked 'git switch -c feat/y && git commit -m x' "$TMP/main" "$TMP/main"
+# 他のリポジトリへの書き込みと primary でのブランチの作成が重なったら、他のリポジトリを示す（ws/b は remote を持つ primary）
+other_not_primary() { oblocked "$1" && ! grep -q "primary-branch-ok" "$TMP/stderr"; }
+run "P51: 他のリポジトリへの push と primary での switch -c は other-repo として止める" other_not_primary "git -C $TMP/ws/b switch -c fix/y && git -C $TMP/ws/b push -u origin fix/y"
+
+# main への commit の message は、primary なら worktree への退避（stash）、それ以外なら git switch -c を案内する
+main_msg_primary() { blocked 'git commit -m x' "$TMP/main" && grep -q "stash push" "$TMP/stderr" && grep -q -- "--no-track" "$TMP/stderr"; }
+main_msg_switch() { blocked 'git commit -m x' "$1" && grep -q "git switch -c" "$TMP/stderr" && ! grep -q "stash push" "$TMP/stderr"; }
+run "P52: primary の main での commit は stash で worktree へ移す手順を案内する" main_msg_primary
+run "P53: unborn の main での commit は git switch -c を案内する" main_msg_switch "$TMP/unborn"
+
+# サブディレクトリで止めたとき、worktree はトップレベルに作るよう案内する
+mkdir -p "$TMP/main/sub"
+top_msg() { pblocked 'git switch -c feat/y' "$TMP/main/sub" && grep -qF "git -C $(cd "$TMP/main" && pwd -P) worktree add --no-track" "$TMP/stderr"; }
+run "P54: サブディレクトリでの switch -c はトップレベルの worktree を案内する" top_msg
+
+# ---------- SessionStart: primary が作業ブランチにいたら警告（ADR 0034） ----------
+# 起動したリポジトリ（CLAUDE_PROJECT_DIR、無ければ cwd）の primary の checkout が、remote を持ち、
+# デフォルトブランチ以外のブランチにいれば標準出力に警告を出す。常に exit 0
+git -C "$TMP/feature" worktree add -q -b feat/fw "$TMP/feature-wt"
+_repo "$TMP/dev" main && git -C "$TMP/dev" update-ref refs/remotes/origin/develop HEAD \
+    && git -C "$TMP/dev" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/develop && git -C "$TMP/dev" switch -q -c develop
+_ss() {
+    local cwd="$1" proj="$2"
+    python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"SessionStart","source":"startup","cwd":sys.argv[1]}))' "$cwd" \
+        | CLAUDE_PROJECT_DIR="$proj" python3 "$HOOK" >"$TMP/stdout" 2>"$TMP/stderr"
+    echo $?
+}
+swarned() { [ "$(_ss "$1" "${2-$1}")" = "0" ] && grep -q "$3" "$TMP/stdout" && grep -q "worktree" "$TMP/stdout" && [ ! -s "$TMP/stderr" ]; }
+squiet() { [ "$(_ss "$1" "${2-$1}")" = "0" ] && [ ! -s "$TMP/stdout" ] && [ ! -s "$TMP/stderr" ]; }
+run "S1: primary が作業ブランチにいれば警告" swarned "$TMP/feature" "$TMP/feature" "feat/x"
+run "S2: worktree のセッションでも primary（作業ブランチ）を見て警告" swarned "$TMP/feature-wt" "$TMP/feature-wt" "feat/x"
+run "S3: CLAUDE_PROJECT_DIR が無ければ cwd で判定" swarned "$TMP/feature" "" "feat/x"
+run "S4: primary がデフォルトブランチ（main）なら何も出さない" squiet "$TMP/main"
+run "S5: worktree のセッションで primary が main なら何も出さない" squiet "$TMP/main-wt"
+run "S6: origin/HEAD が指すデフォルトブランチ（develop）なら何も出さない" squiet "$TMP/dev"
+run "S7: origin/HEAD が無いとき master もデフォルトブランチとみなす" squiet "$TMP/master"
+run "S8: remote の無いリポジトリは何も出さない" squiet "$TMP/noremote-c"
+run "S9: detached HEAD は何も出さない" squiet "$TMP/detached"
+run "S10: リポジトリ外は何も出さない" squiet "$TMP/norepo"
+run "S11: CLAUDE_PROJECT_DIR を cwd より優先する" swarned "$TMP/main" "$TMP/feature" "feat/x"
+# ブランチ名はリポジトリの外（fork の PR など）から決まりうるので、JSON の文字列としてエスケープして埋め込む
+_repo "$TMP/odd" main && git -C "$TMP/odd" switch -q -c "feat/日本\`x"
+escaped() { [ "$(_ss "$TMP/odd")" = "0" ] && grep -q '"feat/.u65e5.u672c`x"' "$TMP/stdout" && ! grep -q "日本" "$TMP/stdout"; }
+run "S12: ブランチ名の非 ASCII はエスケープして埋め込む" escaped
+# ホームの下の primary は ~ で示す（ローカルのユーザー名を文脈に出さない）
+# git が返す primary のパスは実パス（macOS では /private/var/...）なので、HOME も実パスにする
+tilde() { [ "$(HOME="$(cd "$TMP" && pwd -P)" _ss "$TMP/feature")" = "0" ] && grep -qF '"~/feature"' "$TMP/stdout" && ! grep -q "$(cd "$TMP" && pwd -P)" "$TMP/stdout"; }
+run "S13: ホームの下の primary のパスは ~ で示す" tilde
+
 if [ "$FAIL" -gt 0 ]; then
     echo "=== $FAIL test(s) FAILED ==="
     exit 1

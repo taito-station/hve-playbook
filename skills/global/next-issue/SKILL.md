@@ -88,7 +88,7 @@ gh issue list --state open --limit 100 --json number,title,labels,updatedAt \
 
 3. `## 今は避けるもの`: 着手中・依存待ち・判断待ち・衝突のある Issue と、その理由
 4. 推奨: 「おすすめは #N です」と 1 件に絞って言い切り、理由を 1〜2 行で添える
-5. 着手の提案: `/resolve-issue N` を、main から切った worktree で始める（他セッションと clone を共有しているときは、元の clone のブランチを切り替えない）
+5. 着手の提案: `/resolve-issue N` で着手する。ブランチは branching.md の「作業開始時の手順」のとおり worktree に切り、primary の checkout（元の clone）のブランチは切り替えない
 
 着手できる候補が無い（open の Issue が 0 件、またはすべて着手中・依存待ち・判断待ち）なら、候補表と 4・5 は省く。「今は着手できる Issue が無い」と伝えて 3 を示し、knowledge や直近の完了報告の範囲外の項目から起票候補を探すかを聞く。聞く前に探さない。
 
