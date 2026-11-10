@@ -4,9 +4,10 @@
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # 出典: https://platform.claude.com/docs/en/about-claude/pricing（2026-09-26 確認）。
 # cache_write は 5 分キャッシュ書込。キーはモデル ID の前方一致で、最も長く一致したキーを使う。
@@ -31,20 +32,32 @@ PRICING = {
 DEFAULT_PRICING_KEY = "claude-opus-5"
 
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
+# glob に渡すので、.. や * を含む値は使わない
+SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9-]+")
 
 
 def encode_project_dir(cwd: str) -> str:
-    return cwd.replace("/", "-")
+    # Claude Code は英数字以外をすべて - にする（worktree の `.claude` は `-claude` になる）
+    return re.sub(r"[^A-Za-z0-9]", "-", cwd)
+
+
+def latest_file(paths: List[Path]) -> Optional[Path]:
+    files = [p for p in paths if p.is_file()]
+    return max(files, key=lambda p: p.stat().st_mtime) if files else None
+
+
+def find_session_file_by_id(session_id: str) -> Optional[Path]:
+    # EnterWorktree で入ったセッションの JSONL は cwd と別の project ディレクトリにもありうるので、全体から探す
+    if not SESSION_ID_PATTERN.fullmatch(session_id):
+        return None
+    return latest_file(list(PROJECTS_DIR.glob(f"*/{session_id}.jsonl")))
 
 
 def find_latest_session_file(cwd: str) -> Optional[Path]:
     project_dir = PROJECTS_DIR / encode_project_dir(cwd)
     if not project_dir.is_dir():
         return None
-    jsonl_files = [p for p in project_dir.glob("*.jsonl") if p.is_file()]
-    if not jsonl_files:
-        return None
-    return max(jsonl_files, key=lambda p: p.stat().st_mtime)
+    return latest_file(list(project_dir.glob("*.jsonl")))
 
 
 def resolve_pricing_key(model: str) -> Tuple[str, bool]:
@@ -121,12 +134,27 @@ def format_report(stats: Dict[str, Dict[str, int]]) -> str:
     return "\n".join(lines)
 
 
-def resolve_target(args: argparse.Namespace) -> Optional[Path]:
+def resolve_target(args: argparse.Namespace) -> Tuple[Optional[Path], List[str]]:
+    """集計対象と、見つからなかったときに警告へ出す探した場所を返す。"""
     if args.file:
-        return Path(args.file)
-    if args.auto_detect:
-        return find_latest_session_file(os.getcwd())
-    return None
+        return Path(args.file), [args.file]
+    if not args.auto_detect:
+        return None, []
+    searched = []
+    # 並走セッションと project ディレクトリを共有していても、自分のセッションの JSONL を選ぶ
+    session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+    if session_id:
+        target = find_session_file_by_id(session_id)
+        if target:
+            return target, []
+        if SESSION_ID_PATTERN.fullmatch(session_id):
+            searched.append(str(PROJECTS_DIR / "*" / f"{session_id}.jsonl"))
+        else:
+            # 値はそのまま出さない（改行や制御文字が端末に出るため）
+            searched.append("（CLAUDE_CODE_SESSION_ID は形式が不正なため使わなかった）")
+    cwd = os.getcwd()
+    searched.append(str(PROJECTS_DIR / encode_project_dir(cwd) / "*.jsonl"))
+    return find_latest_session_file(cwd), searched
 
 
 def main() -> int:
@@ -153,9 +181,11 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    target = resolve_target(args)
+    target, searched = resolve_target(args)
     if target is None or not target.is_file():
         print("警告: セッション JSONL ファイルが見つかりません", file=sys.stderr)
+        for path in searched:
+            print(f"  探した場所: {path}", file=sys.stderr)
         return 0
 
     if args.snapshot:
