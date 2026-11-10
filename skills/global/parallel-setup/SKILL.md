@@ -31,6 +31,12 @@ worktree は `.git` 本体 + 場合により `vendor/` / `node_modules/` / DB vo
 並走 clone は **完全独立**。各 clone が独自の docker-compose stack を持ち、
 ある clone での実験が他に波及しない。
 
+各 clone の中でも、作業ブランチは worktree に切る（branching.md の「作業開始時の手順」。primary の checkout での
+`git switch -c` は main-commit-guard が止める）。テストは worktree に立てた stack で行う（branching.md の
+「worktree で Docker Compose の stack を立てる」。clone の primary で立てた stack は worktree の変更を見ない）。
+下の `settings.local.json` の `env.COMPOSE_PROJECT_NAME` は worktree で叩く `docker compose` にも効き、worktree の
+`.env` より優先されるので、worktree の stack は branching.md の手順どおり `docker compose -p <名前>` で別の project 名にする。
+
 代償:
 
 - ディスク使用量増（並走数倍）

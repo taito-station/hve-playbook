@@ -31,8 +31,11 @@ Issue の種別（bug / feature / ops）に応じて軽量パス・フルパス�
 ERRORS = []
 
 # (1) ブランチ状態: main にいるか、または未コミットの変更がないか
+#     primary の checkout（clone の本体の作業ツリー。git-dir と git-common-dir が同じ）で remote とコミットがあるときは
+#     判定しない。primary は他のセッションと共有されうるので、ここでブランチの切り替え・stash・commit を求めず、
+#     作業は Step 3 で worktree に作る（branching.md の「作業開始時の手順」）
 CURRENT_BRANCH = $(git branch --show-current)
-if CURRENT_BRANCH != "main" AND $(git status --porcelain) is not empty:
+if 上の primary の checkout でない AND CURRENT_BRANCH != "main" AND $(git status --porcelain) is not empty:
     ERRORS += "現在 ${CURRENT_BRANCH} ブランチに未コミットの変更があります。stash または commit してから再実行してください"
 
 # (2) Docker コンテナ起動確認 (Docker Compose を使うプロジェクトの場合のみ)
@@ -63,7 +66,14 @@ if ERRORS is not empty:
 
 1. 既定ブランチ (以下 `main` と表記。create-pr Step 1 と同じく
    `git rev-parse --abbrev-ref origin/HEAD | sed 's@^origin/@@'` で解決し、無ければ
-   main / master の順に確認する) に切り替え、`git pull` で最新を取得
+   main / master の順に確認する) の最新を `git fetch origin` で取得する。primary の checkout（clone の本体の
+   作業ツリー）を既定ブランチへ切り替えたり pull したりしない（他のセッションが使っているかもしれず、Step 3 の
+   worktree は `origin/<既定ブランチ>` を基点にするので要らない。primary の更新は post-merge-cleanup の条件に委ねる）。
+   Step 3 で worktree を作るまでのコードと knowledge の読み取り（Step 1〜2 の分析・原因特定・Knowledge 検索・Plan）は、
+   primary の作業ツリーが古いか別のブランチにあるかもしれないので、`origin/<既定ブランチ>` の内容で行う
+   （`git show origin/<既定ブランチ>:<path>`・`git grep <語> origin/<既定ブランチ>` など）。
+   branching.md の対象外のリポジトリでは、remote が無くコミットがあれば既定ブランチに切り替え（pull はしない）、
+   コミットが無ければ何もしない
 2. `gh issue view <issue番号>` で Issue の内容を取得
 3. **Issue の内容を分析**し、以下を整理する:
    - **何が起きているか**: 現象（バグ報告）なのか、要望（機能追加・変更）なのか、運用作業なのか
@@ -377,6 +387,15 @@ STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 では�
    feature パスなら `feat`、ops パスなら `chore`（user-level に `~/.claude/rules/git/branching.md`
    があればその命名規約に従う）
    - ブランチ名の概要部分は Issue タイトルから英語のケバブケースで生成
+   - ブランチは worktree に作る（branching.md の「作業開始時の手順」）。primary の checkout にいれば、
+     リポジトリのトップレベルで `git worktree add --no-track -b <ブランチ名> .claude/worktrees/issue-<issue番号> origin/<既定ブランチ>`
+     で作り、EnterWorktree の `path` にそのパスを渡して移る。worktree の中にいれば
+     `git switch --no-track -c <ブランチ名> origin/<既定ブランチ>` で作る。primary の checkout のブランチは切り替えない
+     （branching.md の対象外のリポジトリ（remote やコミットが無い）では、今の作業ツリーで `git switch -c` してよい）
+   - primary の既定ブランチの上に、この Issue のために自分が作った未コミットの変更があれば、branching.md の退避手順
+     （自分の変更だけをタグ付きの stash で worktree へ移す。言い切れない変更はユーザーに確認する）で移す
+   - Docker Compose（Laravel Sail を含む）で動かすリポジトリでは、テストの前に branching.md の「worktree で Docker Compose の
+     stack を立てる」で worktree に stack を立て、項目 3 と Step 4 のテストはその stack で行う（primary の stack は worktree の変更を見ない）
 
 2. Issue の要件に基づいて実装を行う
    - **[bug / feature] `.claude/skills/hve-implement/SKILL.md` がある場合（implement-flow の対象外＝ドキュメントのみ・設定変更のみ・依存更新のみの変更を除く）**: `/hve-implement --phase post <issue番号>`

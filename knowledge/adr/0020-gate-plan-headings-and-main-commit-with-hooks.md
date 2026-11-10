@@ -2,7 +2,10 @@
 
 ## ステータス
 
-Accepted — 2026-10-12
+Partially superseded by 0034-block-branch-creation-in-primary-checkout — 2026-11-08
+
+- 有効な部分: 下の失効した部分以外の決定はすべて有効（A の計画の見出しの検査、B の main / master 上の `git commit` を止める判定と via など）
+- 失効した部分: 決定内容の B の「main 上で作った変更は `git switch -c` で退避してから commit する（branching.md）」は、remote を持つリポジトリの primary の checkout（コミットのあるもの）では、0034 の退避手順（タグ付きの stash で worktree へ移す）に置き換わった。main-commit-guard の deny message もそれを案内する。worktree の中・remote の無いリポジトリ・コミットの無いリポジトリでは `git switch -c` のまま
 
 結果（Consequences）の「main-commit-guard は `commit` を含まないコマンドではすぐ終わる」は、[0033-block-writes-outside-launched-repository](0033-block-writes-outside-launched-repository.md) で main-commit-guard が起動したリポジトリ以外への書き込みも止めるようになり、`push`・`gh` を含むコマンドも解析するので、現状を表さない。決定内容は変わらない。
 

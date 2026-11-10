@@ -25,7 +25,7 @@
 | [0017](0017-qa-answers-in-qa-dir-wherever-check-knowledge-exists.md) | HVE 導入先では、質問の回答を経路を問わず qa/ に残す | Partially superseded by 0019-gmail-answers-as-questionnaire-defaults | 2026-10-07 |
 | [0018](0018-language-agnostic-clean-architecture-rule.md) | 言語を問わないクリーンアーキテクチャ規約を rules/hve に置き、コードを読んだときに読み込む | Accepted | 2026-10-12 |
 | [0019](0019-gmail-answers-as-questionnaire-defaults.md) | Gmail で見つけた質問の回答は保存せず、質問票の既定値候補として PO に確定してもらう | Partially superseded by 0030-drop-past-gmail-qa-special-rules | 2026-10-12 |
-| [0020](0020-gate-plan-headings-and-main-commit-with-hooks.md) | 計画の必須見出しと main への commit を hook でゲートする | Accepted | 2026-10-12 |
+| [0020](0020-gate-plan-headings-and-main-commit-with-hooks.md) | 計画の必須見出しと main への commit を hook でゲートする | Partially superseded by 0034-block-branch-creation-in-primary-checkout | 2026-10-12 |
 | [0021](0021-ship-license-copy-with-hve-assets.md) | setup.sh は導入先に LICENSE の写しを .claude/LICENSE-hve-playbook として配る | Accepted | 2026-10-13 |
 | [0022](0022-permission-log-masks-secrets-and-debug-opt-in.md) | 許可要求ログの hook は既知の形の秘密値を伏せて書き、debug ログは opt-in、本体は環境変数で止められるようにする | Accepted | 2026-10-13 |
 | [0023](0023-via-scope-for-commit-instruction-and-skill-enforcer.md) | 「コミットして」は main への commit の指示に当たらず、skill-enforcer の via はルート名の完全一致に限る | Accepted | 2026-10-13 |
@@ -39,3 +39,4 @@
 | [0031](0031-client-clean-architecture.md) | クライアントのクリーンアーキテクチャ規約を、Web（React）とモバイル（Flutter）に分けて定める | Accepted | 2026-10-31 |
 | [0032](0032-client-credential-storage-and-cache-disposal.md) | クライアントの認証情報の保持と永続化したキャッシュの破棄の責務を、データの層と use-case に置く | Accepted | 2026-11-03 |
 | [0033](0033-block-writes-outside-launched-repository.md) | 起動したリポジトリ以外への書き込みを、規則と main-commit-guard で止める | Accepted | 2026-11-04 |
+| [0034](0034-block-branch-creation-in-primary-checkout.md) | primary の checkout での作業ブランチの作成を main-commit-guard で止め、着手を worktree にする | Accepted | 2026-11-08 |
