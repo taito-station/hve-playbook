@@ -17,7 +17,7 @@ Issue の種別（bug / feature / ops）に応じて軽量パス・フルパス�
 | 種別 | パス | レビュー深度 | 主な工程 |
 |------|------|-------------|--------|
 | bug | 軽量 | `--depth lightweight`（1巡） | 調査→修正→テスト→軽量レビュー→PR |
-| feature | フル | `--depth full`（最大3巡） | 要件確認→Plan→敵対的Plan検証→実装→テスト→UI承認→フルレビュー→PR |
+| feature | フル | `--depth full`（最大2巡） | 要件確認→Plan→敵対的Plan検証→実装→テスト→UI承認→フルレビュー→PR |
 | ops | 自動化 | `--depth lightweight`（コード変更時のみ） | 処理実行→記録→（PR） |
 
 ## 実行フロー
@@ -604,6 +604,8 @@ STOP したら Plan を作らずに PO へ報告する。ADR は項目 5 では�
    - 対応内容の要約
    - PR 番号（コード変更があった場合）
    - テスト結果
+   - セルフレビューの follow-up のうちスコープ外の指摘（Issue の候補。あれば。セキュリティ上の弱点の疑いがあるものの扱いは review-pr Step 7 の follow-up の規則に従う）
+   - 最後の巡で直した未再レビューの修正（あれば）
 
 2. **完了通知**:
    - `AskUserQuestion` で awaiting 化 (PR を作らなかった ops パスでは question を

@@ -1,29 +1,29 @@
 ---
 name: create-pr
-description: 現在のブランチから PR を作成し、base 同期・ブラウザテスト・PR 本文初期化を行ったあと `review-pr` skill にセルフレビュー (--depth で Correctness/Security/Impact + Analyst、フラグなしで Reviewer A/B + Fact-checker) を委譲し、最後に awaiting 化する。「PR作成して」「PRを作って」のような自然言語で起動。一時ファイル経由で PR 本文の # 行問題を回避。
+description: 現在のブランチから PR を作成し、base 同期・ブラウザテスト・PR 本文初期化を行ったあと `review-pr` skill にセルフレビュー (Correctness / Security + Analyst。--depth で巡数を制御) を委譲し、最後に awaiting 化する。「PR作成して」「PRを作って」のような自然言語で起動。一時ファイル経由で PR 本文の # 行問題を回避。
 allowed-tools: Read, Edit, Write, Grep, Glob, Bash, Agent, mcp__playwright__browser_navigate, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_evaluate, mcp__playwright__browser_resize, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_snapshot, mcp__playwright__browser_tab_select, mcp__playwright__browser_console_messages
 ---
 
 # プルリクエスト作成
 
-「PR 作って」と言われたら、その PR を **「独立セルフレビューで指摘が無くなった (= auto-fix が 0 件) 状態」** にして戻す。巡数上限 (ITER_MAX) は `--depth` で決まる (lightweight 1 / full 3 / 指定なし 5) の範囲で自動で回す。
+「PR 作って」と言われたら、その PR を **「独立セルフレビューで指摘が無くなった (= auto-fix が 0 件) 状態」** にして戻す。巡数上限 (ITER_MAX) は `--depth` で決まる (lightweight 1 / full 2。指定なしは full) の範囲で自動で回す。PR のスコープ外の指摘と命名・可読性の提案は直さず、follow-up として記録する。
 
 途中で人間の判断が必要なのは:
 
 - コンフリクトの意味的解消が必要なとき
-- レビュー指摘がブロッカー (Must-fix) / セキュリティ影響 / トレードオフ / 仕様判断のとき
+- PR のスコープ内のレビュー指摘がブロッカー (Must-fix) / セキュリティ影響 / トレードオフ / 仕様判断のとき
 - ブラウザテストが 3 回連続で失敗したとき
 - ブラウザテストで回帰が出たとき
 
-それ以外は全自動で進める。**「指摘 0 件で自然終了」が基本ゴール、ITER_MAX 到達は警戒シグナル** (修正が新たな問題を呼んでいる / レビュアーが新しい観点を毎巡見つけて収束しない可能性。lightweight は 1 巡固定なので該当しない)。
+それ以外は全自動で進める。**「auto-fix 0 件で自然終了」が基本ゴール、ITER_MAX 到達は最後の巡の修正が未再レビューであることを示す** (lightweight の 1 巡目の修正も同じ)。
 
 ## 短縮禁止
 
-Step 5 で委譲する `review-pr` skill のレビュー構成 (`--depth` 指定時: Correctness / Security / Impact + Analyst、フラグなし: Reviewer A / B 2 名並列 + Fact-checker 1 名) と巡数上限を、create-pr 呼び出し側から独断で短縮してはならない (例: 「小さい修正だから 1 名で」「diff が少ないから 1 巡で」等)。
+Step 5 で委譲する `review-pr` skill のレビュー構成 (Correctness / Security + Analyst) と巡数上限を、create-pr 呼び出し側から独断で短縮してはならない (例: 「小さい修正だから 1 名で」「diff が少ないから 1 巡で」等)。
 
 短縮禁止の **正本・理由・具体的に禁止される行動** は `skills/global/review-pr/SKILL.md` の「短縮禁止」セクション参照。create-pr 側は委譲時に短縮指示を渡さず、review-pr の判定に任せる。
 
-例外: `--depth` フラグによる ITER_MAX・観点の変更は「独断での短縮」に該当しない。これは workflow 設計レベルの決定（Issue の種別・承認された計画の分類に基づくパス分岐）であり、実行時の ad-hoc 判断ではないため。`--depth` フラグは resolve-issue skill が Issue の種別から、hve-implement skill（単独モード）が承認された計画の分類（バグ修正かそれ以外か）から決定し、create-pr 経由で review-pr に転送する。
+例外: `--depth` フラグによる ITER_MAX の変更は「独断での短縮」に該当しない。これは workflow 設計レベルの決定（Issue の種別・承認された計画の分類に基づくパス分岐）であり、実行時の ad-hoc 判断ではないため。`--depth` フラグは resolve-issue skill が Issue の種別から、hve-implement skill（単独モード）が承認された計画の分類（バグ修正かそれ以外か）から決定し、create-pr 経由で review-pr に転送する。
 
 ---
 
@@ -35,7 +35,7 @@ Step 5 で委譲する `review-pr` skill のレビュー構成 (`--depth` 指定
 `--depth lightweight` / `--depth full` のみで、resolve-issue skill が Issue の
 種別から、hve-implement skill (単独モード) が承認された計画の分類から決めて渡す
 (`/create-pr --depth lightweight` 等)。create-pr 単独起動では
-指定なし = legacy (全観点、最大 5 巡):
+指定なし = full (最大 2 巡):
 
 ```text
 DEPTH_FLAG=""            # Step 5 で /review-pr にそのまま転送する文字列
@@ -389,26 +389,25 @@ Skill ツール経由で呼び出す:
 
 `{depth_flag}` は Step 0 で `args` から受け取った `DEPTH_FLAG` をそのまま入れる
 (空なら `/review-pr --fix`)。指定がある場合:
-- `--depth lightweight` — バグ修正パス: Correctness + Security のみ、1 巡
-- `--depth full` — 機能追加パス: Correctness + Security + Impact、最大 3 巡
+- `--depth lightweight` — バグ修正パス: Correctness + Security、1 巡
+- `--depth full` — 機能追加パス: Correctness + Security、最大 2 巡
 
-create-pr 単独起動時（resolve-issue / hve-implement skill 経由でない場合）は `DEPTH_FLAG` なし = legacy（全観点、最大 5 巡）。
+create-pr 単独起動時（resolve-issue / hve-implement skill 経由でない場合）は `DEPTH_FLAG` なし = full（最大 2 巡）。
 
 `review-pr` は内部で以下を全自動で実行する (詳細は
 `skills/global/review-pr/SKILL.md` 参照):
 
 - 毎巡先頭で base 再同期 (rebase)
 - 毎巡 `git diff "origin/$BASE"...HEAD` を diff ファイルに書き出し、レビュアーに渡す
-- `--depth` 指定時: Correctness / Security / Impact + Analyst の並列レビュー、
-  フラグなし: Reviewer A / B + Fact-checker の 3 エージェント並列レビュー (worktree
-  分離)
-- 指摘の分類 (silent-reject / escalate / auto-fix)
+- Correctness / Security + Analyst の 3 エージェント並列レビュー (worktree 分離)
+- 指摘の分類 (silent-reject / follow-up / escalate / auto-fix。follow-up = PR のスコープ外・
+  命名や可読性の提案で、直さずに対応履歴と報告に残す)
 - auto-fix の Edit/Write 実装 + commit
 - `docs/temp/pr-body.md`「対応履歴」セクション追記
 - UI 影響時はブラウザテスト再走査
-- 巡数上限は depth 依存 (lightweight 1 / full 3 / legacy 5)。`auto-fix = 0` または
+- 巡数上限は depth 依存 (lightweight 1 / full 2)。`auto-fix = 0` または
   fix-stable 収束で自然終了 / escalate / ブラウザ回帰で中断
-- 3 巡目以降は各ロールのプロンプトを「マージブロッカー級のみ」に
+- 2 巡目以降は各ロールのプロンプトを「マージブロッカー級のみ」に
   自動制約
 
 #### 委譲時の制約
@@ -422,7 +421,7 @@ create-pr 単独起動時（resolve-issue / hve-implement skill 経由でない�
 #### 委譲後の処理
 
 `review-pr` が return したら、その出力 (巡数 / 各巡の件数推移 /
-escalate 内容 / silent-reject 件数等) を保持して Step 5.5 (リモートブランチ判定) に進む。
+escalate 内容 / silent-reject 件数 / follow-up / 未再レビューの修正等) を保持して Step 5.5 (リモートブランチ判定) に進む。
 
 **escalate 時も PR は作る**: `review-pr` 内で escalate された場合も、
 Step 5.5 (リモートブランチ判定) → Step 6 (squash) → Step 7 (push + PR 作成) →
@@ -452,8 +451,7 @@ Step 9 に到達しない中断経路は 5 つあり、`docs/temp/` の扱いは
 `review-pr` を Skill ツールで呼び出すと、`review-pr` 本体は **親
 (create-pr) と同一コンテキストで走る**。これがバイアスにならないのは、
 セルフレビューにおける「コードを書いた本人による評価」を禁じている
-真の対象は **レビュー subagent** (`--depth` 指定時: Correctness / Security /
-Impact + Analyst、フラグなし: Reviewer A/B + Fact-checker) であり、
+真の対象は **レビュー subagent** (Correctness / Security + Analyst) であり、
 orchestration 層 (= `review-pr` 本体) の独立性ではないため。`review-pr` の
 Step 2 で必ず Agent ツール経由 (`isolation: "worktree"`) で subagent を
 spawn することで、レビュー評価の独立性は構造的に担保される。
@@ -639,6 +637,8 @@ fi
 - PR の URL
 - セルフレビュー巡数 (1〜ITER_MAX)
 - 各巡の auto-fix 件数
+- 未再レビューの修正 (最後の巡で auto-fix があった場合、その巡で直した指摘)
+- follow-up (スコープ外の指摘 = Issue の候補は内容と該当箇所つき、judgment は件数)
 - ブラウザテストの実施状況と最終結果
 - escalate された指摘 (あれば内容と該当指摘箇所)
 - sha の追従（Step 6.1）: 追従コミットを積んだ文書と、追従できず蒸留し直しが要る文書 (あれば)
@@ -729,7 +729,7 @@ skill が「ユーザー確認を取って停止する」のは以下のとき�
 4. **ブラウザテストの回帰** (`review-pr` 内の再走査)
    - 修正で動いていた機能が壊れた
 
-それ以外 (lint 違反 / 命名 / 不要 import / typo / 軽微なリファクタ提案等) は **すべて自動修正する** (`review-pr` 側で実施)。
+それ以外のスコープ内の [defect] は **すべて自動修正する** (`review-pr` 側で実施)。スコープ外の指摘と [judgment] (命名・可読性・リファクタ・スタイル) は直さず、follow-up として記録する。
 
 ---
 
@@ -750,5 +750,5 @@ skill が「ユーザー確認を取って停止する」のは以下のとき�
   `docs/temp/` を入れておくとより安全
 - PR 本文を `--body` で直接渡す方法は使わない (`#` 行問題)
 - セルフレビューループ中の commit message・PR 本文の毎巡更新方針は `review-pr` 側に集約 (本 skill では別途定義しない)
-- **指摘 0 件で自然終了 = 基本ゴール / ITER_MAX 到達 = 警戒シグナル または収束** (詳細解釈は `skills/global/review-pr/SKILL.md` 冒頭参照)。Step 8 の報告では ITER_MAX 到達ケースの「巡ごとの auto-fix 件数推移」と「収束 / 警戒の判定」を明記すること (`review-pr` から受領した出力をそのまま転載でよい)
+- **auto-fix 0 件で自然終了 = 基本ゴール / ITER_MAX 到達 = 最後の巡の修正が未再レビュー** (詳細解釈は `skills/global/review-pr/SKILL.md` 冒頭参照)。Step 8 の報告では ITER_MAX 到達ケースの「巡ごとの auto-fix 件数推移」と「未再レビューの修正」、review-pr が報告した follow-up (スコープ外の指摘 = Issue の候補) を明記すること (`review-pr` から受領した出力をそのまま転載でよい)
 - Critical Decisions: Step 3 の 4 軸分析は全 PR で行い、notApplicable の軸も明示的に宣言する
