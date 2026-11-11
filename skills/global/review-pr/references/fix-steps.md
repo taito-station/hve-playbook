@@ -49,12 +49,16 @@ FIXED_KEYS_THIS_ROUND = set()   # 本巡分を毎巡リセット
 
 if escalate が 1 件以上:
     ESCALATE_REASON = "review-finding"
-    Step 4.5 へ (escalate 内容のみで対応履歴に追記、本巡 commit 無し)
+    Step 4.5 へ (escalate 内容と follow-up を対応履歴に追記、本巡 commit 無し)
     その後 break (Step 7 へ)
 
 if auto-fix が 0 件:
-    break  # レビュー OK、ループ終了 (本巡 commit 無しのため Step 4.5 / 5 は skip)
+    if follow-up が 1 件以上:
+        Step 4.5 へ (follow-up のみで対応履歴に追記、本巡 commit 無し)
+    break  # レビュー OK、ループ終了 (本巡 commit 無しのため Step 5 は skip)
 ```
+
+follow-up (Step 3 の (ii)) は本 Step で直さない。
 
 **Step 4 本体 (auto-fix 実装)**:
 
@@ -93,11 +97,12 @@ kind 名前空間付き (`"defect:" + key` / `"judgment:" + key`) で
 - 既存の Summary / 設計判断 / 維持されたノウハウは保持
 - 「対応履歴」セクションの位置は `## Test plan` の直前 (`## ブラウザテスト` が
   ある場合はその後ろ)。create-pr Step 3 のテンプレートには書かず、初回はここで挿入する
-- 「対応履歴」セクションを追加または更新し、今巡の auto-fix /
+- 「対応履歴」セクションを追加または更新し、今巡の auto-fix / follow-up /
   escalate / silent-reject の件数と主な内訳を、次巡のレビュアーと PR の読み手が経緯を追える程度に要約
 - 本巡 commit がある場合: `### N 巡目`
 - escalate 直行経路で commit 無しの場合: `### N 巡目 (escalate 中断
   / 理由: $ESCALATE_REASON)`
+- auto-fix 0 件で follow-up だけを記録する場合: `### N 巡目 (auto-fix なし)`
 - Test plan のチェック状態も最新化 (完了項目は `[x]`)
 - **例外: `- [ ] ブラウザテスト: skip (...)` / `- [ ] ブラウザテスト再走査: ...` の行は
   原文のまま保持する**。前者は「ブラウザテストを実施していない」記録なので、「未完了
@@ -114,10 +119,12 @@ kind 名前空間付き (`"defect:" + key` / `"judgment:" + key`) で
 ## 対応履歴
 
 ### 1 巡目
-- depth: <lightweight|full|legacy> / ロール: <Correctness+Security|+Impact|A/B+FC>
-- 分類: auto-fix <件数> / silent-reject <件数> / escalate <件数>
+- depth: <lightweight|full> / ロール: Correctness+Security+Analyst
+- 分類: auto-fix <件数> / follow-up <件数> / silent-reject <件数> / escalate <件数>
 - 主な auto-fix: <短い箇条書き>
-- silent-reject 内訳: <件数> 件 (主な理由: 事実誤認 N 件 / 主観 1 票 N 件)
+- follow-up (直していない): スコープ外 <件数> 件 (<内容と該当箇所の短い箇条書き>) / judgment <件数> 件
+  (前巡と同じ follow-up は再掲しない。セキュリティ上の弱点の疑いがあるものの扱いは SKILL.md Step 7 の follow-up の規則に従う)
+- silent-reject 内訳: <件数> 件 (主な理由: 事実誤認 N 件 / 親の棄却 N 件)
 - escalate (あれば): <内容>
 - 収束キー解消: <件数> 件 (FIXED_KEYS_THIS_ROUND。Step 6 で RESOLVED_KEYS に反映)
 

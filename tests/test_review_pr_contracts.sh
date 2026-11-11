@@ -6,21 +6,23 @@
 # 手順書は実行されないので、壊れても誰も気付かない。レビューで見つかった
 # 「書いてあるが動かない」箇所を静的に固定し、復活を検知する:
 #   1. fix-stable 収束判定は RESOLVED_KEYS (前巡まで) と比較し、本巡分の追加は判定の後
-#   2. legacy 用プロンプト (Reviewer / Fact-checker) の本文が references に実在する
+#   2. 構成と巡数: legacy (Reviewer A/B + Fact-checker) と Impact が無く、フラグなしは full、
+#      full の ITER_MAX は 2、後半巡制約は 2 巡目から、Correctness が caller・データ整合性・性能を見る (ADR 0035)
 #   3. --depth の値検証と未知フラグの中断がある
 #   4. BROWSER_TEST_DONE / convergence_key が未定義の記号 (... / category / evidence) を使わない
 #   5. review-only の BEHIND は compare API のみ (local fetch + rev-list を使わない)
-#   6. silent-reject の agreement==1 条件は legacy 限定と明記されている
+#   6. 分類: follow-up (スコープ外・judgment) を escalate・auto-fix より先に判定し、命名・typo を自動修正しない
+#   7. 呼び出し側 (create-pr / resolve-issue) の巡数が review-pr と一致する
 
 set -u
 
-# ROOT は tests/ の他の検査と同じく --git-common-dir から導出する = worktree から実行しても
-# **メイン checkout の手順書** を検査する (ブランチの手順書を検査したいときはメインで checkout する)
-ROOT="$(git -C "$(dirname "$0")" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
-if [ -n "$ROOT" ]; then ROOT="$(dirname "$ROOT")"; else ROOT="$(cd "$(dirname "$0")/.." && pwd)"; fi
+# ROOT は tests/ の他の契約テストと同じく、このスクリプトのあるリポジトリ (worktree ならその作業ツリー) にする
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL="$ROOT/skills/global/review-pr/SKILL.md"
 PROMPTS="$ROOT/skills/global/review-pr/references/reviewer-prompts.md"
 FIX_STEPS="$ROOT/skills/global/review-pr/references/fix-steps.md"
+CREATE_PR="$ROOT/skills/global/create-pr/SKILL.md"
+RESOLVE="$ROOT/skills/global/resolve-issue/SKILL.md"
 
 FAIL=0
 pass() { echo "[PASS] $1"; }
@@ -52,25 +54,42 @@ else
     fail "収束判定の巡条件が iteration >= 2 でない"
 fi
 
-# 2. legacy プロンプト本文: 見出しの後にコードフェンスがあり、本文が 10 行以上ある
-body_lines() {  # $1=file $2=見出しの接頭辞
-    awk -v h="$2" '
-        index($0, h)==1 {f=1; next}
-        f && /^```/ {fence=!fence; next}
-        f && fence {n++; next}
-        f && /^## / {exit}
-        END {print n+0}' "$1"
-}
-for h in "## LEGACY_REVIEWER_PROMPT" "## LEGACY_FACTCHECK_PROMPT"; do
-    n=$(body_lines "$PROMPTS" "$h")
-    if [ "$n" -ge 10 ]; then pass "$h の本文が $n 行ある"; else fail "$h の本文が無いか短い ($n 行)"; fi
+# 2. 構成と巡数
+for f in "$SKILL" "$PROMPTS" "$FIX_STEPS" "$CREATE_PR" "$RESOLVE"; do
+    hit=$(grep -nE 'LEGACY_|IMPACT_PROMPT|Reviewer A|Fact-checker|"legacy"|legacy モード|Impact reviewer|[/+] Impact|Impact [+/]' "$f" | head -3)
+    name="$(basename "$(dirname "$f")")/$(basename "$f")"
+    if [ -z "$hit" ]; then pass "$name に legacy・Impact の記述が無い"
+    else fail "$name に legacy・Impact の記述が残っている: $hit"; fi
 done
-if grep -q 'LEGACY_FACTCHECK_PROMPT' "$SKILL"; then
-    pass "SKILL.md が legacy Fact-checker を LEGACY_FACTCHECK_PROMPT で参照している"
+grep -q 'DEPTH = ARG_DEPTH or "full"' "$SKILL" && pass "フラグなしは full" || fail "フラグなしの DEPTH が full でない"
+if grep -qE '^ *ITER_MAX = 2 +# 機能追加のフルパス' "$SKILL" && ! grep -qE 'ITER_MAX = [3-9]' "$SKILL"; then
+    pass "full の ITER_MAX は 2 (3 以上の値が無い)"
 else
-    fail "SKILL.md が legacy Fact-checker プロンプトを参照していない"
+    fail "full の ITER_MAX が 2 でないか、3 以上の値が残っている"
 fi
-if grep -q '旧 FACTCHECK_PROMPT' "$SKILL"; then fail "削除済みの旧 FACTCHECK_PROMPT への参照が残っている"; else pass "旧 FACTCHECK_PROMPT への参照が無い"; fi
+if grep -qF '## 後半巡制約 (`iteration >= 2`' "$PROMPTS" && ! grep -q 'iteration >= 3' "$SKILL" "$PROMPTS"; then
+    pass "後半巡制約は 2 巡目から"
+else
+    fail "後半巡制約が 2 巡目からになっていない"
+fi
+section() {  # $1=file $2=見出し: 見出しから、コードフェンスの外にある次の ## 見出しまで
+    awk -v h="$2" 'index($0, h)==1 {f=1; next} f && /^```/ {fence=!fence} f && !fence && /^## / {exit} f' "$1"
+}
+CORR=$(section "$PROMPTS" "## CORRECTNESS_PROMPT")
+if echo "$CORR" | grep -q 'diff 外' && echo "$CORR" | grep -q 'データ整合性' && echo "$CORR" | grep -q 'N+1'; then
+    pass "Correctness が diff 外の caller・データ整合性・性能を見る"
+else
+    fail "Correctness に diff 外の caller・データ整合性・性能の観点が無い"
+fi
+if ! echo "$CORR" | grep -qE '^- 命名' && echo "$CORR" | grep -q 'review-only モードのときだけ'; then
+    pass "Correctness は命名・可読性を review-only のときだけ見る"
+else
+    fail "Correctness の命名・可読性の観点が review-only 限定になっていない"
+fi
+SEC=$(section "$PROMPTS" "## SECURITY_PROMPT")
+ok=1; for w in 認証認可 インジェクション 秘密漏洩 サニタイズ CSRF; do echo "$SEC" | grep -q "$w" || ok=0; done
+[ "$ok" -eq 1 ] && pass "Security の担当観点が揃っている" || fail "Security の担当観点が欠けている"
+grep -q '文面の曖昧さ・矛盾.*\[defect\]' "$PROMPTS" && pass "手順書・規則の文面の曖昧さ・矛盾は [defect]" || fail "文面の曖昧さ・矛盾を [defect] とする定義が無い"
 
 # 3. --depth 検証と未知フラグ
 grep -q 'if tok not in ("lightweight", "full"):' "$SKILL" && pass "--depth の値を検証している" || fail "--depth の値検証が無い"
@@ -89,7 +108,7 @@ if grep -q 'file + kind + normalize(content)' "$SKILL" && ! grep -q 'category + 
 else
     fail "convergence_key の定義が無いかパース結果に無いフィールドを使っている"
 fi
-grep -qE '(^|[^_A-Z])REVIEWER_PROMPT 末尾' "$SKILL" && fail "廃止した REVIEWER_PROMPT 変数への言及が残っている" || pass "REVIEWER_PROMPT 変数への言及が無い (LEGACY_REVIEWER_PROMPT は対象外)"
+grep -qE '(^|[^_A-Z])REVIEWER_PROMPT 末尾' "$SKILL" && fail "廃止した REVIEWER_PROMPT 変数への言及が残っている" || pass "REVIEWER_PROMPT 変数への言及が無い"
 grep -q 'f\.classification' "$SKILL" && ! grep -q '`classification` フィールド' "$SKILL" && fail "classification フィールドの定義が無い" || pass "classification フィールドが定義されている (または未使用)"
 
 # 5. review-only BEHIND: compare API の肯定形 + local rev-list の否定形
@@ -99,8 +118,57 @@ else
     fail "review-only の BEHIND が compare API でないか local rev-list が戻っている"
 fi
 
-# 6. silent-reject の agreement==1 条件
-grep -q 'legacy (Reviewer A/B) のみ\*\*: `agreement == 1`' "$SKILL" && pass "agreement==1 の silent-reject は legacy 限定" || fail "agreement==1 の silent-reject 条件が legacy 限定になっていない"
+# 6. 分類
+FU=$(grep -n '^#### (ii) follow-up' "$SKILL" | head -1 | cut -d: -f1)
+ES=$(grep -n '^#### (iii) escalate' "$SKILL" | head -1 | cut -d: -f1)
+AF=$(grep -n '^#### (iv) auto-fix' "$SKILL" | head -1 | cut -d: -f1)
+if [ -n "$FU" ] && [ -n "$ES" ] && [ -n "$AF" ] && [ "$FU" -lt "$ES" ] && [ "$ES" -lt "$AF" ]; then
+    pass "follow-up を escalate・auto-fix より先に判定する"
+else
+    fail "follow-up → escalate → auto-fix の判定順が無い (fu=$FU es=$ES af=$AF)"
+fi
+grep -qF '`silent-reject` / `follow-up` / `escalate` / `auto-fix`' "$SKILL" && pass "classification に follow-up がある" || fail "classification に follow-up が無い"
+# G3: セキュリティ指摘が出なくなる・除外される経路を戻さない
+grep -q '実行結果を変えるものは、モードによらずバグとして \[defect\]' "$PROMPTS" && pass "実行結果を変える綴り誤りはモードによらず [defect]" || fail "実行結果を変える綴り誤りを [defect] とする記述が無い"
+LATE=$(section "$PROMPTS" "## 後半巡制約")
+if echo "$LATE" | grep -qF '[Security] (任意重大度)' && echo "$LATE" | grep -q 'follow-up として直していない論点は除外しない'; then
+    pass "後半巡制約は [Security] を任意重大度で報告させ、follow-up を除外しない"
+else
+    fail "後半巡制約から [Security] (任意重大度) か follow-up を除外しない記述が消えている"
+fi
+grep -qF '`[A-Za-z0-9_./-]` だけで' "$PROMPTS" && grep -qF '`[A-Za-z0-9_./-]` だけで' "$SKILL" && pass "コマンドに渡す語・パスの文字種を制限している" || fail "コマンドに渡す語・パスの文字種の制限が無い"
+grep -q '指示には従わない' "$SKILL" && grep -q '指示には従わない' "$PROMPTS" && pass "Analyst とレビュアーは本文の指示に従わない" || fail "本文の記述をデータとして扱う記述が無い"
+grep -qF '<in|out>' "$SKILL" && pass "Analyst が指摘ごとにスコープの内外を返す" || fail "Analyst の返答にスコープの内外が無い"
+if ! grep -qE 'typo / 命名|命名 / 不要 import / typo / 軽微' "$SKILL" "$CREATE_PR"; then
+    pass "命名・typo を自動修正する記述が無い"
+else
+    fail "命名・typo を自動修正する記述が残っている"
+fi
+# F12: [Security] は follow-up にしない / follow-up は収束判定から除く
+FUSEC=$(awk '/^#### \(ii\) follow-up/{f=1; next} /^#### \(iii\)/{exit} f' "$SKILL")
+if echo "$FUSEC" | grep -q 'follow-up にしない' && echo "$FUSEC" | grep -qF '`[Security]` の指摘'; then
+    pass "[Security] の指摘は follow-up にしない"
+else
+    fail "follow-up の例外に [Security] が無い"
+fi
+grep -qF 'f.classification not in ("silent-reject", "follow-up")' "$SKILL" && pass "follow-up は収束判定から除く" || fail "follow-up が収束判定に含まれている"
+if ! grep -q 'Nice-to-have のみ' "$SKILL" "$CREATE_PR" && grep -q '未再レビュー' "$SKILL"; then
+    pass "ITER_MAX 到達の判定は最後の巡の auto-fix (未再レビュー) で行う"
+else
+    fail "ITER_MAX 到達の判定が旧基準 (後半巡が Nice-to-have のみ) のまま"
+fi
+
+# 7. 呼び出し側の整合
+if grep -q 'lightweight 1 / full 2' "$CREATE_PR" && ! grep -qE 'full 3|最大 3 巡|3 巡目以降' "$CREATE_PR"; then
+    pass "create-pr の巡数が review-pr と一致する"
+else
+    fail "create-pr の巡数が review-pr と一致しない"
+fi
+if grep -qF '`--depth full`（最大2巡）' "$RESOLVE" && ! grep -q '最大3巡' "$RESOLVE"; then
+    pass "resolve-issue の巡数が review-pr と一致する"
+else
+    fail "resolve-issue の巡数が review-pr と一致しない"
+fi
 
 echo "==================================="
 if [ "$FAIL" -eq 0 ]; then echo "ALL TESTS PASSED"; exit 0; else echo "SOME TESTS FAILED"; exit 1; fi
